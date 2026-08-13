@@ -10,7 +10,7 @@ import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin/athletes")({ component: AthletesPage });
 
-export function AthletesPage() {
+function AthletesPage() {
   const { user } = useAuth();
   const [athletes, setAthletes] = useState<any[]>([]);
   const [feePlans, setFeePlans] = useState<any[]>([]);
@@ -46,7 +46,7 @@ export function AthletesPage() {
     setLoading(true);
     try {
       const [{ data: aps }, { data: plans }, { data: assigns }, { data: invs }, { data: acs }] = await Promise.all([
-        supabase.from("athlete_profiles").select("*, academies!athlete_profiles_preferred_academy_id_fkey(name)").eq("onboarding_complete", true).order("created_at", { ascending: false }),
+        supabase.from("athlete_profiles").select("*").eq("onboarding_complete", true).order("created_at", { ascending: false }),
         supabase.from("fee_plans").select("id, plan_name, amount, billing_cycle, custom_duration_days").eq("is_active", true),
         supabase.from("fee_assignments").select("id, athlete_profile_id, fee_plan_id, assignment_status, payment_mode, fee_plans(plan_name, amount, billing_cycle, custom_duration_days)"),
         supabase.from("invoices").select("id, athlete_profile_id, status, due_date, amount_due, balance_outstanding"),
@@ -59,6 +59,7 @@ export function AthletesPage() {
       const enriched = (aps ?? []).map(ap => {
         const assignment = assigns?.find(a => a.athlete_profile_id === ap.id);
         const invoice = invs?.find(i => i.athlete_profile_id === ap.id);
+        const academy = acs?.find(ac => ac.id === ap.academy_id);
         let payStatus = "unassigned";
         if (assignment) {
           const st = assignment.assignment_status;
@@ -72,7 +73,7 @@ export function AthletesPage() {
           else if (invoice) payStatus = "unpaid";
           else payStatus = "awaiting_invoice";
         }
-        return { ...ap, assignment, invoice, payStatus };
+        return { ...ap, assignment, invoice, academy, payStatus };
       });
 
       setAthletes(enriched);
@@ -93,7 +94,7 @@ export function AthletesPage() {
       // 1. Assign athlete to selected academy (if chosen)
       if (sendAcademyId) {
         const { error: acadErr } = await supabase.from("athlete_profiles")
-          .update({ preferred_academy_id: sendAcademyId })
+          .update({ academy_id: sendAcademyId })
           .eq("id", selectedAthlete.id);
         if (acadErr) throw new Error(`Academy assignment failed: ${acadErr.message}`);
       }
@@ -133,7 +134,7 @@ export function AthletesPage() {
 
       if (existingInvoice?.id) {
         const { error: invErr } = await supabase.from("invoices").update({
-          academy_id: sendAcademyId || selectedAthlete.preferred_academy_id,
+          academy_id: sendAcademyId || selectedAthlete.academy_id,
           amount_due: plan.amount,
           amount_paid: 0,
           balance_outstanding: plan.amount,
@@ -146,10 +147,10 @@ export function AthletesPage() {
         }).eq("id", existingInvoice.id);
         if (invErr) throw new Error(invErr.message);
       } else {
-        const invNumber = `CRICK-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`;
+        const invNumber = `BOX-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`;
         const { error: invErr } = await supabase.from("invoices").insert({
           invoice_number: invNumber,
-          academy_id: sendAcademyId || selectedAthlete.preferred_academy_id,
+          academy_id: sendAcademyId || selectedAthlete.academy_id,
           athlete_profile_id: selectedAthlete.id,
           amount_due: plan.amount,
           amount_paid: 0,
@@ -162,7 +163,7 @@ export function AthletesPage() {
       }
 
       // 4. Notify athlete
-      const academy = academies.find(a => a.id === (sendAcademyId || selectedAthlete.preferred_academy_id));
+      const academy = academies.find(a => a.id === (sendAcademyId || selectedAthlete.academy_id));
       const isReassignment = !!existingAssignment;
       await supabase.from("notifications").insert({
         recipient_id: selectedAthlete.user_id,
@@ -189,7 +190,7 @@ export function AthletesPage() {
     setReassigning(true);
     try {
       await supabase.from("athlete_profiles")
-        .update({ preferred_academy_id: reassignAcademy })
+        .update({ academy_id: reassignAcademy })
         .eq("id", reassignId);
       const athlete = athletes.find(a => a.id === reassignId);
       const academy = academies.find(a => a.id === reassignAcademy);
@@ -280,10 +281,12 @@ export function AthletesPage() {
       await supabase.from("fee_assignments")
         .update({
           assignment_status: "rollover_approved",
-          cash_approved_by: user?.id,
-          cash_approved_at: new Date().toISOString(),
+          rollover_approved: true,
+          rollover_approved_by: user?.id,
+          rollover_approved_at: new Date().toISOString(),
         })
-        .eq("athlete_profile_id", athleteId);
+        .eq("athlete_profile_id", athleteId)
+        .eq("assignment_status", "rollover_pending");
 
       // 2. Notify athlete
       if (athlete?.user_id) {
@@ -454,8 +457,8 @@ export function AthletesPage() {
                   <td className="py-3.5 text-xs text-muted-foreground">
                     <div className="flex items-center gap-1">
                       <MapPin className="size-3 shrink-0" />
-                      <span className="truncate max-w-[120px]" title={a.academies?.name ?? a.city ?? "Not assigned"}>
-                        {a.academies?.name ?? a.city ?? "Not assigned"}
+                      <span className="truncate max-w-[120px]" title={a.academy?.name ?? a.city ?? "Not assigned"}>
+                        {a.academy?.name ?? a.city ?? "Not assigned"}
                       </span>
                     </div>
                   </td>
@@ -487,7 +490,7 @@ export function AthletesPage() {
                     <div className="flex items-center gap-1 justify-end">
                       {/* Reassign academy — always visible */}
                       <button
-                        onClick={() => { setReassignId(a.id); setReassignAcademy(a.preferred_academy_id ?? ""); }}
+                        onClick={() => { setReassignId(a.id); setReassignAcademy(a.academy_id ?? ""); }}
                         title="Reassign academy"
                         className="size-7 grid place-items-center rounded-md hover:bg-info/10 transition text-info"
                       >
@@ -513,7 +516,7 @@ export function AthletesPage() {
                         onClick={() => {
                           setSelectedAthlete(a);
                           setSendPlanId(a.assignment?.fee_plan_id ?? feePlans[0]?.id ?? "");
-                          setSendAcademyId(a.preferred_academy_id ?? "");
+                          setSendAcademyId(a.academy_id ?? "");
                           setShowSendModal(true);
                         }}
                         title={a.assignment ? "Reassign fee package" : "Assign fee package"}
@@ -582,7 +585,7 @@ export function AthletesPage() {
                     <option key={a.id} value={a.id}>{a.name}{a.city ? ` — ${a.city}` : ""}</option>
                   ))}
                 </select>
-                {selectedAthlete.preferred_academy_id && (
+                {selectedAthlete.academy_id && (
                   <p className="text-[11px] text-muted-foreground mt-1.5">
                     Currently: <strong>{selectedAthlete.academies?.name ?? "Unknown"}</strong>
                   </p>

@@ -9,17 +9,15 @@ export async function loadReportData() {
     { data: leaves },
     { data: academies },
     { data: discounts },
-    { data: refunds },
     { data: feePlans },
   ] = await Promise.all([
     supabase.from("invoices").select("*").order("created_at", { ascending: true }),
     supabase.from("payments").select("*").order("payment_date", { ascending: true }),
-    supabase.from("athlete_profiles").select("id, full_name, preferred_academy_id, onboarding_complete").eq("onboarding_complete", true),
+    supabase.from("athlete_profiles").select("id, full_name, academy_id, onboarding_complete").eq("onboarding_complete", true),
     supabase.from("attendance").select("*"),
     supabase.from("leave_applications").select("*"),
     supabase.from("academies").select("id, name, city"),
     supabase.from("discount_schemes").select("*"),
-    supabase.from("refund_requests").select("*, athlete_profiles(full_name)"),
     supabase.from("fee_plans").select("*"),
   ]);
 
@@ -31,7 +29,7 @@ export async function loadReportData() {
     leaves: leaves ?? [],
     academies: academies ?? [],
     discounts: discounts ?? [],
-    refunds: refunds ?? [],
+    refunds: [],
     feePlans: feePlans ?? [],
   };
 }
@@ -88,7 +86,7 @@ export function buildAttendanceData(attendance: any[], leaves: any[]) {
 
 export function buildAcademyRevenue(invoices: any[], athletes: any[], academies: any[]) {
   const athleteAcademy: Record<string, string> = {};
-  athletes.forEach((a: any) => { if (a.preferred_academy_id) athleteAcademy[a.id] = a.preferred_academy_id; });
+  athletes.forEach((a: any) => { if (a.academy_id) athleteAcademy[a.id] = a.academy_id; });
   const academyMap: Record<string, string> = {};
   academies.forEach((a: any) => { academyMap[a.id] = a.name; });
 

@@ -54,8 +54,7 @@ function PaymentsPage() {
 
   // Rollover state
   const [rolloverSubmitting, setRolloverSubmitting] = useState(false);
-
-
+  const [hasUsedRollover, setHasUsedRollover] = useState(false);
 
   async function loadData() {
     // Always clear state first so no stale data from a previous user is ever shown
@@ -74,7 +73,7 @@ function PaymentsPage() {
     // Strictly fetch athlete_profile for the currently logged-in user only
     const { data: ap } = await supabase
       .from("athlete_profiles")
-      .select("id, preferred_academy_id")
+      .select("id, academy_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -107,17 +106,26 @@ function PaymentsPage() {
         .eq("athlete_profile_id", ap.id)
         .order("created_at", { ascending: false }),
     ]);
+    
+    // Check if athlete has an UNCLEARED rollover (i.e. rollover pending or approved, but not yet paid)
+    const { data: unclearedRollover } = await supabase
+      .from("fee_assignments")
+      .select("id")
+      .eq("athlete_profile_id", ap.id)
+      .in("assignment_status", ["rollover_pending", "rollover_approved"])
+      .limit(1);
 
     setInvoices(invs || []);
     setFeeAssignment(fa);
     setPayments(paymentRows || []);
+    setHasUsedRollover(!!(unclearedRollover && unclearedRollover.length > 0));
 
-    if (ap.preferred_academy_id) {
-      setAthleteAcademyId(ap.preferred_academy_id);
+    if (ap.academy_id) {
+      setAthleteAcademyId(ap.academy_id);
       const { data: ac } = await supabase
         .from("academies")
         .select("active_gateway")
-        .eq("id", ap.preferred_academy_id)
+        .eq("id", ap.academy_id)
         .maybeSingle();
 
       if (ac?.active_gateway) {
@@ -171,9 +179,10 @@ function PaymentsPage() {
   const isPaid =
     feeAssignment?.assignment_status === "cash_approved" ||
     feeAssignment?.assignment_status === "online_paid";
-  // Rollover can only be requested if: no active rollover, not already pending/approved payment
+  // Rollover can only be requested ONCE in lifetime: no past/active rollover, not already pending/approved
   const canRequestRollover =
     !!feeAssignment &&
+    !hasUsedRollover &&
     !isPaid &&
     !isPendingApproval &&
     !isRolloverPending &&

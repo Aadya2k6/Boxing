@@ -126,7 +126,7 @@ export function SiteFooter() {
             <Logo className="h-10 sm:h-11 w-auto" textSize="text-2xl" />
           </Link>
           <p className="mt-5 text-sm text-muted-foreground max-w-sm leading-relaxed">
-            Institutional-grade management platform for cricket academies. Built by athletes, for athletes.
+            Institutional-grade management platform for boxing academies. Built by athletes, for athletes.
           </p>
           <div className="mt-6 flex items-center gap-2">
             <span className="badge badge-gold">v1.0 Beta</span>
@@ -153,7 +153,7 @@ export function SiteFooter() {
         <div>
           <div className="label-micro mb-5">Contact</div>
           <ul className="space-y-3 text-sm text-muted-foreground">
-            <li>hello@crickos.in</li>
+            <li>hello@boxos.in</li>
             <li>New Delhi, India</li>
             <li className="pt-2">
               <span className="text-xs text-muted-foreground">Aligned with BCCI · SAI · ICC</span>
@@ -164,7 +164,7 @@ export function SiteFooter() {
 
       <div className="border-t border-border">
         <div className="max-w-7xl mx-auto px-6 py-5 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-muted-foreground">
-          <span>© 2026 Crickos. All rights reserved.</span>
+          <span>© 2026 Boxos. All rights reserved.</span>
           <span className="font-mono">v1.0.0 — May 2026 · Precision Sports Technology</span>
         </div>
       </div>

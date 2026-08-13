@@ -73,14 +73,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Crickos — Precision academy management" },
+      { title: "Boxos — Precision academy management" },
       { name: "description", content: "Institutional-grade onboarding, fees, and operations for elite sports academies." },
-      { name: "author", content: "Crickos" },
-      { property: "og:title", content: "Crickos — Precision academy management" },
+      { name: "author", content: "Boxos" },
+      { property: "og:title", content: "Boxos — Precision academy management" },
       { property: "og:description", content: "Institutional-grade onboarding, fees, and operations for elite sports academies." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:site", content: "@Crickos" },
+      { name: "twitter:site", content: "@Boxos" },
     ],
     links: [
       {

@@ -60,7 +60,7 @@ export function generateReceipt(data: {
 </head><body>
 <div class="receipt">
   <div class="header">
-    <h1>Crickos Academy</h1>
+    <h1>Boxos Academy</h1>
     <span class="tag">${tagLabel}</span>
   </div>
   <div class="body">

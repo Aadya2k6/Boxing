@@ -13,12 +13,12 @@ export default function Logo({
     <div className="inline-flex items-center gap-2.5">
       <img
         src="/logo.png"
-        alt="CrickOS Logo"
+        alt="BoxOS Logo"
         className={`object-contain ${className} ${imgClassName ?? ""}`}
       />
       {showText && (
         <span className={`font-display font-bold tracking-tight text-foreground ${textSize}`}>
-          Crick<span className="font-extrabold" style={{ color: "#D4AF37" }}>OS</span>
+          Box<span className="font-extrabold" style={{ color: "#D4AF37" }}>OS</span>
         </span>
       )}
     </div>

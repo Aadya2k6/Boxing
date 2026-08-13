@@ -5,7 +5,7 @@ import { useAuth } from "@/lib/auth";
 import Logo from "@/components/site/Logo";
 
 export const Route = createFileRoute("/signup")({
-  head: () => ({ meta: [{ title: "Create account — Crickos" }] }),
+  head: () => ({ meta: [{ title: "Create account — Boxos" }] }),
   component: SignupPage,
 });
 
@@ -55,7 +55,7 @@ function SignupPage() {
           </div>
           <h1 className="font-display font-bold text-2xl">Account created!</h1>
           <p className="text-muted-foreground mt-3">
-            Welcome to Crickos, {fullName.split(" ")[0]}. Redirecting you to onboarding…
+            Welcome to Boxos, {fullName.split(" ")[0]}. Redirecting you to onboarding…
           </p>
         </div>
       </div>

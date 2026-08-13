@@ -62,14 +62,21 @@ function AttendancePage() {
   async function loadData() {
     setLoading(true);
     try {
-      // Get athlete profile + preferred academy
+      // Get athlete profile + assigned academy
       const { data: ap } = await supabase
         .from("athlete_profiles")
-        .select("*, academies!athlete_profiles_preferred_academy_id_fkey(*)")
+        .select("*")
         .eq("user_id", user!.id)
         .maybeSingle();
       setAthleteProfile(ap);
-      setAcademy(ap?.academies ?? null);
+
+      // Fetch academy separately if athlete has one assigned
+      let acData = null;
+      if (ap?.academy_id) {
+        const { data: ac } = await supabase.from("academies").select("*").eq("id", ap.academy_id).maybeSingle();
+        acData = ac;
+      }
+      setAcademy(acData);
 
       if (ap?.id) {
         const [{ data: attData }, { data: lvData }] = await Promise.all([
@@ -79,8 +86,8 @@ function AttendancePage() {
         setAttendanceLog(attData ?? []);
         setLeaves(lvData ?? []);
 
-        if (ap.academies) {
-          await fetchTodaySchedule(ap, ap.academies);
+        if (acData) {
+          await fetchTodaySchedule(ap, acData);
         }
       }
     } finally {
@@ -98,7 +105,7 @@ function AttendancePage() {
         .from("class_schedule_templates")
         .select("*")
         .eq("is_active", true)
-        .or(`academy_id.eq.${ac.id},template_type.eq.tournament`)
+        .eq("academy_id", ac.id)
         .lte("valid_from", todayStr)
         .gte("valid_to", todayStr);
 
@@ -150,7 +157,9 @@ function AttendancePage() {
         const bowlers = over?.bowlers ? over.bowlers : pitch.bowlers;
         const extras = over?.extras ? over.extras : pitch.extras;
 
+        const isAllAcademy = (!batsmen || batsmen.length === 0) && (!bowlers || bowlers.length === 0) && (!extras || extras.length === 0);
         const isAssigned =
+          isAllAcademy ||
           (Array.isArray(batsmen) && batsmen.includes(ap.id)) ||
           (Array.isArray(bowlers) && bowlers.includes(ap.id)) ||
           (Array.isArray(extras) && extras.includes(ap.id));
@@ -224,7 +233,7 @@ function AttendancePage() {
         .from("class_schedule_templates")
         .select("*")
         .eq("is_active", true)
-        .or(`academy_id.eq.${academy.id},template_type.eq.tournament`)
+        .eq("academy_id", academy.id)
         .lte("valid_from", todayStr)
         .gte("valid_to", todayStr);
 
@@ -282,7 +291,9 @@ function AttendancePage() {
         const bowlers = over?.bowlers ? over.bowlers : pitch.bowlers;
         const extras = over?.extras ? over.extras : pitch.extras;
 
+        const isAllAcademy = (!batsmen || batsmen.length === 0) && (!bowlers || bowlers.length === 0) && (!extras || extras.length === 0);
         const isAssigned =
+          isAllAcademy ||
           (Array.isArray(batsmen) && batsmen.includes(athleteProfile.id)) ||
           (Array.isArray(bowlers) && bowlers.includes(athleteProfile.id)) ||
           (Array.isArray(extras) && extras.includes(athleteProfile.id));

@@ -163,8 +163,9 @@ function SuperadminNotifications() {
         await supabase.from("fee_assignments")
           .update({
             assignment_status: "rollover_approved",
-            cash_approved_by: user?.id,
-            cash_approved_at: new Date().toISOString(),
+            rollover_approved: true,
+            rollover_approved_by: user?.id,
+            rollover_approved_at: new Date().toISOString(),
           })
           .eq("id", assignmentId);
 

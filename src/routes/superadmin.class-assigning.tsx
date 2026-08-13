@@ -81,7 +81,7 @@ export interface Student {
   id: string;
   full_name: string;
   user_id: string;
-  preferred_academy_id?: string;
+  academy_id?: string;
   primary_discipline?: string;
   secondary_discipline?: string;
   playing_role?: string;
@@ -341,14 +341,14 @@ function ClassAssigningPage() {
 
       const targetIds = assignedIds.size > 0 
         ? Array.from(assignedIds) 
-        : students.filter(st => !s.academy_id || st.preferred_academy_id === s.academy_id).map(st => st.id);
+        : students.filter(st => !s.academy_id || st.academy_id === s.academy_id).map(st => st.id);
 
       const pitchIds = (s.pitches ?? []).map(p => p.id).filter(Boolean);
 
       const [{ data: rawAttData }, { data: polls }] = await Promise.all([
         supabase.from("attendance").select("*"),
         pitchIds.length > 0
-          ? supabase.from("class_assignment_polls").select("id, pitch_id").in("pitch_id", pitchIds)
+          ? supabase.from("class_assignment_polls").select("id, pitch_id").in("pitch_id", pitchIds).eq("poll_date", dateKey)
           : { data: [] },
       ]);
 
@@ -557,7 +557,7 @@ function ClassAssigningPage() {
       });
       const targetStudents = assignedIds.size > 0
         ? students.filter(st => assignedIds.has(st.id) || assignedIds.has(st.user_id))
-        : students.filter(st => !schedule.academy_id || String(st.preferred_academy_id) === String(schedule.academy_id));
+        : students.filter(st => !schedule.academy_id || String(st.academy_id) === String(schedule.academy_id));
 
       const recipients = Array.from(new Set(targetStudents.map(st => st.user_id).filter(Boolean))) as string[];
       if (recipients.length > 0) {
@@ -615,7 +615,7 @@ function ClassAssigningPage() {
               if (st?.user_id) userIdsToNotify.add(st.user_id);
             });
           });
-          const academyStudents = students.filter(st => !s.academy_id || String(st.preferred_academy_id) === String(s.academy_id));
+          const academyStudents = students.filter(st => !s.academy_id || String(st.academy_id) === String(s.academy_id));
           academyStudents.forEach(st => {
             if (st.user_id) userIdsToNotify.add(st.user_id);
           });
@@ -627,7 +627,7 @@ function ClassAssigningPage() {
               recipient_id: uid,
               type: "class_cancelled",
               title: "Class Cancelled Today",
-              body: `All cricket classes on ${dateKey} have been cancelled by the academy admin.`,
+              body: `All boxing classes on ${dateKey} have been cancelled by the academy admin.`,
             }))
           );
         }
@@ -668,12 +668,12 @@ function ClassAssigningPage() {
     if (!isSilent) setLoading(true);
     try {
       const [studentsRes, pollsRes, academiesRes, sessionsRes, attendanceRes, leavesRes, dbTemplatesRes, dbPitchesRes, instancesRes, pitchOverridesRes] = await Promise.all([
-        supabase.from("athlete_profiles").select("id, full_name, user_id, preferred_academy_id, primary_discipline, secondary_discipline, playing_role, sport")
+        supabase.from("athlete_profiles").select("id, full_name, user_id, academy_id, experience_level, primary_goal")
           .order("full_name",{ascending:true}),
         supabase.from("class_assignment_polls").select("id, template_id, pitch_id, expires_at, created_at")
           .gte("expires_at",new Date().toISOString()).order("created_at",{ascending:false}),
         supabase.from("academies").select("id, name, city").order("name"),
-        supabase.from("sessions").select("*, athlete_profiles(full_name), academies(name)").order("session_date",{ascending:false}),
+        Promise.resolve({ data: [], error: null }),
         supabase.from("attendance").select("*").order("date",{ascending:false}),
         supabase.from("leave_applications").select("*, athlete_profiles(full_name)").order("leave_date",{ascending:false}),
         supabase.from("class_schedule_templates").select("*"),
@@ -685,7 +685,7 @@ function ClassAssigningPage() {
       if (studentsRes.error) console.error("studentsRes error:", studentsRes.error.message);
       if (pollsRes.error) console.error("pollsRes error:", pollsRes.error.message);
       if (academiesRes.error) console.error("academiesRes error:", academiesRes.error.message);
-      if (sessionsRes.error) console.error("sessionsRes error:", sessionsRes.error.message);
+      if ((sessionsRes as any)?.error) console.error("sessionsRes error:", (sessionsRes as any).error.message);
       if (attendanceRes.error) console.error("attendanceRes error:", attendanceRes.error.message);
       if (leavesRes.error) console.error("leavesRes error:", leavesRes.error.message);
       if (dbTemplatesRes.error) console.error("dbTemplates error:", dbTemplatesRes.error.message);
@@ -824,7 +824,6 @@ function ClassAssigningPage() {
           valid_from: sValidFrom,
           valid_to: sValidTo,
           is_active: true,
-          template_type: sIsTournament ? "tournament" : "regular",
         });
 
         if (tErr) throw tErr;
@@ -844,6 +843,60 @@ function ClassAssigningPage() {
             }))
           );
           if (pErr) throw pErr;
+        }
+
+        // Send notifications & class_assignment_polls for new schedule
+        if (sAcademyId && draftPitches.length > 0) {
+          try {
+            for (const p of draftPitches) {
+              const pollId = crypto.randomUUID();
+              await supabase.from("class_assignment_polls").insert({
+                id: pollId,
+                sent_by: user?.id,
+                template_id: newId,
+                pitch_id: p.id || crypto.randomUUID(),
+                poll_date: sValidFrom || new Date().toISOString().split("T")[0],
+                title: `Practice Class: ${sName.trim()} (${p.name})`,
+                message: `Practice class scheduled for ${p.name} (${p.fromTime ?? '09:00'} - ${p.toTime ?? '11:00'}). Please confirm if you will be attending.`,
+                academy_id: sAcademyId,
+                expires_at: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
+              });
+
+              let targetStudentIds: string[] = [];
+              const pitchAssigned = [...(p.batsmen || []), ...(p.bowlers || []), ...(p.extras || [])];
+              if (pitchAssigned.length > 0) {
+                targetStudentIds = pitchAssigned;
+              } else {
+                const { data: academyStudents } = await supabase
+                  .from("athlete_profiles")
+                  .select("id")
+                  .eq("academy_id", sAcademyId);
+                targetStudentIds = (academyStudents || []).map(s => s.id);
+              }
+
+              if (targetStudentIds.length > 0) {
+                const { data: userProfiles } = await supabase
+                  .from("athlete_profiles")
+                  .select("user_id")
+                  .in("id", targetStudentIds)
+                  .not("user_id", "is", null);
+
+                if (userProfiles && userProfiles.length > 0) {
+                  const notifs = userProfiles.map(ap => ({
+                    recipient_id: ap.user_id,
+                    type: "class_assignment_poll",
+                    title: `Practice Class: ${sName.trim()} (${p.name})`,
+                    body: `Practice class scheduled for ${p.name} (${p.fromTime ?? '09:00'} - ${p.toTime ?? '11:00'}). Please confirm your attendance.`,
+                    related_entity_id: pollId,
+                    related_entity_type: "class_assignment_poll",
+                  }));
+                  await supabase.from("notifications").insert(notifs);
+                }
+              }
+            }
+          } catch (notifErr) {
+            console.warn("Poll/notification creation warning:", notifErr);
+          }
         }
       }
       await loadData(true);
@@ -1002,7 +1055,7 @@ function ClassAssigningPage() {
       const { data: poll, error: pollErr } = await supabase.from("class_assignment_polls").insert({
         sent_by: user?.id, template_id: schedule.id, pitch_id: pitch.id,
         poll_date: new Date().toISOString().split("T")[0],
-        title: "Cricket Practice Scheduled",
+        title: "Boxing Practice Scheduled",
         message: `Please respond within 24 hours for ${pitch.name} (${formatTime(pitch.fromTime)} - ${formatTime(pitch.toTime)}).`,
       }).select("id").single();
       if (pollErr) { if (pollErr.code === "23505") { alert("This pitch can only be notified again after 24 hours."); return; } throw pollErr; }
@@ -1012,7 +1065,7 @@ function ClassAssigningPage() {
       if (recipients.length > 0) {
         await supabase.from("notifications").insert(recipients.map(uid => ({
           recipient_id: uid, type: "class_assignment_poll",
-          title: "Cricket Practice Scheduled",
+          title: "Boxing Practice Scheduled",
           body: `Please respond within 24 hours for ${pitch.name} at ${formatTime(pitch.fromTime)} - ${formatTime(pitch.toTime)}.`,
           related_entity_id: poll.id, related_entity_type: "class_assignment_poll",
         })));
@@ -1147,7 +1200,7 @@ function ClassAssigningPage() {
           }
         });
 
-        const academyStudents = students.filter(st => !s.academy_id || String(st.preferred_academy_id) === String(s.academy_id));
+        const academyStudents = students.filter(st => !s.academy_id || String(st.academy_id) === String(s.academy_id));
         const totalAssigned = assignedIds.size > 0 
           ? assignedIds.size 
           : academyStudents.length;
@@ -1268,7 +1321,7 @@ function ClassAssigningPage() {
   const targetAcademyId = showScheduleModal ? sAcademyId : selectedSchedule?.academy_id;
   const scheduleStudents = useMemo(() => {
     if (!targetAcademyId) return students;
-    const matched = students.filter(s => !s.preferred_academy_id || s.preferred_academy_id === targetAcademyId);
+    const matched = students.filter(s => !s.academy_id || s.academy_id === targetAcademyId);
     return matched.length > 0 ? matched : students;
   }, [students, targetAcademyId]);
 
@@ -2000,7 +2053,7 @@ function ClassAssigningPage() {
                   ? students
                   : students.filter(st =>
                       !targetAcademyId ||
-                      String(st.preferred_academy_id) === String(targetAcademyId) ||
+                      String(st.academy_id) === String(targetAcademyId) ||
                       String((st as any).academy_id) === String(targetAcademyId)
                     );
                 return (
@@ -2255,7 +2308,7 @@ function ClassAssigningPage() {
                         const curStud = overrideStudents[pitch.id] || { batsmen: pitch.batsmen, bowlers: pitch.bowlers, extras: pitch.extras };
                         const academyScopedStudents = students.filter(st =>
                           !activeDateModal.schedule.academy_id ||
-                          String(st.preferred_academy_id) === String(activeDateModal.schedule.academy_id) ||
+                          String(st.academy_id) === String(activeDateModal.schedule.academy_id) ||
                           String((st as any).academy_id) === String(activeDateModal.schedule.academy_id)
                         );
 

@@ -46,7 +46,11 @@ export function AccessGuard({ children }: { children: ReactNode }) {
           .limit(1)
           .maybeSingle();
 
-        if (fa?.assignment_status === "cash_approved" || fa?.assignment_status === "online_paid") {
+        if (
+          fa?.assignment_status === "cash_approved" ||
+          fa?.assignment_status === "online_paid" ||
+          fa?.assignment_status === "rollover_approved"
+        ) {
           setDirectUnlock(true);
         }
       } catch {}
@@ -69,6 +73,18 @@ export function AccessGuard({ children }: { children: ReactNode }) {
       title: "Invoice being generated",
       body: "Your fee plan has been assigned and your invoice is being prepared. Check back shortly.",
       tone: "text-info",
+    },
+    rollover_pending: {
+      icon: Clock,
+      title: "Rollover approval pending",
+      body: "Your rollover request has been submitted. Your admin will review and approve it.",
+      tone: "text-info",
+    },
+    rollover_approved: {
+      icon: Clock,
+      title: "Rollover approved",
+      body: "Your payment rollover has been approved. Your dashboard is unlocked.",
+      tone: "text-success",
     },
     payment_required: {
       icon: CreditCard,

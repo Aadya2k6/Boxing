@@ -100,7 +100,7 @@ function ReportsPage() {
       downloadCSV(
         [["Month", "Invoiced", "Collected", "Outstanding", "Rate%"],
          ...monthlyData.map(m => [m.month, m.Invoiced, m.Collected, m.Outstanding, m.Invoiced > 0 ? Math.round(m.Collected / m.Invoiced * 100) : 0])],
-        `Crickos_Revenue_${new Date().toISOString().split("T")[0]}.csv`
+        `Boxos_Revenue_${new Date().toISOString().split("T")[0]}.csv`
       );
     } else if (active === "dues") {
       const dues = invoices.filter(i => i.status !== "paid");
@@ -110,13 +110,13 @@ function ReportsPage() {
            const days = i.status === "overdue" && i.due_date ? Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86400000) : 0;
            return [i.athlete_profiles?.full_name, i.invoice_number, i.amount_due, i.balance_outstanding, i.status, i.due_date, days];
          })],
-        `Crickos_Dues_${new Date().toISOString().split("T")[0]}.csv`
+        `Boxos_Dues_${new Date().toISOString().split("T")[0]}.csv`
       );
     } else if (active === "refunds") {
       downloadCSV(
         [["Athlete", "Amount", "Reason", "Status", "Requested By", "Reviewed At"],
          ...refunds.map(r => [r.athlete_profiles?.full_name, r.amount, r.reason, r.status, r.profiles?.full_name, r.reviewed_at ?? ""])],
-        `Crickos_Refunds_${new Date().toISOString().split("T")[0]}.csv`
+        `Boxos_Refunds_${new Date().toISOString().split("T")[0]}.csv`
       );
     }
   }
@@ -168,7 +168,7 @@ function ReportsPage() {
           <main className="lg:col-span-9 space-y-6">
             {/* Print header */}
             <div className="hidden print:block mb-4">
-              <h1 className="text-2xl font-display font-bold">Crickos Academy — {REPORT_TYPES.find(r => r.k === active)?.label}</h1>
+              <h1 className="text-2xl font-display font-bold">Boxos Academy — {REPORT_TYPES.find(r => r.k === active)?.label}</h1>
               <p className="text-sm text-muted-foreground">Generated on {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
             </div>
 

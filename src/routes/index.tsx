@@ -10,9 +10,9 @@ import {
 export const Route = createFileRoute("/")(({
   head: () => ({
     meta: [
-      { title: "Crickos — Precision Management for Elite Cricket Academies" },
-      { name: "description", content: "Institutional-grade onboarding, fees, and operations for cricket academies." },
-      { property: "og:title", content: "Crickos — Precision Management for Elite Cricket Academies" },
+      { title: "Boxos — Precision Management for Elite Boxing Academies" },
+      { name: "description", content: "Institutional-grade onboarding, fees, and operations for boxing academies." },
+      { property: "og:title", content: "Boxos — Precision Management for Elite Boxing Academies" },
     ],
   }),
   component: LandingPage,
@@ -63,7 +63,7 @@ function Hero() {
             </h1>
 
             <p className="mt-8 text-base md:text-lg text-muted-foreground max-w-lg leading-relaxed">
-              Crickos is the institutional-grade operating system for cricket academies. Onboard athletes, automate fees, and command operations from one calm interface.
+              Boxos is the institutional-grade operating system for boxing academies. Onboard athletes, automate fees, and command operations from one calm interface.
             </p>
 
             {/* CTAs */}

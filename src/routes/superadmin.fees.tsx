@@ -48,11 +48,13 @@ const emptyForm = {
   discount_scholarship: false,
   discount_custom: false,
   discount_approval_required: false,
+  academy_id: "",
 };
 
 function SAFees() {
   const { user, profile } = useAuth();
   const [plans, setPlans] = useState<any[]>([]);
+  const [academies, setAcademies] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<any | null>(null);
@@ -81,15 +83,18 @@ function SAFees() {
   async function loadPlans() {
     setLoading(true);
     try {
-      const [{ data: plansData }, { data: assignments }] = await Promise.all([
+      const [{ data: plansData }, { data: assignments }, { data: acs }] = await Promise.all([
         supabase.from("fee_plans").select("*").order("created_at", { ascending: false }),
         supabase.from("fee_assignments").select("fee_plan_id"),
+        supabase.from("academies").select("id, name"),
       ]);
+      setAcademies(acs ?? []);
       if (plansData) {
         setPlans(
           plansData.map((p) => ({
             ...p,
             count: assignments?.filter((a) => a.fee_plan_id === p.id).length || 0,
+            academy_name: acs?.find((a) => a.id === p.academy_id)?.name || "Global",
           })),
         );
       }
@@ -100,7 +105,10 @@ function SAFees() {
 
   function openCreate() {
     setEditingPlan(null);
-    setForm({ ...emptyForm });
+    setForm({ 
+      ...emptyForm, 
+      academy_id: profile?.academy_id || profile?.preferred_academy_id || academies?.[0]?.id || "" 
+    });
     setShowModal(true);
   }
 
@@ -126,6 +134,7 @@ function SAFees() {
       discount_scholarship: plan.discount_types?.includes("scholarship") ?? false,
       discount_custom: plan.discount_types?.includes("custom") ?? false,
       discount_approval_required: plan.discount_approval_required ?? false,
+      academy_id: plan.academy_id || academies?.[0]?.id || "",
     });
     setShowModal(true);
   }
@@ -155,7 +164,7 @@ function SAFees() {
         discount_types: discountTypes,
         discount_approval_required: form.discount_approval_required,
         created_by: user?.id,
-        academy_id: profile?.academy_id || "11111111-1111-1111-1111-111111111111",
+        academy_id: form.academy_id || profile?.preferred_academy_id || profile?.academy_id || academies?.[0]?.id,
       };
       if (editingPlan) {
         await supabase.from("fee_plans").update(payload).eq("id", editingPlan.id);
@@ -227,7 +236,7 @@ function SAFees() {
                     )}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
-                    {p.count} athlete{p.count !== 1 ? "s" : ""} assigned
+                    {p.academy_name} • {p.count} athlete{p.count !== 1 ? "s" : ""} assigned
                   </div>
                 </div>
                 <div className="text-xl font-display font-bold tabular">

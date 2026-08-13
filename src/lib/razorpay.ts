@@ -150,7 +150,7 @@ export async function openRazorpayCheckout(opts: {
     key,
     amount: Math.round(opts.amount * 100), // convert to paise
     currency: "INR",
-    name: "Crickos Academy",
+    name: "Boxos Academy",
     description: `Fee payment — Invoice ${opts.invoiceNumber}`,
     order_id,
     prefill: {

@@ -29,11 +29,17 @@ function SettingsPage() {
   async function loadData() {
     const { data: ap } = await supabase
       .from("athlete_profiles")
-      .select("*, academies!athlete_profiles_preferred_academy_id_fkey(name, city, state, latitude, longitude, radius_meters)")
+      .select("*")
       .eq("user_id", user!.id)
       .maybeSingle();
     setAthleteProfile(ap);
-    setAcademy(ap?.academies ?? null);
+    // Fetch academy if athlete has one assigned
+    if (ap?.academy_id) {
+      const { data: ac } = await supabase.from("academies").select("name, city, state, latitude, longitude, radius_meters").eq("id", ap.academy_id).maybeSingle();
+      setAcademy(ac ?? null);
+    } else {
+      setAcademy(null);
+    }
     setLoading(false);
   }
 

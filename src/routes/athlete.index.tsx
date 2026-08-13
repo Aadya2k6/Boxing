@@ -34,8 +34,10 @@ function AthleteOverview() {
   const navigate = useNavigate();
   const { isUnlocked, status, refresh: refreshAccess } = useAthleteAccess();
   const [athleteProfile, setAthleteProfile] = useState<AthleteProfile | null>(null);
+  const [academyName, setAcademyName] = useState<string>("Not assigned");
   const [feeAssignment, setFeeAssignment] = useState<any>(null);
   const [latestInvoice, setLatestInvoice] = useState<any>(null);
+  const [hasUsedRollover, setHasUsedRollover] = useState(false);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -138,6 +140,14 @@ function AthleteOverview() {
 
       if (ap) {
         setAthleteProfile(ap);
+        if (ap.academy_id) {
+          const { data: ac } = await supabase
+            .from("academies")
+            .select("name")
+            .eq("id", ap.academy_id)
+            .maybeSingle();
+          if (ac?.name) setAcademyName(ac.name);
+        }
       }
 
       // Fetch latest fee assignment with plan details
@@ -172,6 +182,17 @@ function AthleteOverview() {
           .maybeSingle();
         setLatestInvoice(anyInv);
       }
+
+      // Check if athlete has an UNCLEARED rollover (i.e. rollover pending or approved, but not yet paid)
+      const { data: unclearedRollover } = await supabase
+        .from("fee_assignments")
+        .select("id")
+        .eq("athlete_profile_id", ap.id)
+        .in("assignment_status", ["rollover_pending", "rollover_approved"])
+        .limit(1);
+      
+      setHasUsedRollover(!!(unclearedRollover && unclearedRollover.length > 0));
+
     } finally {
       setLoading(false);
     }
@@ -212,7 +233,7 @@ function AthleteOverview() {
       <div className={isLocked ? "pointer-events-none select-none" : ""}>
         <PageHeader
           title={`${greeting()}, ${firstName} 👋`}
-          subtitle={`Cricket · ${athleteProfile?.primary_discipline ?? "—"}`}
+          subtitle={`Boxing · ${athleteProfile?.primary_discipline ?? "—"}`}
           actions={
             !isLocked ? (
               <button
@@ -228,7 +249,7 @@ function AthleteOverview() {
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           <StatCard
             label="Sport"
-            value="Cricket"
+            value="Boxing"
             hint={athleteProfile?.primary_discipline ?? "Batting"}
             icon={Target}
             accent="bg-primary/10"
@@ -279,8 +300,8 @@ function AthleteOverview() {
                       ? `${athleteProfile.city}, ${athleteProfile.state}`
                       : "—",
                 },
-                { label: "Coach", value: athleteProfile?.current_coach ?? "Not assigned" },
-                { label: "Academy", value: athleteProfile?.current_academy ?? "Not assigned" },
+                { label: "Coach", value: (athleteProfile as any)?.coach_name ?? "Not assigned" },
+                { label: "Academy", value: academyName },
               ].map(({ label, value }) => (
                 <div
                   key={label}
@@ -324,6 +345,7 @@ function AthleteOverview() {
             <PaymentWall
               assignment={feeAssignment}
               invoice={latestInvoice}
+              hasUsedRollover={hasUsedRollover}
               onRefresh={handleRefresh}
             />
           </div>
@@ -339,10 +361,12 @@ function AthleteOverview() {
 function PaymentWall({
   assignment,
   invoice,
+  hasUsedRollover,
   onRefresh,
 }: {
   assignment: any;
   invoice: any;
+  hasUsedRollover: boolean;
   onRefresh: () => void;
 }) {
   const { user, profile } = useAuth();
@@ -368,16 +392,16 @@ function PaymentWall({
     (async () => {
       const { data: ap } = await supabase
         .from("athlete_profiles")
-        .select("preferred_academy_id")
+        .select("academy_id")
         .eq("user_id", user.id)
         .maybeSingle();
 
-      if (ap?.preferred_academy_id) {
-        setAthleteAcademyId(ap.preferred_academy_id);
+      if (ap?.academy_id) {
+        setAthleteAcademyId(ap.academy_id);
         const { data: ac } = await supabase
           .from("academies")
           .select("active_gateway")
-          .eq("id", ap.preferred_academy_id)
+          .eq("id", ap.academy_id)
           .maybeSingle();
 
         if (ac?.active_gateway) {
@@ -506,8 +530,8 @@ function PaymentWall({
 
   // ── Determine what to show ──────────────────────────────────────────
   const showPayButtons = hasAssignment && !isAlreadyApproved && !isPendingApproval && !isRolloverPending;
-  // Rollover is allowed only if no active rollover exists and is NOT already paid
-  const canRequestRollover = hasAssignment && !isRolloverPending && !isRolloverApproved && !isPendingApproval;
+  // Rollover is allowed only ONCE per person lifetime, never again once requested
+  const canRequestRollover = hasAssignment && !hasUsedRollover && !isRolloverPending && !isRolloverApproved && !isPendingApproval;
 
   /** Handle rollover request */
   async function handleRolloverRequest() {
@@ -515,10 +539,14 @@ function PaymentWall({
     setRolloverSubmitting(true);
     setPayError(null);
     try {
-      // 1. Set assignment to rollover_pending
+      // 1. Set assignment to rollover_pending and flag as used
       await supabase
         .from("fee_assignments")
-        .update({ assignment_status: "rollover_pending", payment_mode: "rollover" })
+        .update({ 
+          assignment_status: "rollover_pending", 
+          payment_mode: "rollover",
+          rollover_requested: true,
+        })
         .eq("id", assignment.id);
 
       // 2. Notify all superadmins

@@ -158,6 +158,28 @@ function AthleteLayout() {
     return () => { supabase.removeChannel(ch); };
   }, [authUser?.id, checkAccess]);
 
+  const [academyName, setAcademyName] = useState<string | null>(null);
+
+  useEffect(() => {
+    async function loadAcademy() {
+      if (!authUser?.id) return;
+      const { data: ap } = await supabase
+        .from("athlete_profiles")
+        .select("academy_id")
+        .eq("user_id", authUser.id)
+        .maybeSingle();
+      if (ap?.academy_id) {
+        const { data: ac } = await supabase
+          .from("academies")
+          .select("name")
+          .eq("id", ap.academy_id)
+          .maybeSingle();
+        if (ac?.name) setAcademyName(ac.name);
+      }
+    }
+    loadAcademy();
+  }, [authUser?.id]);
+
   const isUnlocked = status === "unlocked";
   const isRolloverPending = status === "rollover_pending";
 
@@ -175,7 +197,7 @@ function AthleteLayout() {
         basePath="/athlete"
         role="Athlete"
         userName={name}
-        userMeta="Cricket"
+        userMeta={academyName ? `Boxing · ${academyName}` : "Boxing"}
         accentClass="text-primary-dark"
         accentBg="bg-primary/10"
         dotColor="bg-primary"

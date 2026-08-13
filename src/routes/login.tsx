@@ -6,7 +6,7 @@ import { supabase } from "@/lib/supabase";
 import Logo from "@/components/site/Logo";
 
 export const Route = createFileRoute("/login")({
-  head: () => ({ meta: [{ title: "Sign in — Crickos" }] }),
+  head: () => ({ meta: [{ title: "Sign in — Boxos" }] }),
   component: LoginPage,
 });
 
@@ -65,7 +65,7 @@ function LoginPage() {
         <div className="bento-card p-8">
           <div className="mb-7">
             <h1 className="font-display font-bold text-2xl">Welcome back</h1>
-            <p className="text-muted-foreground text-sm mt-1.5">Sign in to your Crickos account</p>
+            <p className="text-muted-foreground text-sm mt-1.5">Sign in to your Boxos account</p>
           </div>
 
           {error && (

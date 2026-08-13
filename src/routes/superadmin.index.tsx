@@ -32,34 +32,27 @@ function SAOverview() {
           { data: academies },
           { count: athletesCount, data: athletesList },
           { data: paymentsThisMonth },
-          { data: refunds },
           { data: invoicesList }
         ] = await Promise.all([
           supabase.from("academies").select("*"),
-          supabase.from("athlete_profiles").select("preferred_academy_id", { count: "exact" }).eq("onboarding_complete", true),
+          supabase.from("athlete_profiles").select("academy_id", { count: "exact" }).eq("onboarding_complete", true),
           supabase.from("payments").select("amount").gte("payment_date", startOfMonth),
-          supabase.from("refunds").select("id, amount, reason, created_at, athlete_profiles(full_name)").eq("status", "pending"),
           supabase.from("invoices").select("academy_id, amount_due, amount_paid")
         ]);
 
         const rev = paymentsThisMonth?.reduce((sum, p) => sum + p.amount, 0) || 0;
-        const refCount = refunds?.length || 0;
-        const refAmt = refunds?.reduce((sum, r) => sum + r.amount, 0) || 0;
 
         setStats({
           totalAcademies: academies?.length || 0,
           totalAthletes: athletesCount || 0,
           monthlyRevenue: rev,
-          pendingRefundsCount: refCount,
-          pendingRefundsAmount: refAmt,
+          pendingRefundsCount: 0,
+          pendingRefundsAmount: 0,
         });
 
         // Aggregate academy data dynamically
         const aggregatedAcademies = academies?.map((a) => {
-          // Count athletes matching this academy's ID
-          const athletesForAcademy = athletesList?.filter(ath => ath.preferred_academy_id === a.id).length || 0;
-          
-          // Sum invoices for this academy ID
+          const athletesForAcademy = athletesList?.filter(ath => ath.academy_id === a.id).length || 0;
           const academyInvoices = invoicesList?.filter(inv => inv.academy_id === a.id) || [];
           const totalDue = academyInvoices.reduce((sum, inv) => sum + Number(inv.amount_due), 0);
           const totalPaid = academyInvoices.reduce((sum, inv) => sum + Number(inv.amount_paid), 0);
@@ -77,8 +70,6 @@ function SAOverview() {
         }) || [];
 
         setAcademiesList(aggregatedAcademies);
-
-        setPendingRefunds(refunds || []);
       } catch (err) {
         console.error("Error loading superadmin dashboard data:", err);
       } finally {

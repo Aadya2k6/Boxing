@@ -27,15 +27,15 @@ function ProfilePage() {
     city: "",
     state: "",
     country: "",
-    blood_group: "",
-    sport: "",
-    primary_discipline: "",
-    secondary_discipline: "",
-    training_year: "",
-    years_in_sport: "",
-    current_coach: "",
-    current_academy: "",
+    boxing_stance: "",
     dominant_hand: "",
+    reach_cm: "",
+    weight_kg: "",
+    height_cm: "",
+    experience_level: "",
+    primary_goal: "",
+    previous_club: "",
+    coach_name: "",
   });
 
   useEffect(() => {
@@ -46,7 +46,7 @@ function ProfilePage() {
       }
       const { data } = await supabase
         .from("athlete_profiles")
-        .select("*, academies!athlete_profiles_preferred_academy_id_fkey(name, city, state, latitude, longitude, radius_meters)")
+        .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
 
@@ -55,7 +55,14 @@ function ProfilePage() {
         return;
       }
       setAthleteProfile(data);
-      setAcademy(data.academies ?? null);
+      if (data.academy_id) {
+        const { data: acData } = await supabase
+          .from("academies")
+          .select("id, name, city, state, latitude, longitude, radius_meters")
+          .eq("id", data.academy_id)
+          .maybeSingle();
+        if (acData) setAcademy(acData);
+      }
       setForm({
         full_name: data.full_name ?? profile?.full_name ?? "",
         phone: data.phone ?? profile?.phone ?? "",
@@ -64,15 +71,15 @@ function ProfilePage() {
         city: data.city ?? "",
         state: data.state ?? "",
         country: data.country ?? "",
-        blood_group: data.blood_group ?? "",
-        sport: data.sport ?? "",
-        primary_discipline: data.primary_discipline ?? "",
-        secondary_discipline: data.secondary_discipline ?? "",
-        training_year: data.training_year ?? "",
-        years_in_sport: data.years_in_sport?.toString() ?? "",
-        current_coach: data.current_coach ?? "",
-        current_academy: data.current_academy ?? "",
+        boxing_stance: (data as any).boxing_stance ?? "",
         dominant_hand: (data as any).dominant_hand ?? "",
+        reach_cm: (data as any).reach_cm?.toString() ?? "",
+        weight_kg: (data as any).weight_kg?.toString() ?? "",
+        height_cm: (data as any).height_cm?.toString() ?? "",
+        experience_level: (data as any).experience_level ?? "",
+        primary_goal: (data as any).primary_goal ?? "",
+        previous_club: (data as any).previous_club ?? "",
+        coach_name: (data as any).coach_name ?? "",
       });
       setLoading(false);
     }
@@ -85,13 +92,6 @@ function ProfilePage() {
 
     setSaving(true);
     setSaveError(null);
-
-    const years = form.years_in_sport.trim() === "" ? null : Number(form.years_in_sport);
-    if (years !== null && (!Number.isFinite(years) || years < 0)) {
-      setSaving(false);
-      setSaveError("Years in sport must be a valid positive number.");
-      return;
-    }
 
     const { error: profileError } = await supabase.from("profiles").update({
       full_name: form.full_name.trim(),
@@ -112,15 +112,15 @@ function ProfilePage() {
       city: form.city.trim() || null,
       state: form.state.trim() || null,
       country: form.country.trim() || null,
-      blood_group: form.blood_group.trim() || null,
-      sport: form.sport.trim() || null,
-      primary_discipline: form.primary_discipline.trim() || null,
-      secondary_discipline: form.secondary_discipline.trim() || null,
-      training_year: form.training_year.trim() || null,
-      years_in_sport: years,
-      current_coach: form.current_coach.trim() || null,
-      current_academy: form.current_academy.trim() || null,
-      dominant_hand: form.dominant_hand.trim() || null,
+      boxing_stance: (form as any).boxing_stance?.trim() || null,
+      dominant_hand: (form as any).dominant_hand?.trim() || null,
+      reach_cm: (form as any).reach_cm ? parseFloat((form as any).reach_cm) : null,
+      weight_kg: (form as any).weight_kg ? parseFloat((form as any).weight_kg) : null,
+      height_cm: (form as any).height_cm ? parseFloat((form as any).height_cm) : null,
+      experience_level: (form as any).experience_level?.trim() || null,
+      primary_goal: (form as any).primary_goal?.trim() || null,
+      previous_club: (form as any).previous_club?.trim() || null,
+      coach_name: (form as any).coach_name?.trim() || null,
     }).eq("id", athleteProfile.id);
 
     if (athleteError) {
@@ -131,13 +131,13 @@ function ProfilePage() {
 
     const { data } = await supabase
       .from("athlete_profiles")
-      .select("*, academies!athlete_profiles_preferred_academy_id_fkey(name, city, state, latitude, longitude, radius_meters)")
+      .select("*")
       .eq("user_id", user.id)
       .maybeSingle();
 
     if (data) {
       setAthleteProfile(data);
-      setAcademy(data.academies ?? null);
+      setAcademy(null);
     }
     setSaving(false);
     setEditOpen(false);
@@ -181,35 +181,34 @@ function ProfilePage() {
         </div>
 
         <div className="lg:col-span-2 space-y-4">
-          <Section title="Sport profile" icon={Trophy}>
+          <Section title="Boxing profile" icon={Trophy}>
             <Grid items={[
-              ["Sport", athleteProfile.sport || "—"], 
-              ["Discipline", athleteProfile.primary_discipline || "—"], 
-              ["Secondary", athleteProfile.secondary_discipline || "—"], 
-              ["Training year", athleteProfile.training_year || "—"], 
-              ["Years in sport", athleteProfile.years_in_sport?.toString() || "—"], 
-              ["Dominant hand", (athleteProfile as any).dominant_hand || "—"], 
-              ["Coach", athleteProfile.current_coach || "—"], 
-              ["Club", athleteProfile.current_academy || "—"]
+              ["Stance", (athleteProfile as any).boxing_stance || "—"],
+              ["Dominant hand", (athleteProfile as any).dominant_hand || "—"],
+              ["Experience", (athleteProfile as any).experience_level || "—"],
+              ["Primary goal", (athleteProfile as any).primary_goal || "—"],
+              ["Height", (athleteProfile as any).height_cm ? `${(athleteProfile as any).height_cm} cm` : "—"],
+              ["Weight", (athleteProfile as any).weight_kg ? `${(athleteProfile as any).weight_kg} kg` : "—"],
+              ["Reach", (athleteProfile as any).reach_cm ? `${(athleteProfile as any).reach_cm} cm` : "—"],
+              ["Previous club", (athleteProfile as any).previous_club || "—"],
+              ["Coach", (athleteProfile as any).coach_name || "—"],
             ]} />
           </Section>
 
           <Section title="Medical & fitness" icon={Heart}>
             <Grid items={[
-              ["Blood group", athleteProfile.blood_group || "—"], 
-              ["Conditions", athleteProfile.medical_conditions || "None disclosed"], 
-              ["Medications", athleteProfile.current_medications || "—"], 
-              ["Allergies", athleteProfile.allergies || "—"], 
-              ["Fitness declared", athleteProfile.fitness_declaration ? "Yes" : "No"]
+              ["Conditions", (athleteProfile as any).medical_history_details || "None disclosed"],
+              ["Medications", (athleteProfile as any).current_medications || "—"],
+              ["Allergies", (athleteProfile as any).allergies || "—"],
+              ["Insurance", (athleteProfile as any).health_insurance_provider || "—"],
             ]} />
           </Section>
 
           <Section title="Emergency contact" icon={Phone}>
             <Grid items={[
-              ["Name", athleteProfile.emergency_contact_name || "—"], 
-              ["Relationship", athleteProfile.emergency_contact_relation || "—"], 
-              ["Phone", athleteProfile.emergency_contact_phone || "—"], 
-              ["Physician", athleteProfile.primary_physician_details || "—"]
+              ["Name", (athleteProfile as any).emergency_contact_name || "—"],
+              ["Relationship", (athleteProfile as any).emergency_contact_relation || "—"],
+              ["Phone", (athleteProfile as any).emergency_contact_phone || "—"],
             ]} />
           </Section>
 
@@ -266,15 +265,15 @@ function ProfilePage() {
                   ["city", "City"],
                   ["state", "State"],
                   ["country", "Country"],
-                  ["blood_group", "Blood group"],
-                  ["sport", "Sport"],
-                  ["primary_discipline", "Primary discipline"],
-                  ["secondary_discipline", "Secondary discipline"],
-                  ["training_year", "Training year"],
-                  ["years_in_sport", "Years in sport"],
-                  ["current_coach", "Coach"],
-                  ["current_academy", "Club / academy"],
+                  ["boxing_stance", "Boxing stance"],
                   ["dominant_hand", "Dominant hand"],
+                  ["reach_cm", "Reach (cm)"],
+                  ["weight_kg", "Weight (kg)"],
+                  ["height_cm", "Height (cm)"],
+                  ["experience_level", "Experience level"],
+                  ["primary_goal", "Primary goal"],
+                  ["previous_club", "Previous club"],
+                  ["coach_name", "Coach name"],
                 ].map(([key, label]) => (
                   <label key={key} className="block">
                     <span className="block text-xs font-semibold mb-1.5">{label}</span>

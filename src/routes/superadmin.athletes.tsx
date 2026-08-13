@@ -157,11 +157,11 @@ function FullAthleteDetailView({
         { data: leaves },
         { data: discounts },
       ] = await Promise.all([
-        ap.preferred_academy_id
-          ? supabase.from("academies").select("id, name, city, state").eq("id", ap.preferred_academy_id).maybeSingle()
+        ap.academy_id
+          ? supabase.from("academies").select("id, name, city, state").eq("id", ap.academy_id).maybeSingle()
           : Promise.resolve({ data: null }),
         ap.user_id
-          ? supabase.from("profiles").select("email, role, last_sign_in_at").eq("id", ap.user_id).maybeSingle()
+          ? supabase.from("profiles").select("email, role, updated_at").eq("id", ap.user_id).maybeSingle()
           : Promise.resolve({ data: null }),
         supabase.from("guardian_details").select("*").eq("athlete_profile_id", athleteId).maybeSingle(),
         supabase
@@ -223,7 +223,18 @@ function FullAthleteDetailView({
     }
   }, [athleteId]);
 
-  useEffect(() => { loadDetails(); }, [loadDetails]);
+  useEffect(() => {
+    loadDetails();
+    const channel = supabase
+      .channel(`athlete-detail-${athleteId}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "athlete_profiles", filter: `id=eq.${athleteId}` }, () => {
+        loadDetails();
+      })
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [athleteId, loadDetails]);
 
   if (loading) {
     return (
@@ -341,7 +352,7 @@ function FullAthleteDetailView({
                 <StatusPill status={payStatus} />
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {ap.primary_discipline ?? "Cricket Athlete"} · {ap.training_year ?? "General Training"}
+                {ap.primary_discipline ?? "Boxing Athlete"} · {ap.training_year ?? "General Training"}
               </p>
               <div className="flex items-center gap-4 mt-2.5 text-xs text-muted-foreground flex-wrap">
                 {ap.academies?.name && (
@@ -475,10 +486,10 @@ function FullAthleteDetailView({
             <DetailRow label="State" value={ap.state} />
             <DetailRow label="Nationality" value={ap.nationality} />
             <DetailRow label="Onboarding Date" value={ap.created_at ? new Date(ap.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : null} icon={CalendarDays} />
-            <DetailRow label="Last Active Login" value={ap.profiles?.last_sign_in_at ? new Date(ap.profiles.last_sign_in_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric", hour: "2-digit", minute: "2-digit" } as any) : null} icon={Clock} />
+            <DetailRow label="Last Profile Update" value={ap.updated_at ? new Date(ap.updated_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" } as any) : null} icon={Clock} />
           </SectionCard>
 
-          <SectionCard title="Cricket & Skill Profile" icon={BookOpen}>
+          <SectionCard title="Boxing & Skill Profile" icon={BookOpen}>
             <DetailRow label="Primary Discipline" value={ap.primary_discipline} />
             <DetailRow label="Batting Style" value={ap.batting_style} />
             <DetailRow label="Bowling Style" value={ap.bowling_style} />
@@ -871,7 +882,7 @@ function SuperAdminAthletesPage() {
     setLoading(true);
     try {
       const [{ data: aps }, { data: plans }, { data: assigns }, { data: invs }, { data: acs }] = await Promise.all([
-        supabase.from("athlete_profiles").select("*, academies!athlete_profiles_preferred_academy_id_fkey(name)").eq("onboarding_complete", true).order("created_at", { ascending: false }),
+        supabase.from("athlete_profiles").select("*").eq("onboarding_complete", true).order("created_at", { ascending: false }),
         supabase.from("fee_plans").select("id,plan_name,amount,billing_cycle,custom_duration_days").eq("is_active", true),
         supabase.from("fee_assignments").select("id,athlete_profile_id,fee_plan_id,assignment_status,payment_mode,fee_plans(plan_name,amount,billing_cycle,custom_duration_days)"),
         supabase.from("invoices").select("id,athlete_profile_id,status,due_date,amount_due,balance_outstanding"),
@@ -884,6 +895,7 @@ function SuperAdminAthletesPage() {
       const enriched = (aps ?? []).map(ap => {
         const assignment = assigns?.find(a => a.athlete_profile_id === ap.id);
         const invoice    = invs?.find(i => i.athlete_profile_id === ap.id);
+        const academy    = acs?.find(ac => ac.id === ap.academy_id);
         let payStatus = "unassigned";
         if (assignment) {
           const st = assignment.assignment_status;
@@ -897,7 +909,7 @@ function SuperAdminAthletesPage() {
           else if (invoice)                       payStatus = "unpaid";
           else                                    payStatus = "awaiting_invoice";
         }
-        return { ...ap, assignment, invoice, payStatus };
+        return { ...ap, assignment, invoice, academy, payStatus };
       });
 
       setAthletes(enriched);
@@ -915,7 +927,7 @@ function SuperAdminAthletesPage() {
       if (!plan) throw new Error("Plan not found");
 
       if (sendAcademyId) {
-        await supabase.from("athlete_profiles").update({ preferred_academy_id: sendAcademyId }).eq("id", selectedAthleteForModal.id);
+        await supabase.from("athlete_profiles").update({ academy_id: sendAcademyId }).eq("id", selectedAthleteForModal.id);
       }
 
       const existing = selectedAthleteForModal.assignment;
@@ -942,7 +954,7 @@ function SuperAdminAthletesPage() {
         : plan.billing_cycle.charAt(0).toUpperCase() + plan.billing_cycle.slice(1);
 
       const existingInv = selectedAthleteForModal.invoice;
-      const academyId   = sendAcademyId || selectedAthleteForModal.preferred_academy_id;
+      const academyId   = sendAcademyId || selectedAthleteForModal.academy_id;
       if (existingInv?.id) {
         await supabase.from("invoices").update({
           academy_id: academyId, amount_due: plan.amount, amount_paid: 0,
@@ -952,7 +964,7 @@ function SuperAdminAthletesPage() {
         }).eq("id", existingInv.id);
       } else {
         await supabase.from("invoices").insert({
-          invoice_number: `CRICK-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`,
+          invoice_number: `BOX-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`,
           academy_id: academyId, athlete_profile_id: selectedAthleteForModal.id,
           amount_due: plan.amount, amount_paid: 0, balance_outstanding: plan.amount,
           due_date: dueDate.toISOString().split("T")[0],
@@ -979,7 +991,7 @@ function SuperAdminAthletesPage() {
     if (!reassignId || !reassignAcademy) return;
     setReassigning(true);
     try {
-      await supabase.from("athlete_profiles").update({ preferred_academy_id: reassignAcademy }).eq("id", reassignId);
+      await supabase.from("athlete_profiles").update({ academy_id: reassignAcademy }).eq("id", reassignId);
       const athlete = athletes.find(a => a.id === reassignId);
       const academy = academies.find(a => a.id === reassignAcademy);
       if (athlete?.user_id && academy) {
@@ -1036,8 +1048,11 @@ function SuperAdminAthletesPage() {
     try {
       const athlete = athletes.find(a => a.id === athleteId);
       await supabase.from("fee_assignments").update({
-        assignment_status: "rollover_approved", cash_approved_by: user?.id, cash_approved_at: new Date().toISOString(),
-      }).eq("athlete_profile_id", athleteId);
+        assignment_status: "rollover_approved", 
+        rollover_approved: true,
+        rollover_approved_by: user?.id, 
+        rollover_approved_at: new Date().toISOString(),
+      }).eq("athlete_profile_id", athleteId).eq("assignment_status", "rollover_pending");
       if (athlete?.user_id) {
         await supabase.from("notifications").insert({
           recipient_id: athlete.user_id, type: "rollover_approved",
@@ -1097,12 +1112,12 @@ function SuperAdminAthletesPage() {
         onOpenSendModal={(ap) => {
           setSelectedAthleteForModal(ap);
           setSendPlanId(ap.assignment?.fee_plan_id ?? feePlans[0]?.id ?? "");
-          setSendAcademyId(ap.preferred_academy_id ?? "");
+          setSendAcademyId(ap.academy_id ?? "");
           setShowSendModal(true);
         }}
         onOpenReassignAcademy={(ap) => {
           setReassignId(ap.id);
-          setReassignAcademy(ap.preferred_academy_id ?? "");
+          setReassignAcademy(ap.academy_id ?? "");
         }}
         onApproveCash={(id) => setCashApproveId(id)}
         onApproveRollover={(id) => setRolloverApproveId(id)}
@@ -1229,7 +1244,7 @@ function SuperAdminAthletesPage() {
                   <td className="py-4 px-4 text-xs">
                     <div className="flex items-center gap-1.5 text-muted-foreground">
                       <MapPin className="size-3.5 shrink-0 text-primary" />
-                      <span className="truncate max-w-[150px] font-medium text-foreground">{a.academies?.name ?? "Unassigned"}</span>
+                      <span className="truncate max-w-[150px] font-medium text-foreground">{a.academy?.name ?? "Unassigned"}</span>
                     </div>
                   </td>
                   <td className="py-4 px-4 text-xs">
@@ -1249,7 +1264,7 @@ function SuperAdminAthletesPage() {
                   <td className="py-4 px-6 text-right" onClick={e => e.stopPropagation()}>
                     <div className="flex items-center gap-2 justify-end">
                       <button
-                        onClick={() => { setReassignId(a.id); setReassignAcademy(a.preferred_academy_id ?? ""); }}
+                        onClick={() => { setReassignId(a.id); setReassignAcademy(a.academy_id ?? ""); }}
                         title="Reassign Academy"
                         className="p-2 rounded-xl border border-border hover:bg-info/10 hover:border-info/30 transition text-info"
                       >
@@ -1286,7 +1301,7 @@ function SuperAdminAthletesPage() {
                         onClick={() => {
                           setSelectedAthleteForModal(a);
                           setSendPlanId(a.assignment?.fee_plan_id ?? feePlans[0]?.id ?? "");
-                          setSendAcademyId(a.preferred_academy_id ?? "");
+                          setSendAcademyId(a.academy_id ?? "");
                           setShowSendModal(true);
                         }}
                         className="text-xs font-semibold px-3 py-1.5 rounded-xl bg-primary/10 text-primary-dark hover:bg-primary/20 transition inline-flex items-center gap-1.5"

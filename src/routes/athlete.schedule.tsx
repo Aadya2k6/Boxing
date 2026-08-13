@@ -99,7 +99,7 @@ function SchedulePage() {
 
     const { data: ap } = await supabase
       .from("athlete_profiles")
-      .select("id, user_id, preferred_academy_id, sport, primary_discipline, full_name, email")
+      .select("id, user_id, academy_id, experience_level, primary_goal, full_name, email")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -122,7 +122,7 @@ function SchedulePage() {
     setCalendarLoading(true);
 
     const athleteProfileId: string = ap.id;
-    const academyId: string | null = ap.preferred_academy_id ?? null;
+    const academyId: string | null = ap.academy_id ?? null;
 
     try {
       // Build queries — filter templates by the athlete's academy when known
@@ -145,12 +145,7 @@ function SchedulePage() {
         supabase
           .from("class_schedule_pitches")
           .select("*"),
-        supabase
-          .from("sessions")
-          .select("*")
-          .eq("athlete_profile_id", athleteProfileId)
-          .gte("session_date", `${year}-01-01`)
-          .lte("session_date", `${year}-12-31`),
+        Promise.resolve({ data: [] }),
         supabase
           .from("attendance")
           .select("date, status")
@@ -192,13 +187,13 @@ function SchedulePage() {
 
         if (!rawFrom || !rawTo || daysOfWeek.length === 0) return;
 
-        // Find pitches for this template where this athlete's UUID is assigned
         const myPitches = combinedPitches.filter((p: any) => {
           if (p.template_id !== tmpl.id) return false;
+          const isAllAcademy = (!p.batsmen || p.batsmen.length === 0) && (!p.bowlers || p.bowlers.length === 0) && (!p.extras || p.extras.length === 0);
           const inBatsmen = Array.isArray(p.batsmen) && p.batsmen.includes(athleteProfileId);
           const inBowlers = Array.isArray(p.bowlers) && p.bowlers.includes(athleteProfileId);
           const inExtras  = Array.isArray(p.extras)  && p.extras.includes(athleteProfileId);
-          return inBatsmen || inBowlers || inExtras;
+          return isAllAcademy || inBatsmen || inBowlers || inExtras;
         });
 
         if (myPitches.length === 0) return; // athlete not assigned in any pitch of this template

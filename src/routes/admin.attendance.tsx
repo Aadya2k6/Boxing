@@ -44,7 +44,7 @@ function AdminAttendancePage() {
     setLoading(true);
     try {
       const [{ data: aps }, { data: att }, { data: leaves }, { data: todayPoll }] = await Promise.all([
-        supabase.from("athlete_profiles").select("id, full_name, user_id, preferred_academy_id").eq("onboarding_complete", true).order("full_name"),
+        supabase.from("athlete_profiles").select("id, full_name, user_id, academy_id").eq("onboarding_complete", true).order("full_name"),
         supabase.from("attendance").select("athlete_profile_id, status, date, marked_at, distance_meters"),
         supabase.from("leave_applications")
           .select("*, athlete_profiles!leave_applications_athlete_profile_id_fkey(full_name)")

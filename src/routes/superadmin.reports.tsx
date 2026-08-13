@@ -58,7 +58,7 @@ function generateAcademyPaymentReportPdf(data: {
 <div class="report">
   <div class="header">
     <div>
-      <h1>Crickos Academy — Payment History Statement</h1>
+      <h1>Boxos Academy — Payment History Statement</h1>
       <div class="sub">Academy Location: <strong>${data.academyName}</strong></div>
     </div>
     <div class="badge">${data.academyName}</div>
@@ -134,7 +134,7 @@ function generateAcademyPaymentReportPdf(data: {
   </table>
 
   <div class="footer">
-    Official Crickos Platform Statement — ${data.academyName}<br/>
+    Official Boxos Platform Statement — ${data.academyName}<br/>
     Generated on ${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })} at ${new Date().toLocaleTimeString("en-IN")}
   </div>
 </div>
@@ -191,7 +191,7 @@ function SAReports() {
   function handleCSV() {
     const h = "Invoice,Date,Status,Invoiced,Collected,Outstanding,Athlete";
     const rows = overdueInvoices.map((i: any) => `${i.invoice_number},${i.due_date},${i.status},${i.amount_due},${i.amount_paid},${i.balance_outstanding},${i.athleteName}`);
-    csvExport(`Crickos_Report_${new Date().toISOString().split("T")[0]}.csv`, h, rows);
+    csvExport(`Boxos_Report_${new Date().toISOString().split("T")[0]}.csv`, h, rows);
   }
 
   const tabs = [
@@ -215,7 +215,7 @@ function SAReports() {
       <div className="print-area">
         {/* Print header */}
         <div className="mb-6 hidden print:block">
-          <h1 className="text-2xl font-display font-bold">Crickos Platform Report</h1>
+          <h1 className="text-2xl font-display font-bold">Boxos Platform Report</h1>
           <p className="text-sm text-muted-foreground">Generated {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
         </div>
 
@@ -486,7 +486,7 @@ function SAReports() {
         }, {});
 
         const athleteAcademy = (athletes || []).reduce((acc: Record<string, string>, a: any) => {
-          if (a.preferred_academy_id) acc[a.id] = a.preferred_academy_id;
+          if (a.academy_id) acc[a.id] = a.academy_id;
           return acc;
         }, {});
 

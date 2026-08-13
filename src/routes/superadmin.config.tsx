@@ -15,10 +15,10 @@ function ConfigPage() {
 
   // Academy settings state
   const [settings, setSettings] = useState({
-    academy_name: "Crickos Pilot Academy",
+    academy_name: "Boxos Pilot Academy",
     tagline: "Precision since 2018",
-    primary_sport: "Cricket",
-    secondary_sports: "Cricket",
+    primary_sport: "Boxing",
+    secondary_sports: "Boxing",
     operating_hours: "06:00 — 21:00",
     time_zone: "Asia/Kolkata",
     default_fee_currency: "INR",
@@ -76,7 +76,7 @@ function ConfigPage() {
 
   function generateRandomCode() {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
-    setNewCodeInput(`CRICK-${randomNum}`);
+    setNewCodeInput(`BOX-${randomNum}`);
   }
 
   async function handleCreateCode(e: React.FormEvent) {
@@ -177,7 +177,7 @@ function ConfigPage() {
                 required
                 value={newCodeInput}
                 onChange={(e) => setNewCodeInput(e.target.value.toUpperCase())}
-                placeholder="e.g. CRICKOS1 or CRICK-8842"
+                placeholder="e.g. BOXOS1 or BOX-8842"
                 className="w-full bg-elevated border border-border rounded-xl px-4 py-2.5 text-sm font-mono font-bold uppercase tracking-wider focus:outline-none focus:border-primary"
               />
             </div>

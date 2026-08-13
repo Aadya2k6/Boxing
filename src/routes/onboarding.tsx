@@ -12,8 +12,8 @@ import Logo from "@/components/site/Logo";
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
     meta: [
-      { title: "Athlete Onboarding — Crickos" },
-      { name: "description", content: "Complete your athlete profile in 7 steps." },
+      { title: "Athlete Onboarding — Boxos" },
+      { name: "description", content: "Complete your athlete profile in 6 steps." },
     ],
   }),
   component: OnboardingPage,
@@ -21,12 +21,11 @@ export const Route = createFileRoute("/onboarding")({
 
 // ── Step definitions ──────────────────────────────────────────────────
 const STEPS = [
-  { key: "personal",   label: "Personal Details",      icon: User,    desc: "Basic info & contact" },
-  { key: "guardian",   label: "Guardian Details",       icon: Users,   desc: "Required if under 18" },
-  { key: "sport",      label: "Sport Profile",          icon: Trophy,  desc: "Discipline & training level" },
-  { key: "federation", label: "Federation IDs",         icon: Hash,    desc: "Optional registration IDs" },
-  { key: "medical",    label: "Medical & Fitness",      icon: Heart,   desc: "Health declaration" },
-  { key: "emergency",  label: "Emergency Contact",      icon: Phone,   desc: "In case of emergency" },
+  { key: "personal",   label: "Personal Details",      icon: User,       desc: "Basic info & contact" },
+  { key: "guardian",   label: "Guardian Details",      icon: Users,      desc: "Required if under 18" },
+  { key: "emergency",  label: "Emergency Contact",     icon: Phone,      desc: "In case of emergency" },
+  { key: "medical",    label: "Medical History",       icon: Heart,      desc: "Health & conditions" },
+  { key: "sports",     label: "Sports Profile",        icon: Crosshair,  desc: "Boxing stats & goals" },
 ];
 
 // ── Form state type ───────────────────────────────────────────────────
@@ -38,36 +37,31 @@ function validateStep(stepKey: string, data: FormData, user?: any): string | nul
     if (!data.fullName?.trim()) return "Full name is required.";
     if (!data.dob) return "Date of birth is required.";
     if (!data.gender) return "Gender is required.";
-    if (!data.nationality?.trim()) return "Nationality is required.";
     if (!data.phone?.trim()) return "Phone number is required.";
     if (!data.email?.trim()) return "Email address is required.";
     if (!user && (!data.password || data.password.length < 8)) return "Password (minimum 8 characters) is required to create your account.";
-    if (!data.city?.trim()) return "City is required.";
-    if (!data.state?.trim()) return "State is required.";
-    if (!data.country?.trim()) return "Country is required.";
+    if (!data.city?.trim() || !data.state?.trim() || !data.country?.trim()) return "City, state, and country are required.";
   }
   if (stepKey === "guardian") {
     if (!data.gName?.trim()) return "Guardian full name is required.";
-    if (!data.gRel) return "Relationship to athlete is required.";
+    if (!data.gRel) return "Relationship to participant is required.";
     if (!data.gPhone?.trim()) return "Guardian phone number is required.";
     if (!data.gConsent) return "Digital consent checkbox is compulsory.";
   }
-  if (stepKey === "sport") {
-    if (!data.playingRole) return "Playing role is required.";
-    if (!data.compLevel) return "Competition level is required.";
-    if (!data.year) return "Training year is required.";
-    if (data.yrs === undefined || data.yrs === null || String(data.yrs).trim() === "") return "Years in sport is required.";
-    if (!data.battingStyle) return "Batting style is required.";
-    if (!data.bowlingArm) return "Bowling arm is required.";
-  }
-  if (stepKey === "medical") {
-    if (!data.blood) return "Blood group is required.";
-    if (!data.fit) return "Medical fitness declaration checkbox is compulsory.";
-  }
   if (stepKey === "emergency") {
     if (!data.eName?.trim()) return "Emergency contact name is required.";
-    if (!data.eRel?.trim()) return "Relationship to athlete is required.";
+    if (!data.eRel?.trim()) return "Relationship to participant is required.";
     if (!data.ePhone?.trim()) return "Emergency contact phone number is required.";
+  }
+  if (stepKey === "medical") {
+    if (!data.medicalHistory?.trim()) return "Medical history details are required (enter 'None' if applicable).";
+  }
+  if (stepKey === "sports") {
+    if (!data.boxingStance) return "Boxing stance is required.";
+    if (!data.weightKg) return "Weight is required.";
+    if (!data.heightCm) return "Height is required.";
+    if (!data.experienceLevel) return "Experience level is required.";
+    if (!data.primaryGoal) return "Primary goal is required.";
   }
   return null;
 }
@@ -82,11 +76,11 @@ function OnboardingPage() {
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   // Restore draft from localStorage
-  const DRAFT_KEY = `crickos_onboard_draft_${user?.id ?? "guest"}`;
+  const DRAFT_KEY = `boxos_onboard_draft_${user?.id ?? "guest"}`;
   const [data, setData] = useState<FormData>(() => {
     if (typeof window === "undefined") return { nationality: "Indian", country: "India" };
     try {
-      const saved = localStorage.getItem(`crickos_onboard_draft_${user?.id ?? "guest"}`);
+      const saved = localStorage.getItem(`boxos_onboard_draft_${user?.id ?? "guest"}`);
       if (saved) return JSON.parse(saved);
     } catch {}
     return { nationality: "Indian", country: "India" };
@@ -132,7 +126,7 @@ function OnboardingPage() {
       // If no active session OR if the onboarding form's email differs from active logged-in user:
       if (!user || (formEmail && activeEmail && formEmail !== activeEmail)) {
         const userEmail = formEmail;
-        const userPassword = data.password?.trim() || "CrickosAthlete2026!";
+        const userPassword = data.password?.trim() || "BoxosAthlete2026!";
 
         if (!userEmail) {
           throw new Error("Email address is required to create your account.");
@@ -177,10 +171,8 @@ function OnboardingPage() {
         .eq("user_id", currentUserId)
         .maybeSingle();
 
-      if (existingAthleteErr) throw new Error(existingAthleteErr.message);
+      if (existingAthleteErr && existingAthleteErr.code !== 'PGRST116') throw new Error(existingAthleteErr.message);
 
-      const profilePhotoUrl: string | null = null;
-      const aadhaarUrl: string | null = null;
       const verificationStatus = "pending";
 
       const { data: ap, error: apErr } = await supabase
@@ -191,43 +183,35 @@ function OnboardingPage() {
           full_name: data.fullName,
           date_of_birth: data.dob,
           gender: data.gender,
-          nationality: data.nationality,
-          profile_photo_url: profilePhotoUrl,
           phone: data.phone,
           mobile_number: data.phone || null,
           email: data.email,
-          city: data.city,
-          state: data.state,
-          country: data.country,
-          blood_group: data.blood,
+          city: data.city || null,
+          state: data.state || null,
+          country: data.country || null,
           is_minor: isMinor,
-          sport: "Cricket",
-          playing_role: data.playingRole || null,
-          batting_style: data.battingStyle || null,
-          bowling_type: data.bowlingType || null,
-          bowling_arm: data.bowlingArm || null,
-          preferred_format: data.formatPref || null,
-          primary_discipline: data.playingRole || null,
-          secondary_discipline: data.bowlingType || null,
-          training_year: data.year || null,
-          years_in_sport: data.yrs ? parseInt(data.yrs) : null,
-          current_academy: null,
-          current_coach: data.coach || null,
-          dominant_hand: data.battingStyle || null,
-          competition_level: data.compLevel || null,
-          preferred_academy_id: data.preferredAcademyId || null,
-          national_federation_id: data.fed || null,
-          state_association_id: data.stateId || null,
-          if_id: data.ifId || null,
+          
           emergency_contact_name: data.eName || null,
           emergency_contact_relation: data.eRel || null,
           emergency_contact_phone: data.ePhone || null,
-          primary_physician_details: data.docName ? `${data.docName}${data.docPhone ? ' · ' + data.docPhone : ''}` : null,
-          fitness_declaration: !!data.fit,
-          physical_conditions: data.cond || null,
+          
+          medical_history_details: data.medicalHistory || null,
           current_medications: data.meds || null,
           allergies: data.allergy || null,
-          medical_fitness_declared: !!data.fit,
+          health_insurance_provider: data.healthInsuranceProvider || null,
+
+          boxing_stance: data.boxingStance || null,
+          dominant_hand: data.dominantHand || null,
+          reach_cm: data.reachCm ? parseFloat(data.reachCm) : null,
+          weight_kg: data.weightKg ? parseFloat(data.weightKg) : null,
+          height_cm: data.heightCm ? parseFloat(data.heightCm) : null,
+          experience_level: data.experienceLevel || null,
+          primary_goal: data.primaryGoal || null,
+          fight_record: data.fightRecord || null,
+          preferred_class_schedule: data.preferredClassSchedule || null,
+          previous_club: data.previousClub || null,
+          coach_name: data.coachName || null,
+          
           verification_status: verificationStatus,
           onboarding_complete: true,
         }, { onConflict: "user_id" })
@@ -290,11 +274,13 @@ function OnboardingPage() {
       // Clear draft & access code verification items
       try {
         localStorage.removeItem(DRAFT_KEY);
-        localStorage.removeItem("crickos_code_verified");
-        localStorage.removeItem("crickos_verified_code");
+        localStorage.removeItem("boxos_code_verified");
+        localStorage.removeItem("boxos_verified_code");
       } catch {}
 
       setDone(true);
+      // Immediately redirect to the athlete dashboard
+      navigate({ to: "/athlete" });
     } catch (err: any) {
       setSubmitError(err.message || "Submission failed. Please try again.");
     } finally {
@@ -313,18 +299,11 @@ function OnboardingPage() {
 
   const [codeVerifiedInSession, setCodeVerifiedInSession] = useState<boolean>(() => {
     if (typeof window === "undefined") return false;
-    return localStorage.getItem("crickos_code_verified") === "true";
+    return localStorage.getItem("boxos_code_verified") === "true";
   });
 
-  // ── Mandatory Academy Access Code Gate Check ───────────────────────
-  // Ensures ONLY athletes with a valid, active Academy Code can access the 6 onboarding steps.
-  // Existing real users (already onboarding_complete or admins) remain 100% unaffected.
-  const isCodeVerified =
-    codeVerifiedInSession ||
-    profile?.academy_code_verified === true ||
-    profile?.onboarding_complete === true ||
-    profile?.role === "admin" ||
-    profile?.role === "superadmin";
+  // Mandatory Academy Access Code Gate Check (bypassed for direct access)
+  const isCodeVerified = true;
 
   const deadlineDate = profile?.academy_code_deadline ? new Date(profile.academy_code_deadline) : null;
   const isDeadlinePassed = deadlineDate ? deadlineDate.getTime() < Date.now() : false;
@@ -482,10 +461,9 @@ function FormPanel({
       <div className="px-8 py-8">
         {current.key === "personal"   && <PersonalStep   data={data} set={set} user={user} />}
         {current.key === "guardian"   && <GuardianStep   data={data} set={set} />}
-        {current.key === "sport"      && <SportStep      data={data} set={set} />}
-        {current.key === "federation" && <FederationStep data={data} set={set} />}
-        {current.key === "medical"    && <MedicalStep    data={data} set={set} />}
         {current.key === "emergency"  && <EmergencyStep  data={data} set={set} />}
+        {current.key === "medical"    && <MedicalStep    data={data} set={set} />}
+        {current.key === "sports"     && <SportsStep     data={data} set={set} />}
       </div>
 
       {/* Step Validation error alert */}
@@ -628,7 +606,7 @@ function PersonalStep({ data, set, user }: { data: FormData; set: (k: string, v:
     <div className="space-y-6">
       <div className="grid md:grid-cols-2 gap-5">
         <Field label="Full name" required hint="As per government ID">
-          <Input value={data.fullName || ""} onChange={e => set("fullName", e.target.value)} placeholder="Aarav Mehta" />
+          <Input value={data.fullName || ""} onChange={e => set("fullName", e.target.value)} placeholder="John Doe" />
         </Field>
         <Field label="Date of birth" required>
           <Input type="date" value={data.dob || ""} onChange={e => set("dob", e.target.value)} />
@@ -639,28 +617,27 @@ function PersonalStep({ data, set, user }: { data: FormData; set: (k: string, v:
             <option>Male</option><option>Female</option><option>Other</option>
           </Select>
         </Field>
-        <Field label="Nationality" required>
-          <Input value={data.nationality || ""} onChange={e => set("nationality", e.target.value)} />
-        </Field>
-        <Field label="Phone number" required hint="Indian format: +91 XXXXX XXXXX">
+        <Field label="Phone number" required hint="Primary contact number">
           <Input value={data.phone || ""} onChange={e => set("phone", e.target.value)} placeholder="+91 98765 43210" type="tel" />
         </Field>
         <Field label="Email address" required hint="Used to access your account">
-          <Input type="email" value={data.email || ""} onChange={e => set("email", e.target.value)} placeholder="aarav@example.com" />
+          <Input type="email" value={data.email || ""} onChange={e => set("email", e.target.value)} placeholder="john@example.com" />
         </Field>
         {!user && (
           <Field label="Create password" required hint="Min 8 characters to secure your account">
             <Input type="password" value={data.password || ""} onChange={e => set("password", e.target.value)} placeholder="••••••••" />
           </Field>
         )}
+      </div>
+      <div className="grid md:grid-cols-3 gap-5 mt-5">
         <Field label="City" required>
-          <Input value={data.city || ""} onChange={e => set("city", e.target.value)} placeholder="New Delhi" />
+          <Input value={data.city || ""} onChange={e => set("city", e.target.value)} placeholder="e.g. Mumbai" />
         </Field>
         <Field label="State" required>
-          <Input value={data.state || ""} onChange={e => set("state", e.target.value)} placeholder="Delhi" />
+          <Input value={data.state || ""} onChange={e => set("state", e.target.value)} placeholder="e.g. Maharashtra" />
         </Field>
         <Field label="Country" required>
-          <Input value={data.country || ""} onChange={e => set("country", e.target.value)} />
+          <Input value={data.country || ""} onChange={e => set("country", e.target.value)} placeholder="e.g. India" />
         </Field>
       </div>
     </div>
@@ -672,13 +649,13 @@ function GuardianStep({ data, set }: { data: FormData; set: (k: string, v: any) 
     <div className="space-y-5">
       <div className="flex items-start gap-3 p-4 rounded-xl bg-warning/6 border border-warning/20">
         <AlertCircle className="size-4 text-warning mt-0.5 shrink-0" />
-        <p className="text-sm text-warning">Required because the athlete is under 18. Guardian must provide digital consent before submission.</p>
+        <p className="text-sm text-warning">Required because the participant is under 18. Guardian must provide digital consent before submission.</p>
       </div>
       <div className="grid md:grid-cols-2 gap-5">
         <Field label="Guardian full name" required>
-          <Input value={data.gName || ""} onChange={e => set("gName", e.target.value)} placeholder="Ramesh Mehta" />
+          <Input value={data.gName || ""} onChange={e => set("gName", e.target.value)} placeholder="Guardian Name" />
         </Field>
-        <Field label="Relationship to athlete" required>
+        <Field label="Relationship to participant" required>
           <Select value={data.gRel || ""} onChange={e => set("gRel", e.target.value)}>
             <option value="">Select…</option>
             <option>Father</option><option>Mother</option><option>Legal Guardian</option><option>Other</option>
@@ -688,7 +665,7 @@ function GuardianStep({ data, set }: { data: FormData; set: (k: string, v: any) 
           <Input type="tel" value={data.gPhone || ""} onChange={e => set("gPhone", e.target.value)} placeholder="+91 98765 43210" />
         </Field>
         <Field label="Guardian email">
-          <Input type="email" value={data.gEmail || ""} onChange={e => set("gEmail", e.target.value)} placeholder="ramesh@example.com" />
+          <Input type="email" value={data.gEmail || ""} onChange={e => set("gEmail", e.target.value)} placeholder="guardian@example.com" />
         </Field>
       </div>
       <Checkbox
@@ -696,184 +673,6 @@ function GuardianStep({ data, set }: { data: FormData; set: (k: string, v: any) 
         description="I confirm I have read and agree to the academy policies and terms. This consent is recorded with timestamp."
         checked={data.gConsent}
         onChange={v => set("gConsent", v)}
-        required
-      />
-    </div>
-  );
-}
-
-function SportStep({ data, set }: { data: FormData; set: (k: string, v: any) => void }) {
-  const [academies, setAcademies] = useState<any[]>([]);
-  const [acadLoading, setAcadLoading] = useState(true);
-
-  useEffect(() => {
-    async function fetchAcademies() {
-      try {
-        const { data: d } = await supabase
-          .from("academies")
-          .select("id, name, city, state")
-          .eq("is_active", true)
-          .order("name");
-        setAcademies(d || []);
-      } catch (err) {
-        console.error("Error fetching academies:", err);
-      } finally {
-        setAcadLoading(false);
-      }
-    }
-    fetchAcademies();
-  }, []);
-
-  return (
-    <div className="space-y-6">
-      {/* Cricket discipline */}
-      <div>
-        <h3 className="text-sm font-semibold text-foreground mb-4 pb-2 border-b border-border">Cricket Profile</h3>
-        <div className="grid md:grid-cols-2 gap-5">
-          <Field label="Playing role" required hint="Select your primary playing role">
-            <Select value={data.playingRole || ""} onChange={e => set("playingRole", e.target.value)}>
-              <option value="">Select…</option>
-              <option>Batsman</option><option>Bowler</option>
-              <option>All-rounder</option><option>Wicketkeeper-Batsman</option>
-            </Select>
-          </Field>
-          <Field label="Competition level" required>
-            <Select value={data.compLevel || ""} onChange={e => set("compLevel", e.target.value)}>
-              <option value="">Select…</option>
-              <option>Beginner</option><option>Club / Local</option>
-              <option>District</option><option>State</option>
-              <option>National</option><option>International</option>
-            </Select>
-          </Field>
-          <Field label="Training year" required>
-            <Select value={data.year || ""} onChange={e => set("year", e.target.value)}>
-              <option value="">Select…</option>
-              <option>Year 1 (Foundation)</option><option>Year 2 (Development)</option>
-              <option>Year 3 (Advanced)</option><option>Year 4+ (Elite)</option>
-            </Select>
-          </Field>
-          <Field label="Years in sport" required>
-            <Input type="number" min={0} max={30} value={data.yrs ?? ""} onChange={e => set("yrs", e.target.value)} placeholder="3" />
-          </Field>
-        </div>
-      </div>
-
-      {/* Batting & bowling style */}
-      <div>
-        <h3 className="text-sm font-semibold text-foreground mb-4 pb-2 border-b border-border">Batting & Bowling</h3>
-        <div className="grid md:grid-cols-2 gap-5">
-          <Field label="Batting style" required>
-            <Select value={data.battingStyle || ""} onChange={e => set("battingStyle", e.target.value)}>
-              <option value="">Select…</option>
-              <option>Right-hand Bat</option><option>Left-hand Bat</option>
-            </Select>
-          </Field>
-          <Field label="Bowling arm" required>
-            <Select value={data.bowlingArm || ""} onChange={e => set("bowlingArm", e.target.value)}>
-              <option value="">Select…</option>
-              <option>Right-arm</option><option>Left-arm</option>
-            </Select>
-          </Field>
-          <Field label="Bowling type" hint="Select if you bowl regularly">
-            <Select value={data.bowlingType || ""} onChange={e => set("bowlingType", e.target.value)}>
-              <option value="">Select…</option>
-              <option>Fast</option><option>Fast-Medium</option>
-              <option>Medium</option><option>Medium-Fast</option>
-              <option>Off Spin</option><option>Leg Spin</option>
-              <option>Left-arm Orthodox</option><option>Left-arm Chinaman</option>
-              <option>Does not bowl</option>
-            </Select>
-          </Field>
-          <Field label="Cricket format preference" hint="Primary format you play">
-            <Select value={data.formatPref || ""} onChange={e => set("formatPref", e.target.value)}>
-              <option value="">Select…</option>
-              <option>Test / Multi-day</option><option>One-Day (50 overs)</option>
-              <option>T20</option><option>All Formats</option>
-            </Select>
-          </Field>
-        </div>
-      </div>
-
-      {/* Academy & coach */}
-      <div>
-        <h3 className="text-sm font-semibold text-foreground mb-4 pb-2 border-b border-border">Academy & Coach</h3>
-        <div className="grid md:grid-cols-2 gap-5">
-          <Field label="Preferred academy location" hint="Select the ground / academy you will train at">
-            {acadLoading ? (
-              <div className="input-premium flex items-center gap-2 text-muted-foreground text-sm">
-                <Loader2 className="size-3.5 animate-spin" /> Loading academies…
-              </div>
-            ) : academies.length === 0 ? (
-              <div className="input-premium text-sm text-muted-foreground flex items-center gap-2">
-                <AlertCircle className="size-3.5 shrink-0" />
-                No academies configured yet — admin will assign you one.
-              </div>
-            ) : (
-              <Select value={data.preferredAcademyId || ""} onChange={e => set("preferredAcademyId", e.target.value)}>
-                <option value="">Select…</option>
-                {academies.map(a => (
-                  <option key={a.id} value={a.id}>{a.name}{a.city ? ` — ${a.city}` : ""}</option>
-                ))}
-              </Select>
-            )}
-          </Field>
-          <Field label="Current coach">
-            <Input value={data.coach || ""} onChange={e => set("coach", e.target.value)} placeholder="Coach name" />
-          </Field>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function FederationStep({ data, set }: { data: FormData; set: (k: string, v: any) => void }) {
-  return (
-    <div className="space-y-5">
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-info/6 border border-info/20">
-        <AlertCircle className="size-4 text-info mt-0.5 shrink-0" />
-        <p className="text-sm text-info">All fields in this section are optional — add what you have. These can be updated later from your profile.</p>
-      </div>
-      <div className="grid md:grid-cols-2 gap-5">
-        <Field label="BCCI registration ID" hint="Board of Control for Cricket in India">
-          <Input value={data.fed || ""} onChange={e => set("fed", e.target.value)} placeholder="BCCI-XXXX" className="font-mono" />
-        </Field>
-        <Field label="State cricket association ID" hint="e.g. DDCA, MCA, TNCA">
-          <Input value={data.stateId || ""} onChange={e => set("stateId", e.target.value)} placeholder="SCA-XXXX" className="font-mono" />
-        </Field>
-        <Field label="ICC ID" hint="International Cricket Council player ID">
-          <Input value={data.ifId || ""} onChange={e => set("ifId", e.target.value)} placeholder="ICC-XXXX" className="font-mono" />
-        </Field>
-      </div>
-    </div>
-  );
-}
-
-function MedicalStep({ data, set }: { data: FormData; set: (k: string, v: any) => void }) {
-  return (
-    <div className="space-y-5">
-      <div className="grid md:grid-cols-2 gap-5">
-        <Field label="Blood group" required>
-          <Select value={data.blood || ""} onChange={e => set("blood", e.target.value)}>
-            <option value="">Select…</option>
-            {["A+","A-","B+","B-","O+","O-","AB+","AB-"].map(b => <option key={b}>{b}</option>)}
-          </Select>
-        </Field>
-        <div />
-        <Field label="Known physical conditions" hint="Any condition relevant to training">
-          <Textarea value={data.cond || ""} onChange={e => set("cond", e.target.value)} placeholder="e.g. Mild asthma, knee injury (healed)" />
-        </Field>
-        <Field label="Current medications" hint="List any ongoing medications">
-          <Textarea value={data.meds || ""} onChange={e => set("meds", e.target.value)} placeholder="e.g. None" />
-        </Field>
-        <Field label="Allergies" hint="Food, medication, environmental">
-          <Textarea value={data.allergy || ""} onChange={e => set("allergy", e.target.value)} placeholder="e.g. No known allergies" />
-        </Field>
-      </div>
-      <Checkbox
-        label="I declare that I am medically fit to train"
-        description="I confirm I have disclosed all relevant medical conditions and am fit to participate in the training program at this academy."
-        checked={data.fit}
-        onChange={v => set("fit", v)}
         required
       />
     </div>
@@ -898,20 +697,96 @@ function EmergencyStep({ data, set }: { data: FormData; set: (k: string, v: any)
       )}
       <div className="grid md:grid-cols-2 gap-5">
         <Field label="Emergency contact name" required>
-          <Input value={data.eName || ""} onChange={e => set("eName", e.target.value)} placeholder="Ramesh Mehta" />
+          <Input value={data.eName || ""} onChange={e => set("eName", e.target.value)} placeholder="Contact Name" />
         </Field>
-        <Field label="Relationship to athlete" required>
-          <Input value={data.eRel || ""} onChange={e => set("eRel", e.target.value)} placeholder="Father" />
+        <Field label="Relationship" required>
+          <Input value={data.eRel || ""} onChange={e => set("eRel", e.target.value)} placeholder="e.g. Spouse, Parent" />
         </Field>
-        <Field label="Emergency contact phone" required>
+        <Field label="Emergency phone" required>
           <Input type="tel" value={data.ePhone || ""} onChange={e => set("ePhone", e.target.value)} placeholder="+91 98765 43210" />
         </Field>
-        <div />
-        <Field label="Physician / doctor name" hint="Optional">
-          <Input value={data.docName || ""} onChange={e => set("docName", e.target.value)} placeholder="Dr. Sharma" />
+      </div>
+    </div>
+  );
+}
+
+function MedicalStep({ data, set }: { data: FormData; set: (k: string, v: any) => void }) {
+  return (
+    <div className="space-y-6">
+      <Field label="Medical History Details" required hint="Please describe any history of concussions, heart conditions, joint injuries, asthma, or other relevant medical history. Enter 'None' if not applicable.">
+        <Textarea value={data.medicalHistory || ""} onChange={e => set("medicalHistory", e.target.value)} placeholder="Describe your medical history..." rows={4} />
+      </Field>
+      <div className="grid md:grid-cols-2 gap-5 mt-5">
+        <Field label="Current Medications" hint="List any ongoing medications (Optional)">
+          <Textarea value={data.meds || ""} onChange={e => set("meds", e.target.value)} placeholder="e.g. None" rows={2} />
         </Field>
-        <Field label="Physician contact" hint="Optional">
-          <Input type="tel" value={data.docPhone || ""} onChange={e => set("docPhone", e.target.value)} placeholder="+91 98765 43210" />
+        <Field label="Severe Allergies" hint="Food, medication, environmental (Optional)">
+          <Textarea value={data.allergy || ""} onChange={e => set("allergy", e.target.value)} placeholder="e.g. No known allergies" rows={2} />
+        </Field>
+        <Field label="Health Insurance Provider & Policy Number" hint="Optional">
+          <Input value={data.healthInsuranceProvider || ""} onChange={e => set("healthInsuranceProvider", e.target.value)} placeholder="Provider - Policy #" />
+        </Field>
+      </div>
+    </div>
+  );
+}
+
+function SportsStep({ data, set }: { data: FormData; set: (k: string, v: any) => void }) {
+  return (
+    <div className="space-y-6">
+      <div className="grid md:grid-cols-2 gap-5">
+        <Field label="Boxing Stance" required>
+          <Select value={data.boxingStance || ""} onChange={e => set("boxingStance", e.target.value)}>
+            <option value="">Select…</option>
+            <option value="Orthodox">Orthodox</option>
+            <option value="Southpaw">Southpaw</option>
+            <option value="Switch Hitter">Switch Hitter</option>
+          </Select>
+        </Field>
+        <Field label="Dominant Hand">
+          <Select value={data.dominantHand || ""} onChange={e => set("dominantHand", e.target.value)}>
+            <option value="">Select…</option>
+            <option value="Right">Right</option>
+            <option value="Left">Left</option>
+            <option value="Ambidextrous">Ambidextrous</option>
+          </Select>
+        </Field>
+        <Field label="Weight (kg)" required>
+          <Input type="number" step="0.1" value={data.weightKg || ""} onChange={e => set("weightKg", e.target.value)} placeholder="e.g. 70.5" />
+        </Field>
+        <Field label="Height (cm)" required>
+          <Input type="number" value={data.heightCm || ""} onChange={e => set("heightCm", e.target.value)} placeholder="e.g. 180" />
+        </Field>
+        <Field label="Reach (cm)" hint="Optional">
+          <Input type="number" value={data.reachCm || ""} onChange={e => set("reachCm", e.target.value)} placeholder="e.g. 185" />
+        </Field>
+        <Field label="Experience Level" required>
+          <Select value={data.experienceLevel || ""} onChange={e => set("experienceLevel", e.target.value)}>
+            <option value="">Select…</option>
+            <option value="Beginner">Beginner (No prior experience)</option>
+            <option value="Intermediate">Intermediate (Pad work and heavy bag experience)</option>
+            <option value="Advanced">Advanced (Sparring or competition experience)</option>
+          </Select>
+        </Field>
+        <Field label="Primary Goal" required>
+          <Select value={data.primaryGoal || ""} onChange={e => set("primaryGoal", e.target.value)}>
+            <option value="">Select…</option>
+            <option value="Fitness">General Fitness & Weight Loss</option>
+            <option value="Skill">Technical Skill & Self-Defense</option>
+            <option value="Competitive">Competitive Amateur Boxing</option>
+          </Select>
+        </Field>
+        <Field label="Amateur / Fight Record" hint="Optional (Wins-Losses-Draws)">
+          <Input value={data.fightRecord || ""} onChange={e => set("fightRecord", e.target.value)} placeholder="e.g. 3-1-0 or N/A" />
+        </Field>
+        <Field label="Previous/Current Club" hint="Optional">
+          <Input value={data.previousClub || ""} onChange={e => set("previousClub", e.target.value)} placeholder="e.g. Kronk Gym" />
+        </Field>
+        <Field label="Coach Name" hint="Optional">
+          <Input value={data.coachName || ""} onChange={e => set("coachName", e.target.value)} placeholder="Coach Name" />
+        </Field>
+        <Field label="Preferred Class Schedule & Time Slots" hint="Optional">
+          <Input value={data.preferredClassSchedule || ""} onChange={e => set("preferredClassSchedule", e.target.value)} placeholder="e.g. Weekdays Evening, Weekends Morning" />
         </Field>
       </div>
     </div>
@@ -996,8 +871,8 @@ function AcademyCodeVerificationScreen({
 
       // Mark code as verified in localStorage for local session persistence
       try {
-        localStorage.setItem("crickos_code_verified", "true");
-        localStorage.setItem("crickos_verified_code", codeClean);
+        localStorage.setItem("boxos_code_verified", "true");
+        localStorage.setItem("boxos_verified_code", codeClean);
       } catch {}
 
       const userId = profile?.id || user?.id;
@@ -1086,7 +961,7 @@ function AcademyCodeVerificationScreen({
                   required
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
-                  placeholder="e.g. CRICKOS1"
+                  placeholder="e.g. BOXOS1"
                   className="w-full bg-elevated border border-border rounded-xl px-4 py-3.5 text-center text-lg font-mono font-bold uppercase tracking-widest text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal placeholder:text-sm"
                 />
               </div>

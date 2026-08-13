@@ -91,7 +91,7 @@ function NotifPage() {
     // Fetch athlete profile ID and joining date
     const { data: ap } = await supabase
       .from("athlete_profiles")
-      .select("id, created_at")
+      .select("id, created_at, academy_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -126,15 +126,100 @@ function NotifPage() {
     if (joinCutoffIso) {
       pollsQuery = pollsQuery.gte("created_at", joinCutoffIso);
     }
-    const { data: polls } = await pollsQuery;
+    const { data: pollsData } = await pollsQuery;
+    const polls: any[] = pollsData ? [...pollsData] : [];
 
-    // 3. Fetch poll responses for this athlete
+    // Synthesize date-specific polls from active academy schedule templates
+    if (ap?.academy_id && apId) {
+      const { data: academyTemplates } = await supabase
+        .from("class_schedule_templates")
+        .select("id, name, academy_id, valid_from, valid_to, days_of_week, created_at")
+        .eq("is_active", true)
+        .eq("academy_id", ap.academy_id);
+
+      if (academyTemplates && academyTemplates.length > 0) {
+        const tmplIds = academyTemplates.map((t) => t.id);
+        const { data: academyPitches } = await supabase
+          .from("class_schedule_pitches")
+          .select("*")
+          .in("template_id", tmplIds);
+
+        if (academyPitches && academyPitches.length > 0) {
+          const today = new Date();
+          for (let dayOffset = 0; dayOffset <= 7; dayOffset++) {
+            const curDate = new Date(today);
+            curDate.setDate(curDate.getDate() + dayOffset);
+            
+            // Format locally instead of UTC to prevent date mismatch
+            const y = curDate.getFullYear();
+            const m = String(curDate.getMonth() + 1).padStart(2, "0");
+            const d = String(curDate.getDate()).padStart(2, "0");
+            const dateStr = `${y}-${m}-${d}`;
+            
+            const dayOfWeek = curDate.getDay();
+
+            for (const tmpl of academyTemplates) {
+              if (dateStr < tmpl.valid_from || dateStr > tmpl.valid_to) continue;
+              const rawDays = Array.isArray(tmpl.days_of_week) ? tmpl.days_of_week.map(Number) : [];
+              if (!rawDays.includes(dayOfWeek)) continue;
+
+              const tmplPitches = academyPitches.filter((p) => p.template_id === tmpl.id);
+              for (const pitch of tmplPitches) {
+                const isAllAcademy =
+                  (!pitch.batsmen || pitch.batsmen.length === 0) &&
+                  (!pitch.bowlers || pitch.bowlers.length === 0) &&
+                  (!pitch.extras || pitch.extras.length === 0);
+                const isAssigned =
+                  isAllAcademy ||
+                  (Array.isArray(pitch.batsmen) && pitch.batsmen.includes(apId)) ||
+                  (Array.isArray(pitch.bowlers) && pitch.bowlers.includes(apId)) ||
+                  (Array.isArray(pitch.extras) && pitch.extras.includes(apId));
+
+                if (!isAssigned) continue;
+
+                const alreadyPresent = (polls ?? []).some(
+                  (p: any) => String(p.pitch_id) === String(pitch.id) && String(p.poll_date).substring(0, 10) === dateStr
+                );
+                if (alreadyPresent) continue;
+
+                const formattedDate = curDate.toLocaleDateString("en-IN", {
+                  weekday: "short",
+                  month: "short",
+                  day: "numeric",
+                  year: "numeric",
+                });
+
+                polls.push({
+                  id: `poll-${pitch.id}_${dateStr}`,
+                  title: `Practice Class: ${tmpl.name} (${pitch.name}) — ${formattedDate}`,
+                  message: `Practice class scheduled for ${formattedDate} (${String(pitch.from_time ?? "").substring(0, 5)} - ${String(pitch.to_time ?? "").substring(0, 5)}). Please confirm if you will be attending.`,
+                  poll_date: dateStr,
+                  created_at: pitch.created_at || tmpl.created_at || new Date().toISOString(),
+                  pitch_id: pitch.id,
+                  type: "class_assignment_poll",
+                });
+              }
+            }
+          }
+        }
+      }
+    }
+
     if (apId) {
       const { data: responses } = await supabase
         .from("class_assignment_poll_responses")
-        .select("poll_id, status, reason, responded_at")
+        .select("poll_id, status, reason, responded_at, class_assignment_polls(pitch_id, poll_date)")
         .eq("athlete_profile_id", apId);
-      setClassPollResponses(Object.fromEntries((responses ?? []).map((r: any) => [r.poll_id, r])));
+
+      const mapped: any = {};
+      (responses ?? []).forEach((r: any) => {
+        mapped[r.poll_id] = r;
+        if (r.class_assignment_polls) {
+          const synthId = `poll-${r.class_assignment_polls.pitch_id}_${r.class_assignment_polls.poll_date}`;
+          mapped[synthId] = r;
+        }
+      });
+      setClassPollResponses(mapped);
     }
 
     // Merge notifications and class assignment polls (strictly after join date)
@@ -206,8 +291,47 @@ function NotifPage() {
 
     setRsvpState((prev) => ({ ...prev, [notifId]: { ...currentState, loading: true } }));
 
+    let targetPollId = pollId;
+    if (pollId.startsWith("poll-") || pollId.startsWith("tmpl-pitch-")) {
+      const raw = pollId.replace(/^tmpl-pitch-|^poll-/, "");
+      
+      const d = new Date();
+      const fallbackDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+      const [pitchId, dateStr = fallbackDate] = raw.split("_");
+
+      const { data: realPoll } = await supabase
+        .from("class_assignment_polls")
+        .select("id")
+        .eq("pitch_id", pitchId)
+        .eq("poll_date", dateStr)
+        .maybeSingle();
+
+      if (realPoll?.id) {
+        targetPollId = realPoll.id;
+      } else {
+        const newPollId = crypto.randomUUID();
+        const { data: pitchData } = await supabase
+          .from("class_schedule_pitches")
+          .select("*, class_schedule_templates(name, valid_from, academy_id)")
+          .eq("id", pitchId)
+          .maybeSingle();
+
+        await supabase.from("class_assignment_polls").insert({
+          id: newPollId,
+          sent_by: user?.id || null,
+          template_id: pitchData?.template_id || crypto.randomUUID(),
+          pitch_id: pitchId,
+          poll_date: dateStr,
+          title: `Practice Class: ${pitchData?.class_schedule_templates?.name ?? "Scheduled"} (${pitchData?.name ?? "Pitch"}) — ${dateStr}`,
+          message: `Practice class scheduled for ${dateStr}. Please confirm attendance.`,
+          academy_id: pitchData?.class_schedule_templates?.academy_id || null,
+        });
+        targetPollId = newPollId;
+      }
+    }
+
     const responsePayload = {
-      poll_id: pollId,
+      poll_id: targetPollId,
       athlete_profile_id: athleteId,
       status: isAttending ? "attending" : "not_attending",
       reason: isAttending ? null : currentState.reason.trim(),
@@ -217,7 +341,7 @@ function NotifPage() {
     const { data: existingResponse } = await supabase
       .from("class_assignment_poll_responses")
       .select("id")
-      .eq("poll_id", pollId)
+      .eq("poll_id", targetPollId)
       .eq("athlete_profile_id", athleteId)
       .maybeSingle();
 

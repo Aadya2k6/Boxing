@@ -61,13 +61,13 @@ function AcademiesPage() {
         supabase.from("academies").select("*").order("created_at"),
         supabase
           .from("athlete_profiles")
-          .select("preferred_academy_id")
-          .not("preferred_academy_id", "is", null),
+          .select("academy_id")
+          .not("academy_id", "is", null),
       ]);
       setAcademies(
         (acs ?? []).map((a) => ({
           ...a,
-          athlete_count: athletes?.filter((ap) => ap.preferred_academy_id === a.id).length ?? 0,
+          athlete_count: athletes?.filter((ap) => ap.academy_id === a.id).length ?? 0,
         })),
       );
     } finally {
@@ -274,7 +274,7 @@ function AcademiesPage() {
                   value={form.name}
                   onChange={(e) => setF("name", e.target.value)}
                   className="input-premium"
-                  placeholder="e.g. Crickos Academy, Pune"
+                  placeholder="e.g. Boxos Academy, Pune"
                 />
               </div>
               <div>
