@@ -41,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const { data: userData } = await supabase.auth.getUser();
       const u = userData?.user;
       if (u) {
+        const deadline = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
         const { data: newP } = await supabase
           .from("profiles")
           .upsert({
@@ -49,7 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             full_name: u.user_metadata?.full_name || "Athlete",
             email: u.email || null,
             is_active: true,
-            academy_code_verified: true,
+            academy_code_verified: false,
+            academy_code_deadline: deadline,
             updated_at: new Date().toISOString(),
           }, { onConflict: "id" })
           .select("*")

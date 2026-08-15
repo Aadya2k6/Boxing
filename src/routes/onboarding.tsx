@@ -112,6 +112,20 @@ function OnboardingPage() {
   const totalSteps = visibleSteps.length;
   const progress = (step / (totalSteps - 1)) * 100;
 
+  const [codeVerifiedInSession, setCodeVerifiedInSession] = useState<boolean>(false);
+
+  // If the profile explicitly says NOT verified, clear any stale localStorage flag
+  // so the gate always shows for unverified users (fixes bypass from old sessions)
+  useEffect(() => {
+    if (profile !== null && profile.academy_code_verified !== true) {
+      try {
+        localStorage.removeItem("boxos_code_verified");
+        localStorage.removeItem("boxos_verified_code");
+      } catch {}
+      setCodeVerifiedInSession(false);
+    }
+  }, [profile]);
+
   // ── Submit to Supabase ──────────────────────────────────────────────
   async function submitProfile() {
     setSubmitting(true);
@@ -297,13 +311,12 @@ function OnboardingPage() {
 
   if (done) return <SuccessScreen name={data.fullName || "Athlete"} />;
 
-  const [codeVerifiedInSession, setCodeVerifiedInSession] = useState<boolean>(() => {
-    if (typeof window === "undefined") return false;
-    return localStorage.getItem("boxos_code_verified") === "true";
-  });
-
-  // Mandatory Academy Access Code Gate Check (bypassed for direct access)
-  const isCodeVerified = true;
+  // Academy Access Code Gate — verified if:
+  // 1. Logged-in user's profile has academy_code_verified = true (persisted in DB), OR
+  // 2. They entered a valid code in this exact session (codeVerifiedInSession set by handleVerify)
+  // NOTE: localStorage alone cannot bypass the gate — the useEffect above clears stale flags
+  //       when profile says unverified. For anonymous users (no profile), they must always verify.
+  const isCodeVerified = profile?.academy_code_verified === true || codeVerifiedInSession;
 
   const deadlineDate = profile?.academy_code_deadline ? new Date(profile.academy_code_deadline) : null;
   const isDeadlinePassed = deadlineDate ? deadlineDate.getTime() < Date.now() : false;
