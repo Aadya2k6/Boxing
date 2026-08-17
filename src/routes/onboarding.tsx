@@ -1,13 +1,18 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMemo, useState, useEffect, useCallback } from "react";
 import {
-  Check, ChevronLeft, ChevronRight, Upload, Shield,
-  CircleCheck, User, Users, Trophy, Hash, Heart, Phone,
+  Check, ChevronLeft, ChevronRight, Shield,
+  CircleCheck, User, Users, Trophy, Heart, Phone,
   X, AlertCircle, Crosshair, Loader2
 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import Logo from "@/components/site/Logo";
+import { CinematicLayout } from "@/components/auth/CinematicLayout";
+import { CinematicCard } from "@/components/auth/CinematicCard";
+import { CinematicWizardPanel } from "@/components/auth/CinematicWizardPanel";
+import { CinematicInput } from "@/components/auth/CinematicInput";
+import { CinematicMedia } from "@/components/auth/CinematicMedia";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
@@ -304,8 +309,8 @@ function OnboardingPage() {
 
   // Auth guard — render loading state while checking session
   if (authLoading) return (
-    <div className="min-h-screen bg-background grid place-items-center">
-      <span className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+    <div className="min-h-screen theme-cinematic-dark bg-cinematic-base grid place-items-center">
+      <span className="size-6 border-2 border-cinematic-red border-t-transparent rounded-full animate-spin" />
     </div>
   );
 
@@ -337,64 +342,67 @@ function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col">
-      {/* Top bar */}
-      <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-xl border-b border-border px-6 h-16 flex items-center justify-between">
-        <Link to="/" className="flex items-center group">
-          <Logo className="h-9 sm:h-10 w-auto" textSize="text-xl" />
-        </Link>
-        <div className="flex items-center gap-3">
-          <span className="text-xs text-muted-foreground">
-            Step {step + 1} of {totalSteps}
-          </span>
-          <Link to="/" className="size-8 rounded-md border border-border grid place-items-center hover:bg-subtle transition">
-            <X className="size-3.5" />
-          </Link>
+    <CinematicLayout maxWidth="max-w-[900px]">
+      {/* Atmospheric Lighting */}
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-1/4 right-0 translate-x-1/3 opacity-70" style={{ animationDelay: '-3s' }} />
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[1000px] h-[1000px] top-1/3 right-0 translate-x-1/4 opacity-80" style={{ animationDelay: '-6s' }} />
+
+      <CinematicMedia allowVideo={false} />
+      
+      <div className="w-full relative z-10 flex flex-col flex-1 justify-center py-8">
+        {/* Global progress bar */}
+        <div className="w-full px-6 lg:px-8 mb-6">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-semibold text-cinematic-primary tracking-wider uppercase">
+              Step {step + 1} of {totalSteps}
+            </span>
+            <span className="text-xs text-cinematic-secondary">{current.label}</span>
+          </div>
+          <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
+            <div
+              className="h-full bg-cinematic-red transition-all duration-500 ease-out rounded-full"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
         </div>
-      </header>
 
-      {/* Global progress bar */}
-      <div className="h-0.5 bg-border">
-        <div
-          className="h-full bg-gradient-to-r from-primary-dark to-primary transition-all duration-500"
-          style={{ width: `${progress}%` }}
-        />
+        <div className="w-full px-6 lg:px-8 flex flex-col lg:flex-row gap-6 lg:gap-8 mx-auto">
+          {/* LEFT — step sidebar */}
+          <div className="hidden lg:block w-40 xl:w-48 shrink-0">
+            <StepSidebar steps={visibleSteps} current={step} onJump={(i) => i < step && setStep(i)} />
+          </div>
+
+          {/* RIGHT — form content */}
+          <main className="flex-1 w-full min-w-0">
+            <FormPanel
+              current={current}
+              step={step}
+              totalSteps={totalSteps}
+              data={data}
+              set={set}
+              user={user}
+              onPrev={() => setStep(s => Math.max(0, s - 1))}
+              onNext={() => {
+                if (step < totalSteps - 1) setStep(s => s + 1);
+                else submitProfile();
+              }}
+              isLast={step === totalSteps - 1}
+              submitting={submitting}
+              submitError={submitError}
+            />
+          </main>
+        </div>
       </div>
-
-      <div className="flex-1 max-w-6xl mx-auto w-full px-6 py-10 grid lg:grid-cols-12 gap-8">
-        {/* LEFT — step sidebar */}
-        <StepSidebar steps={visibleSteps} current={step} onJump={(i) => i < step && setStep(i)} />
-
-        {/* RIGHT — form content */}
-        <main className="lg:col-span-9">
-          <FormPanel
-            current={current}
-            step={step}
-            totalSteps={totalSteps}
-            data={data}
-            set={set}
-            user={user}
-            onPrev={() => setStep(s => Math.max(0, s - 1))}
-            onNext={() => {
-              if (step < totalSteps - 1) setStep(s => s + 1);
-              else submitProfile();
-            }}
-            isLast={step === totalSteps - 1}
-            submitting={submitting}
-            submitError={submitError}
-          />
-        </main>
-      </div>
-    </div>
+    </CinematicLayout>
   );
 }
 
 // ── Sidebar ───────────────────────────────────────────────────────────
 function StepSidebar({ steps, current, onJump }: { steps: typeof STEPS; current: number; onJump: (i: number) => void }) {
   return (
-    <aside className="lg:col-span-3 hidden lg:block">
-      <div className="sticky top-28 space-y-1">
-        <p className="label-micro px-3 mb-4">Progress</p>
+    <aside className="w-full">
+      <div className="space-y-2">
         {steps.map((s, i) => {
           const state = i === current ? "active" : i < current ? "done" : "todo";
           return (
@@ -402,23 +410,20 @@ function StepSidebar({ steps, current, onJump }: { steps: typeof STEPS; current:
               key={s.key}
               onClick={() => onJump(i)}
               className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-sm transition-all text-left group ${
-                state === "active" ? "bg-primary/8 text-primary-dark font-semibold" :
-                state === "done" ? "hover:bg-elevated cursor-pointer text-foreground" :
-                "text-muted-foreground cursor-default"
+                state === "active" ? "bg-white/10 text-cinematic-primary font-bold" :
+                state === "done" ? "hover:bg-white/5 cursor-pointer text-cinematic-primary opacity-80" :
+                "text-cinematic-secondary cursor-default opacity-50"
               }`}
             >
               <span className={`size-8 rounded-lg grid place-items-center text-xs font-bold border shrink-0 transition-all ${
-                state === "active" ? "border-primary bg-primary text-primary-foreground shadow-glow" :
-                state === "done" ? "border-success/40 bg-success/8 text-success" :
-                "border-border bg-surface text-muted-foreground"
+                state === "active" ? "border-cinematic-blue bg-cinematic-blue/20 text-cinematic-blue" :
+                state === "done" ? "border-green-500/40 bg-green-500/10 text-green-500" :
+                "border-white/10 bg-transparent text-white/50"
               }`}>
                 {state === "done" ? <Check className="size-3.5" strokeWidth={2.5} /> : i + 1}
               </span>
               <div className="min-w-0">
                 <div className="truncate">{s.label}</div>
-                {state === "active" && (
-                  <div className="text-[11px] text-muted-foreground font-normal mt-0.5 truncate">{s.desc}</div>
-                )}
               </div>
             </button>
           );
@@ -456,22 +461,22 @@ function FormPanel({
   }
 
   return (
-    <div className="bg-surface border border-border rounded-2xl shadow-card overflow-hidden">
+    <CinematicWizardPanel>
       {/* Section header */}
-      <div className="px-8 py-6 border-b border-border bg-subtle/40">
+      <div className="px-5 md:px-8 py-6 border-b border-white/5 bg-black/20">
         <div className="flex items-center gap-4">
-          <div className="size-12 rounded-xl bg-primary/10 grid place-items-center">
-            <Icon className="size-5 text-primary-dark" strokeWidth={1.75} />
+          <div className="size-12 rounded-xl bg-cinematic-blue/10 border border-cinematic-blue/20 grid place-items-center shrink-0">
+            <Icon className="size-5 text-cinematic-blue" strokeWidth={1.5} />
           </div>
           <div>
-            <div className="label-micro text-primary-dark">Section {step + 1} of {totalSteps}</div>
-            <h2 className="font-display font-bold text-xl mt-0.5">{current.label}</h2>
+            <h2 className="font-display font-bold text-xl md:text-2xl text-cinematic-primary">{current.label}</h2>
+            <p className="text-sm text-cinematic-secondary mt-1">{current.desc}</p>
           </div>
         </div>
       </div>
 
       {/* Form body */}
-      <div className="px-8 py-8">
+      <div className="px-5 md:px-8 py-6">
         {current.key === "personal"   && <PersonalStep   data={data} set={set} user={user} />}
         {current.key === "guardian"   && <GuardianStep   data={data} set={set} />}
         {current.key === "emergency"  && <EmergencyStep  data={data} set={set} />}
@@ -481,58 +486,52 @@ function FormPanel({
 
       {/* Step Validation error alert */}
       {valError && (
-        <div className="mx-8 mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-destructive/8 border border-destructive/20">
-          <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
-          <p className="text-sm text-destructive font-medium">{valError}</p>
+        <div className="mx-6 md:mx-10 mb-6 flex items-start gap-3 p-4 rounded-xl bg-cinematic-red/10 border border-cinematic-red/20">
+          <AlertCircle className="size-5 text-cinematic-red shrink-0 mt-0.5" />
+          <p className="text-sm text-cinematic-red font-medium leading-relaxed">{valError}</p>
         </div>
       )}
 
       {/* Submit error */}
       {submitError && (
-        <div className="mx-8 mb-4 flex items-start gap-3 p-3.5 rounded-xl bg-destructive/8 border border-destructive/20">
-          <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
-          <p className="text-sm text-destructive">{submitError}</p>
+        <div className="mx-6 md:mx-10 mb-6 flex items-start gap-3 p-4 rounded-xl bg-cinematic-red/10 border border-cinematic-red/20">
+          <AlertCircle className="size-5 text-cinematic-red shrink-0 mt-0.5" />
+          <p className="text-sm text-cinematic-red font-medium leading-relaxed">{submitError}</p>
         </div>
       )}
 
       {/* Navigation footer */}
-      <div className="px-8 py-5 border-t border-border flex items-center justify-between bg-subtle/30">
+      <div className="px-6 md:px-10 py-6 border-t border-white/5 bg-black/20 flex flex-col-reverse md:flex-row items-center justify-between gap-4">
         <button
           onClick={onPrev}
           disabled={step === 0 || submitting}
-          className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 border border-border rounded-lg hover:bg-elevated disabled:opacity-35 disabled:cursor-not-allowed transition-all"
+          className="w-full md:w-auto inline-flex items-center justify-center gap-2 text-sm font-medium px-6 py-3 border border-white/10 rounded-xl text-cinematic-primary hover:bg-white/5 disabled:opacity-30 transition-all"
         >
-          <ChevronLeft className="size-4" /> Previous
+          <ChevronLeft className="size-4.5" /> Previous
         </button>
-        <div className="hidden md:flex gap-1">
-          {Array.from({ length: totalSteps }).map((_, i) => (
-            <div key={i} className={`h-1.5 rounded-full transition-all ${
-              i === step ? "w-6 bg-primary" : i < step ? "w-3 bg-primary/40" : "w-3 bg-border"
-            }`} />
-          ))}
-        </div>
+        
         {isLast ? (
           <button
             onClick={handleAttemptNext}
             disabled={submitting}
-            className="inline-flex items-center gap-2 text-sm font-semibold bg-[#ef4444] text-white px-6 py-2.5 rounded-lg hover:bg-[#dc2626] disabled:opacity-60 transition-all shadow-card"
+            className="w-full md:w-auto inline-flex items-center justify-center gap-2 text-sm font-bold bg-cinematic-red text-white px-8 py-3 rounded-xl hover:bg-cinematic-red-hover disabled:opacity-50 transition-all shadow-xl"
           >
             {submitting ? (
-              <><Loader2 className="size-4 animate-spin" /> Submitting…</>
+              <><Loader2 className="size-4.5 animate-spin" /> Submitting…</>
             ) : (
-              <>Submit profile <Check className="size-4" /></>
+              <>Submit profile <Check className="size-4.5" /></>
             )}
           </button>
         ) : (
           <button
             onClick={handleAttemptNext}
-            className="inline-flex items-center gap-2 text-sm font-semibold bg-primary text-primary-foreground px-6 py-2.5 rounded-lg hover:bg-primary-light transition-all shadow-glow"
+            className="w-full md:w-auto inline-flex items-center justify-center gap-2 text-sm font-bold bg-cinematic-blue text-white px-8 py-3 rounded-xl hover:bg-blue-600 transition-all shadow-xl"
           >
-            Continue <ChevronRight className="size-4" />
+            Continue <ChevronRight className="size-4.5" />
           </button>
         )}
       </div>
-    </div>
+    </CinematicWizardPanel>
   );
 }
 
@@ -543,24 +542,14 @@ function Field({ label, required, hint, error, children }: {
 }) {
   return (
     <label className="block">
-      <span className="inline-flex items-center gap-1 text-xs font-semibold text-foreground mb-1.5">
+      <span className="inline-flex items-center gap-1 text-xs font-semibold text-cinematic-primary mb-2">
         {label}
-        {required && <span className="text-primary font-bold">*</span>}
+        {required && <span className="text-cinematic-blue font-bold">*</span>}
       </span>
       {children}
-      {hint && !error && <span className="block text-[11px] text-muted-foreground mt-1.5">{hint}</span>}
-      {error && <span className="block text-[11px] text-destructive mt-1.5">{error}</span>}
+      {hint && !error && <span className="block text-xs text-cinematic-secondary/70 mt-2">{hint}</span>}
+      {error && <span className="block text-xs text-cinematic-red mt-2">{error}</span>}
     </label>
-  );
-}
-
-function Input(props: React.InputHTMLAttributes<HTMLInputElement>) {
-  const { className = "", ...rest } = props;
-  return (
-    <input
-      {...rest}
-      className={`input-premium ${className}`}
-    />
   );
 }
 
@@ -569,13 +558,13 @@ function Select({ children, ...props }: React.SelectHTMLAttributes<HTMLSelectEle
     <div className="relative">
       <select
         {...props}
-        className="input-premium appearance-none pr-9 cursor-pointer"
+        className="w-full bg-[#0B0F17]/60 border border-[#ffffff1a] rounded-lg px-4 py-3 text-sm text-[#F8FAFC] focus:outline-none focus:border-cinematic-blue focus:ring-1 focus:ring-cinematic-blue transition-all appearance-none pr-10 cursor-pointer [&>option]:bg-[#0B0F17]"
       >
         {children}
       </select>
-      <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2">
+      <div className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2">
         <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-muted-foreground"/>
+          <path d="M2.5 4.5L6 8L9.5 4.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" className="text-cinematic-secondary"/>
         </svg>
       </div>
     </div>
@@ -587,7 +576,7 @@ function Textarea(props: React.TextareaHTMLAttributes<HTMLTextAreaElement>) {
     <textarea
       {...props}
       rows={props.rows || 3}
-      className="input-premium resize-none"
+      className="w-full bg-[#0B0F17]/60 border border-[#ffffff1a] rounded-lg px-4 py-3 text-sm text-[#F8FAFC] placeholder:text-[#94A3B8] focus:outline-none focus:border-cinematic-blue focus:ring-1 focus:ring-cinematic-blue transition-all resize-none"
     />
   );
 }
@@ -596,18 +585,18 @@ function Checkbox({ label, checked, onChange, description, required }: {
   label: string; checked?: boolean; onChange?: (v: boolean) => void; description?: string; required?: boolean;
 }) {
   return (
-    <label className="flex items-start gap-3 cursor-pointer p-4 rounded-xl border border-border hover:bg-elevated hover:border-border-strong transition-all group">
-      <span className={`size-5 rounded-md border-2 grid place-items-center mt-0.5 shrink-0 transition-all ${
-        checked ? "bg-primary border-primary shadow-glow" : "border-border-strong group-hover:border-primary/50"
+    <label className="flex items-start gap-4 cursor-pointer p-4 rounded-xl border border-white/10 hover:bg-white/5 hover:border-white/20 transition-all group mt-2">
+      <span className={`size-5 rounded-md border-[1.5px] grid place-items-center mt-0.5 shrink-0 transition-all ${
+        checked ? "bg-cinematic-blue border-cinematic-blue" : "border-cinematic-secondary/50 group-hover:border-cinematic-primary/70"
       }`}>
-        {checked && <Check className="size-3 text-primary-foreground" strokeWidth={3} />}
+        {checked && <Check className="size-3.5 text-white" strokeWidth={3} />}
       </span>
       <input type="checkbox" checked={!!checked} onChange={e => onChange?.(e.target.checked)} className="sr-only" />
       <div>
-        <span className="text-sm font-medium">
-          {label} {required && <span className="text-primary font-bold">*</span>}
+        <span className="text-sm font-semibold text-cinematic-primary">
+          {label} {required && <span className="text-cinematic-blue font-bold">*</span>}
         </span>
-        {description && <p className="text-xs text-muted-foreground mt-0.5 leading-relaxed">{description}</p>}
+        {description && <p className="text-xs text-cinematic-secondary mt-1.5 leading-relaxed">{description}</p>}
       </div>
     </label>
   );
@@ -617,12 +606,12 @@ function Checkbox({ label, checked, onChange, description, required }: {
 function PersonalStep({ data, set, user }: { data: FormData; set: (k: string, v: any) => void; user?: any }) {
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-6">
         <Field label="Full name" required hint="As per government ID">
-          <Input value={data.fullName || ""} onChange={e => set("fullName", e.target.value)} placeholder="John Doe" />
+          <CinematicInput value={data.fullName || ""} onChange={e => set("fullName", e.target.value)} placeholder="Aarav Mehta" />
         </Field>
         <Field label="Date of birth" required>
-          <Input type="date" value={data.dob || ""} onChange={e => set("dob", e.target.value)} />
+          <CinematicInput type="date" value={data.dob || ""} onChange={e => set("dob", e.target.value)} />
         </Field>
         <Field label="Gender" required>
           <Select value={data.gender || ""} onChange={e => set("gender", e.target.value)}>
@@ -631,26 +620,26 @@ function PersonalStep({ data, set, user }: { data: FormData; set: (k: string, v:
           </Select>
         </Field>
         <Field label="Phone number" required hint="Primary contact number">
-          <Input value={data.phone || ""} onChange={e => set("phone", e.target.value)} placeholder="+91 98765 43210" type="tel" />
+          <CinematicInput value={data.phone || ""} onChange={e => set("phone", e.target.value)} placeholder="+91 98765 43210" type="tel" />
         </Field>
         <Field label="Email address" required hint="Used to access your account">
-          <Input type="email" value={data.email || ""} onChange={e => set("email", e.target.value)} placeholder="john@example.com" />
+          <CinematicInput type="email" value={data.email || ""} onChange={e => set("email", e.target.value)} placeholder="aarav@example.com" />
         </Field>
         {!user && (
           <Field label="Create password" required hint="Min 8 characters to secure your account">
-            <Input type="password" value={data.password || ""} onChange={e => set("password", e.target.value)} placeholder="••••••••" />
+            <CinematicInput type="password" value={data.password || ""} onChange={e => set("password", e.target.value)} placeholder="••••••••" />
           </Field>
         )}
       </div>
-      <div className="grid md:grid-cols-3 gap-5 mt-5">
+      <div className="grid md:grid-cols-3 gap-6 pt-2">
         <Field label="City" required>
-          <Input value={data.city || ""} onChange={e => set("city", e.target.value)} placeholder="e.g. Mumbai" />
+          <CinematicInput value={data.city || ""} onChange={e => set("city", e.target.value)} placeholder="e.g. Mumbai" />
         </Field>
         <Field label="State" required>
-          <Input value={data.state || ""} onChange={e => set("state", e.target.value)} placeholder="e.g. Maharashtra" />
+          <CinematicInput value={data.state || ""} onChange={e => set("state", e.target.value)} placeholder="e.g. Maharashtra" />
         </Field>
         <Field label="Country" required>
-          <Input value={data.country || ""} onChange={e => set("country", e.target.value)} placeholder="e.g. India" />
+          <CinematicInput value={data.country || ""} onChange={e => set("country", e.target.value)} placeholder="e.g. India" />
         </Field>
       </div>
     </div>
@@ -659,14 +648,14 @@ function PersonalStep({ data, set, user }: { data: FormData; set: (k: string, v:
 
 function GuardianStep({ data, set }: { data: FormData; set: (k: string, v: any) => void }) {
   return (
-    <div className="space-y-5">
-      <div className="flex items-start gap-3 p-4 rounded-xl bg-warning/6 border border-warning/20">
-        <AlertCircle className="size-4 text-warning mt-0.5 shrink-0" />
-        <p className="text-sm text-warning">Required because the participant is under 18. Guardian must provide digital consent before submission.</p>
+    <div className="space-y-6">
+      <div className="flex items-start gap-4 p-4 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/20">
+        <AlertCircle className="size-5 text-[#F59E0B] mt-0.5 shrink-0" />
+        <p className="text-sm text-[#F59E0B] leading-relaxed">Required because the participant is under 18. Guardian must provide digital consent before submission.</p>
       </div>
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-6">
         <Field label="Guardian full name" required>
-          <Input value={data.gName || ""} onChange={e => set("gName", e.target.value)} placeholder="Guardian Name" />
+          <CinematicInput value={data.gName || ""} onChange={e => set("gName", e.target.value)} placeholder="Guardian Name" />
         </Field>
         <Field label="Relationship to participant" required>
           <Select value={data.gRel || ""} onChange={e => set("gRel", e.target.value)}>
@@ -675,10 +664,10 @@ function GuardianStep({ data, set }: { data: FormData; set: (k: string, v: any) 
           </Select>
         </Field>
         <Field label="Guardian phone" required>
-          <Input type="tel" value={data.gPhone || ""} onChange={e => set("gPhone", e.target.value)} placeholder="+91 98765 43210" />
+          <CinematicInput type="tel" value={data.gPhone || ""} onChange={e => set("gPhone", e.target.value)} placeholder="+91 98765 43210" />
         </Field>
         <Field label="Guardian email">
-          <Input type="email" value={data.gEmail || ""} onChange={e => set("gEmail", e.target.value)} placeholder="guardian@example.com" />
+          <CinematicInput type="email" value={data.gEmail || ""} onChange={e => set("gEmail", e.target.value)} placeholder="guardian@example.com" />
         </Field>
       </div>
       <Checkbox
@@ -694,7 +683,7 @@ function GuardianStep({ data, set }: { data: FormData; set: (k: string, v: any) 
 
 function EmergencyStep({ data, set }: { data: FormData; set: (k: string, v: any) => void }) {
   return (
-    <div className="space-y-5">
+    <div className="space-y-6">
       {data.gName && (
         <button
           type="button"
@@ -703,20 +692,20 @@ function EmergencyStep({ data, set }: { data: FormData; set: (k: string, v: any)
             set("eRel", data.gRel || "");
             set("ePhone", data.gPhone || "");
           }}
-          className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg border border-info/30 bg-info/6 text-info hover:bg-info/10 transition-colors"
+          className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-lg border border-cinematic-blue/30 bg-cinematic-blue/10 text-cinematic-blue hover:bg-cinematic-blue/20 transition-colors"
         >
           Copy from guardian details
         </button>
       )}
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-6">
         <Field label="Emergency contact name" required>
-          <Input value={data.eName || ""} onChange={e => set("eName", e.target.value)} placeholder="Contact Name" />
+          <CinematicInput value={data.eName || ""} onChange={e => set("eName", e.target.value)} placeholder="Contact Name" />
         </Field>
         <Field label="Relationship" required>
-          <Input value={data.eRel || ""} onChange={e => set("eRel", e.target.value)} placeholder="e.g. Spouse, Parent" />
+          <CinematicInput value={data.eRel || ""} onChange={e => set("eRel", e.target.value)} placeholder="e.g. Spouse, Parent" />
         </Field>
         <Field label="Emergency phone" required>
-          <Input type="tel" value={data.ePhone || ""} onChange={e => set("ePhone", e.target.value)} placeholder="+91 98765 43210" />
+          <CinematicInput type="tel" value={data.ePhone || ""} onChange={e => set("ePhone", e.target.value)} placeholder="+91 98765 43210" />
         </Field>
       </div>
     </div>
@@ -729,7 +718,7 @@ function MedicalStep({ data, set }: { data: FormData; set: (k: string, v: any) =
       <Field label="Medical History Details" required hint="Please describe any history of concussions, heart conditions, joint injuries, asthma, or other relevant medical history. Enter 'None' if not applicable.">
         <Textarea value={data.medicalHistory || ""} onChange={e => set("medicalHistory", e.target.value)} placeholder="Describe your medical history..." rows={4} />
       </Field>
-      <div className="grid md:grid-cols-2 gap-5 mt-5">
+      <div className="grid md:grid-cols-2 gap-6 pt-2">
         <Field label="Current Medications" hint="List any ongoing medications (Optional)">
           <Textarea value={data.meds || ""} onChange={e => set("meds", e.target.value)} placeholder="e.g. None" rows={2} />
         </Field>
@@ -737,7 +726,7 @@ function MedicalStep({ data, set }: { data: FormData; set: (k: string, v: any) =
           <Textarea value={data.allergy || ""} onChange={e => set("allergy", e.target.value)} placeholder="e.g. No known allergies" rows={2} />
         </Field>
         <Field label="Health Insurance Provider & Policy Number" hint="Optional">
-          <Input value={data.healthInsuranceProvider || ""} onChange={e => set("healthInsuranceProvider", e.target.value)} placeholder="Provider - Policy #" />
+          <CinematicInput value={data.healthInsuranceProvider || ""} onChange={e => set("healthInsuranceProvider", e.target.value)} placeholder="Provider - Policy #" />
         </Field>
       </div>
     </div>
@@ -747,7 +736,7 @@ function MedicalStep({ data, set }: { data: FormData; set: (k: string, v: any) =
 function SportsStep({ data, set }: { data: FormData; set: (k: string, v: any) => void }) {
   return (
     <div className="space-y-6">
-      <div className="grid md:grid-cols-2 gap-5">
+      <div className="grid md:grid-cols-2 gap-6">
         <Field label="Boxing Stance" required>
           <Select value={data.boxingStance || ""} onChange={e => set("boxingStance", e.target.value)}>
             <option value="">Select…</option>
@@ -765,13 +754,13 @@ function SportsStep({ data, set }: { data: FormData; set: (k: string, v: any) =>
           </Select>
         </Field>
         <Field label="Weight (kg)" required>
-          <Input type="number" step="0.1" value={data.weightKg || ""} onChange={e => set("weightKg", e.target.value)} placeholder="e.g. 70.5" />
+          <CinematicInput type="number" step="0.1" value={data.weightKg || ""} onChange={e => set("weightKg", e.target.value)} placeholder="e.g. 70.5" />
         </Field>
         <Field label="Height (cm)" required>
-          <Input type="number" value={data.heightCm || ""} onChange={e => set("heightCm", e.target.value)} placeholder="e.g. 180" />
+          <CinematicInput type="number" value={data.heightCm || ""} onChange={e => set("heightCm", e.target.value)} placeholder="e.g. 180" />
         </Field>
         <Field label="Reach (cm)" hint="Optional">
-          <Input type="number" value={data.reachCm || ""} onChange={e => set("reachCm", e.target.value)} placeholder="e.g. 185" />
+          <CinematicInput type="number" value={data.reachCm || ""} onChange={e => set("reachCm", e.target.value)} placeholder="e.g. 185" />
         </Field>
         <Field label="Experience Level" required>
           <Select value={data.experienceLevel || ""} onChange={e => set("experienceLevel", e.target.value)}>
@@ -790,16 +779,16 @@ function SportsStep({ data, set }: { data: FormData; set: (k: string, v: any) =>
           </Select>
         </Field>
         <Field label="Amateur / Fight Record" hint="Optional (Wins-Losses-Draws)">
-          <Input value={data.fightRecord || ""} onChange={e => set("fightRecord", e.target.value)} placeholder="e.g. 3-1-0 or N/A" />
+          <CinematicInput value={data.fightRecord || ""} onChange={e => set("fightRecord", e.target.value)} placeholder="e.g. 3-1-0 or N/A" />
         </Field>
         <Field label="Previous/Current Club" hint="Optional">
-          <Input value={data.previousClub || ""} onChange={e => set("previousClub", e.target.value)} placeholder="e.g. Kronk Gym" />
+          <CinematicInput value={data.previousClub || ""} onChange={e => set("previousClub", e.target.value)} placeholder="e.g. Kronk Gym" />
         </Field>
         <Field label="Coach Name" hint="Optional">
-          <Input value={data.coachName || ""} onChange={e => set("coachName", e.target.value)} placeholder="Coach Name" />
+          <CinematicInput value={data.coachName || ""} onChange={e => set("coachName", e.target.value)} placeholder="Coach Name" />
         </Field>
         <Field label="Preferred Class Schedule & Time Slots" hint="Optional">
-          <Input value={data.preferredClassSchedule || ""} onChange={e => set("preferredClassSchedule", e.target.value)} placeholder="e.g. Weekdays Evening, Weekends Morning" />
+          <CinematicInput value={data.preferredClassSchedule || ""} onChange={e => set("preferredClassSchedule", e.target.value)} placeholder="e.g. Weekdays Evening, Weekends Morning" />
         </Field>
       </div>
     </div>
@@ -809,26 +798,32 @@ function SportsStep({ data, set }: { data: FormData; set: (k: string, v: any) =>
 // ── Success screen ────────────────────────────────────────────────────
 function SuccessScreen({ name }: { name: string }) {
   return (
-    <div className="min-h-screen bg-background grid place-items-center px-6">
-      <div className="max-w-lg text-center animate-fade-up">
-        <div className="size-24 mx-auto rounded-full bg-success/10 grid place-items-center mb-8">
-          <CircleCheck className="size-12 text-success" strokeWidth={1.5} />
+    <CinematicLayout>
+      {/* Atmospheric Lighting */}
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1000px] h-[1000px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" />
+      
+      <CinematicMedia allowVideo={false} />
+      <CinematicCard>
+        <div className="text-center py-6">
+          <div className="size-20 mx-auto rounded-full bg-[#10B981]/10 border border-[#10B981]/20 grid place-items-center mb-6">
+            <CircleCheck className="size-10 text-[#10B981]" strokeWidth={1.5} />
+          </div>
+          <p className="text-xs font-bold uppercase tracking-wider text-[#10B981] mb-2">Profile submitted</p>
+          <h1 className="font-display font-bold text-3xl text-white tracking-tight">Welcome, {name.split(" ")[0]}.</h1>
+          <p className="mt-4 text-cinematic-secondary leading-relaxed">
+            Your profile has been auto-approved. Your dashboard is now unlocked — head over to set up your fee plan and access your academy.
+          </p>
+          <div className="mt-8 flex flex-col gap-3">
+            <Link to="/athlete" className="w-full inline-flex items-center justify-center gap-2 bg-cinematic-red text-white px-6 py-3.5 rounded-xl text-sm font-bold hover:bg-cinematic-red-hover transition-all shadow-xl">
+              Go to dashboard
+            </Link>
+            <Link to="/" className="w-full inline-flex items-center justify-center gap-2 border border-white/10 px-6 py-3.5 rounded-xl text-sm font-medium hover:bg-white/5 transition-all text-cinematic-primary">
+              Back home
+            </Link>
+          </div>
         </div>
-        <div className="label-micro text-success mb-4">Profile submitted</div>
-        <h1 className="text-h1 font-display">Welcome, {name.split(" ")[0]}.</h1>
-        <p className="mt-5 text-muted-foreground leading-relaxed">
-          Your profile has been auto-approved. Your dashboard is now unlocked — head over to set up your fee plan and access your academy.
-        </p>
-        <div className="mt-10 flex justify-center gap-3">
-          <Link to="/athlete" className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-6 py-3 rounded-xl text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-card">
-            Go to dashboard
-          </Link>
-          <Link to="/" className="inline-flex items-center gap-2 border border-border px-6 py-3 rounded-xl text-sm font-medium hover:bg-subtle transition-all">
-            Back home
-          </Link>
-        </div>
-      </div>
-    </div>
+      </CinematicCard>
+    </CinematicLayout>
   );
 }
 
@@ -929,45 +924,41 @@ function AcademyCodeVerificationScreen({
   }
 
   return (
-    <div className="min-h-screen bg-background flex flex-col justify-center items-center px-4 py-12">
-      <div className="w-full max-w-lg animate-fade-up">
-        {/* Header Branding */}
-        <Link to="/" className="flex items-center justify-center mb-8 group">
-          <Logo className="h-11 sm:h-12 w-auto" textSize="text-2xl" />
-        </Link>
+    <CinematicLayout>
+      {/* Atmospheric Lighting */}
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[1000px] h-[1000px] top-1/2 right-0 -translate-y-1/2 translate-x-1/4" />
 
-        <div className="bg-surface border border-border rounded-2xl shadow-card p-8 relative overflow-hidden">
-          <div className="absolute top-0 left-0 right-0 h-1.5 bg-gradient-to-r from-primary-dark via-primary to-primary-light" />
-
-          <div className="text-center mb-6">
-            <div className="size-14 mx-auto rounded-2xl bg-primary/10 border border-primary/20 grid place-items-center mb-4 text-primary-dark shadow-xs">
+      <div className="w-full flex flex-col items-center relative z-10">
+        <CinematicCard>
+          <div className="text-center mb-8">
+            <div className="size-14 mx-auto rounded-xl bg-cinematic-blue/10 border border-cinematic-blue/20 grid place-items-center mb-5 text-cinematic-blue shadow-lg">
               <Shield className="size-7" />
             </div>
-            <h1 className="font-display font-bold text-2xl">Enter Academy Access Code</h1>
-            <p className="text-muted-foreground text-sm mt-2 max-w-md mx-auto leading-relaxed">
-              An <strong>Academy Access Code</strong> provided by your academy administrator is required before you can complete your athlete onboarding profile.
+            <h1 className="font-display font-bold text-3xl text-white tracking-tight">Enter Academy Access Code</h1>
+            <p className="text-cinematic-secondary text-sm mt-3 max-w-[280px] mx-auto leading-relaxed">
+              Required to complete your athlete onboarding profile.
             </p>
           </div>
 
-          <div className="flex items-center justify-between p-3.5 rounded-xl bg-warning/8 border border-warning/20 mb-6 text-xs">
-            <div className="flex items-center gap-2 text-warning font-medium">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-4 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/20 mb-8 text-xs">
+            <div className="flex items-center gap-2 text-[#F59E0B] font-medium">
               <span className="font-bold">⏰ 15-Day Window:</span>
-              <span>{daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining to verify code</span>
+              <span>{daysRemaining} day{daysRemaining !== 1 ? "s" : ""} remaining</span>
             </div>
-            <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">Required</span>
+            <span className="text-[10px] font-bold uppercase tracking-wider text-[#F59E0B]/80 bg-[#F59E0B]/10 px-2 py-1 rounded-md self-start sm:self-auto">Required</span>
           </div>
 
           {verifiedSuccess ? (
-            <div className="p-6 rounded-xl bg-success/10 border border-success/30 text-center text-success space-y-2">
+            <div className="p-6 rounded-xl bg-[#10B981]/10 border border-[#10B981]/30 text-center text-[#10B981] space-y-2">
               <CircleCheck className="size-8 mx-auto" />
               <p className="font-bold text-base">Code Verified Successfully!</p>
-              <p className="text-xs text-muted-foreground">Unlocking athlete onboarding form…</p>
+              <p className="text-xs opacity-80">Unlocking athlete onboarding form…</p>
             </div>
           ) : (
-            <form onSubmit={handleVerify} className="space-y-5">
+            <form onSubmit={handleVerify} className="space-y-6">
               <div>
-                <label className="block text-xs font-semibold text-foreground mb-1.5 uppercase tracking-wider">
-                  Academy Access Code *
+                <label className="block text-xs font-semibold text-cinematic-primary mb-2 uppercase tracking-wider text-center">
+                  Academy Access Code
                 </label>
                 <input
                   type="text"
@@ -975,25 +966,25 @@ function AcademyCodeVerificationScreen({
                   value={codeInput}
                   onChange={(e) => setCodeInput(e.target.value.toUpperCase())}
                   placeholder="e.g. BOXOS1"
-                  className="w-full bg-elevated border border-border rounded-xl px-4 py-3.5 text-center text-lg font-mono font-bold uppercase tracking-widest text-foreground focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 placeholder:text-muted-foreground/50 placeholder:font-normal placeholder:tracking-normal placeholder:text-sm"
+                  className="w-full bg-[#050811]/80 border border-white/20 rounded-xl px-4 py-4 text-center text-xl font-mono font-bold uppercase tracking-widest text-white focus:outline-none focus:border-cinematic-blue focus:ring-2 focus:ring-cinematic-blue/30 placeholder:text-white/20 placeholder:font-sans placeholder:tracking-normal placeholder:text-base transition-all"
                 />
               </div>
 
               {error && (
-                <div className="flex items-start gap-2.5 p-3.5 rounded-xl bg-destructive/10 border border-destructive/30 text-xs text-destructive">
-                  <AlertCircle className="size-4 shrink-0 mt-0.5" />
-                  <span>{error}</span>
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-cinematic-red/10 border border-cinematic-red/20 text-sm text-cinematic-red font-medium">
+                  <AlertCircle className="size-5 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{error}</span>
                 </div>
               )}
 
               <button
                 type="submit"
                 disabled={verifying || !codeInput.trim()}
-                className="w-full flex items-center justify-center gap-2 bg-[#ef4444] text-white py-3.5 rounded-xl text-sm font-semibold hover:bg-[#dc2626] disabled:opacity-50 transition shadow-card cursor-pointer"
+                className="w-full flex items-center justify-center gap-2 bg-cinematic-red text-white py-4 rounded-xl text-sm font-bold hover:bg-cinematic-red-hover disabled:opacity-50 transition shadow-xl cursor-pointer"
               >
                 {verifying ? (
                   <>
-                    <Loader2 className="size-4 animate-spin" /> Verifying Code…
+                    <Loader2 className="size-4.5 animate-spin" /> Verifying Code…
                   </>
                 ) : (
                   <>Verify & Unlock Onboarding</>
@@ -1002,18 +993,18 @@ function AcademyCodeVerificationScreen({
             </form>
           )}
 
-          <div className="mt-6 pt-5 border-t border-border flex items-center justify-between text-xs text-muted-foreground">
+          <div className="mt-8 pt-6 border-t border-white/5 flex flex-col items-center justify-center gap-3 text-sm text-cinematic-secondary">
             <span>Don't have a code? Ask your academy admin.</span>
             <button
               onClick={() => signOut()}
-              className="text-foreground hover:underline font-medium cursor-pointer"
+              className="text-cinematic-primary hover:text-cinematic-blue font-medium transition-colors"
             >
               Sign out
             </button>
           </div>
-        </div>
+        </CinematicCard>
       </div>
-    </div>
+    </CinematicLayout>
   );
 }
 
@@ -1021,27 +1012,34 @@ function AcademyCodeVerificationScreen({
 function AcademyCodeExpiredScreen({ deadline }: { deadline?: string | null }) {
   const { signOut } = useAuth();
   return (
-    <div className="min-h-screen bg-background flex flex-col justify-center items-center px-4 py-12">
-      <div className="w-full max-w-md animate-fade-up text-center">
-        <div className="size-16 mx-auto rounded-full bg-destructive/10 grid place-items-center mb-5 text-destructive">
-          <AlertCircle className="size-8" />
+    <CinematicLayout>
+      {/* Atmospheric Lighting */}
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[1000px] h-[1000px] top-1/2 right-0 -translate-y-1/2 translate-x-1/4" />
+
+      <div className="relative z-10 w-full flex flex-col items-center">
+        <CinematicCard>
+        <div className="text-center py-4">
+          <div className="size-16 mx-auto rounded-full bg-cinematic-red/10 grid place-items-center mb-6 text-cinematic-red">
+            <AlertCircle className="size-8" />
+          </div>
+          <h1 className="font-display font-bold text-2xl">Registration Window Expired</h1>
+          <p className="text-cinematic-secondary text-sm mt-4 leading-relaxed">
+            The 15-day timeline to verify your Academy Access Code has expired. Unverified accounts cannot proceed with onboarding.
+          </p>
+          <div className="mt-6 p-4 rounded-xl bg-white/5 border border-white/10 text-xs text-cinematic-secondary font-medium">
+            Deadline date: {deadline ? new Date(deadline).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "Expired"}
+          </div>
+          <div className="mt-8">
+            <button
+              onClick={() => signOut()}
+              className="w-full py-3.5 bg-white text-black text-sm font-bold rounded-xl hover:bg-white/90 transition shadow-lg cursor-pointer"
+            >
+              Sign Out & Contact Administrator
+            </button>
+          </div>
         </div>
-        <h1 className="font-display font-bold text-2xl">Registration Window Expired</h1>
-        <p className="text-muted-foreground text-sm mt-3 leading-relaxed">
-          The 15-day timeline to verify your Academy Access Code has expired. Unverified accounts cannot proceed with onboarding.
-        </p>
-        <div className="mt-6 p-4 rounded-xl bg-subtle border border-border text-xs text-muted-foreground">
-          Deadline date: {deadline ? new Date(deadline).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : "Expired"}
-        </div>
-        <div className="mt-6 flex flex-col gap-3">
-          <button
-            onClick={() => signOut()}
-            className="w-full py-3 bg-foreground text-background text-sm font-semibold rounded-xl hover:bg-foreground/90 transition cursor-pointer"
-          >
-            Sign Out & Contact Administrator
-          </button>
-        </div>
+      </CinematicCard>
       </div>
-    </div>
+    </CinematicLayout>
   );
 }

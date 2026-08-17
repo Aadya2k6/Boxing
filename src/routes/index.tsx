@@ -1,13 +1,14 @@
+import { useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SiteHeader, SiteFooter } from "@/components/site/Chrome";
 import {
-  ArrowUpRight, Crosshair, ShieldCheck, Receipt,
-  LayoutDashboard, CreditCard, Tag, Activity, ChevronRight,
-  Users, CheckCircle2, Zap, Trophy, Target, BarChart3,
-  FileText, Bell, Lock
+  ArrowUpRight, ShieldCheck, Receipt,
+  CreditCard, Tag, Activity,
+  Users, Trophy,
+  CircleCheck, Search, LayoutDashboard
 } from "lucide-react";
 
-export const Route = createFileRoute("/")(({
+export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Boxos — Precision Management for Elite Boxing Academies" },
@@ -16,541 +17,382 @@ export const Route = createFileRoute("/")(({
     ],
   }),
   component: LandingPage,
-} as any));
+});
 
 function LandingPage() {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            observer.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: "0px 0px -50px 0px" }
+    );
+
+    document.querySelectorAll('.reveal-section').forEach((el) => {
+      observer.observe(el);
+    });
+
+    return () => observer.disconnect();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-background overflow-x-hidden">
+    <div className="theme-cinematic-dark min-h-screen bg-cinematic-base text-cinematic-primary overflow-x-hidden selection:bg-cinematic-red/30">
       <SiteHeader />
       <Hero />
       <LogoStrip />
       <Features />
       <HowItWorks />
-      <DashboardPreview />
-      <Testimonials />
-      <CTA />
+      <FinalAction />
       <SiteFooter />
     </div>
   );
 }
 
-/* ── Hero ───────────────────────────────────────────────────────────── */
+/* ── Components ─────────────────────────────────────────────────────── */
+
+function CinematicFeatureCard({ icon: Icon, title, body, index }: any) {
+  return (
+    <div className="bg-cinematic-panel border border-cinematic-border rounded-2xl p-8 hover:border-cinematic-blue/40 transition-all duration-300 ease-out group hover:-translate-y-[3px] hover:shadow-[0_0_30px_-5px_rgba(59,130,246,0.15)]">
+      <div className="size-12 rounded-xl bg-cinematic-blue/10 border border-cinematic-blue/20 grid place-items-center mb-6 text-cinematic-blue group-hover:scale-110 group-hover:bg-cinematic-blue/20 transition-transform duration-300 ease-out">
+        <Icon className="size-5" strokeWidth={1.5} />
+      </div>
+      <h3 className="font-display font-semibold text-xl text-cinematic-primary">{title}</h3>
+      <p className="mt-3 text-sm text-cinematic-secondary leading-relaxed">{body}</p>
+    </div>
+  );
+}
+
+
+/* ── Sections ───────────────────────────────────────────────────────── */
+
 function Hero() {
   return (
-    <section className="relative overflow-hidden bg-background">
-      {/* Background layers */}
-      <div className="absolute inset-0 dot-pattern opacity-50" />
-      <div className="absolute top-0 right-0 w-[600px] h-[600px] gold-glow opacity-60 blur-3xl" />
-      <div className="absolute bottom-0 left-0 w-[400px] h-[400px] rounded-full" style={{ background: "radial-gradient(ellipse, rgba(58,123,217,0.06) 0%, transparent 70%)" }} />
+    <section id="hero" className="relative w-full pt-24 lg:pt-32 pb-8 overflow-hidden min-h-[90vh] flex flex-col">
+      {/* ── ATMOSPHERE FOG ── */}
+      {/* Blue Spotlight Entering from Top Left */}
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1200px] h-[1200px] -top-[400px] -left-[400px]" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-0 left-0" style={{ animationDelay: '-4s' }} />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1600px] h-[1600px] -top-[600px] -left-[600px] opacity-70" style={{ animationDelay: '-8s' }} />
+      
+      {/* Subtle Red Environmental Spill from Bottom Right */}
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[900px] h-[900px] -bottom-[400px] -right-[300px]" style={{ animationDelay: '-10s' }} />
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[600px] h-[600px] -bottom-[200px] -right-[100px] opacity-50" style={{ animationDelay: '-6s' }} />
 
-      <div className="relative max-w-7xl mx-auto px-6 pt-16 pb-20 lg:pt-20 lg:pb-28">
-        <div className="grid lg:grid-cols-2 gap-16 items-center">
-          {/* Left — copy */}
-          <div className="animate-fade-up">
-            {/* Pill badge */}
-            <div className="inline-flex items-center gap-2 text-xs font-semibold px-3.5 py-2 rounded-full border border-primary/30 bg-primary/6 text-primary-dark mb-8">
-              <span className="size-1.5 rounded-full bg-primary animate-pulse" />
-              Now onboarding pilot academies — May 2026
-            </div>
+      {/* ── DESKTOP PHOTOGRAPHY ── */}
+      <div className="hidden lg:block absolute -top-12 -right-8 bottom-0 w-[60%] z-0 overflow-hidden">
+        <img
+          src="/red-boxing-ring.png"
+          alt="Boxing Ring"
+          className="w-full h-full object-cover object-right-bottom opacity-100"
+          style={{ WebkitMaskImage: 'linear-gradient(to right, transparent 0%, black 20%)', maskImage: 'linear-gradient(to right, transparent 0%, black 20%)' }}
+        />
+      </div>
 
-            {/* Hero headline */}
-            <h1 className="text-hero font-display">
-              Run your academy<br />
-              with{" "}
-              <span className="text-gradient-gold">
-                precision.
-              </span>
-            </h1>
-
-            <p className="mt-8 text-base md:text-lg text-muted-foreground max-w-lg leading-relaxed">
-              Boxos is the institutional-grade operating system for boxing academies. Onboard athletes, automate fees, and command operations from one calm interface.
-            </p>
-
-            {/* CTAs */}
-            <div className="mt-10 flex flex-wrap items-center gap-3">
-              <Link
-                to="/onboarding"
-                className="group inline-flex items-center gap-2 bg-[#ef4444] text-white px-6 py-3.5 rounded-xl text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-elevated hover:shadow-modal"
-              >
-                Start onboarding
-                <ArrowUpRight className="size-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-              </Link>
-            </div>
-
-            {/* Social proof */}
-            <div className="mt-12 flex items-center gap-6">
-              <div className="flex -space-x-2.5">
-                {["AM", "SK", "VP", "RI"].map((initials, i) => (
-                  <div
-                    key={i}
-                    className="size-9 rounded-full border-2 border-background font-display font-bold text-xs grid place-items-center text-primary-foreground"
-                    style={{
-                      background: `linear-gradient(135deg, #9E7C2A ${i * 15}%, #C9A84C 100%)`,
-                      zIndex: 4 - i
-                    }}
-                  >
-                    {initials}
-                  </div>
-                ))}
-              </div>
-              <div>
-                <div className="font-semibold text-sm">Trusted by 12 pilot academies</div>
-                <div className="text-xs text-muted-foreground mt-0.5">Across 6 disciplines · 480+ athletes</div>
-              </div>
-            </div>
-          </div>
-
-          {/* Right — hero card */}
-          <div className="relative animate-fade-up delay-200 hidden lg:block">
-            <HeroCard />
-          </div>
+      <div className="max-w-7xl mx-auto px-6 w-full flex-1 flex flex-col lg:flex-row relative z-10">
+        
+        {/* ── MOBILE PHOTOGRAPHY (Stacked) ── */}
+        <div className="relative w-full h-[40vh] lg:hidden z-0 mb-6 -mx-6 w-[calc(100%+3rem)]">
+          <img
+            src="/red-boxing-ring.png"
+            alt="Boxing Ring"
+            className="w-full h-full object-cover object-center opacity-100"
+          />
+          <div className="absolute inset-x-0 bottom-0 h-32 bg-gradient-to-t from-cinematic-base to-transparent" />
         </div>
 
-        {/* Feature pill row */}
-        <div className="mt-16 flex flex-wrap gap-2 animate-fade-up delay-400">
-          {[
-            { icon: ShieldCheck, label: "Aadhaar OTP Verified" },
-            { icon: CreditCard, label: "Razorpay Integrated" },
-            { icon: Zap, label: "Real-time Sync" },
-            { icon: Lock, label: "Row-Level Security" },
-            { icon: Bell, label: "Auto Reminders" },
-          ].map(({ icon: Icon, label }) => (
-            <div key={label} className="inline-flex items-center gap-2 text-xs font-medium px-3.5 py-2 rounded-full border border-border bg-surface text-muted-foreground shadow-xs">
-              <Icon className="size-3.5 text-primary" strokeWidth={2} />
-              {label}
-            </div>
-          ))}
+        {/* ── CONTENT ── */}
+        <div className="w-full lg:w-1/2 flex flex-col justify-center py-12 lg:py-0 my-auto animate-fade-up relative z-10">
+          <h1 className="font-display font-extrabold text-[4.5rem] md:text-[5.5rem] lg:text-[6rem] tracking-tighter leading-[0.88] uppercase text-white">
+            RUN THE <span className="text-cinematic-red">BUSINESS.</span><br />
+            BUILD THE <span className="text-cinematic-red">BOXER.</span>
+          </h1>
+
+          <p className="mt-8 font-sans text-lg md:text-xl text-cinematic-secondary font-medium leading-relaxed max-w-xl drop-shadow-md">
+            Boxos is the institutional-grade operating system for boxing academies. Onboard athletes, automate fees, and command operations from one calm interface.
+          </p>
+
+          <div className="mt-10 mb-8 flex items-center gap-4">
+            <Link
+              to="/onboarding"
+              className="group inline-flex items-center justify-center gap-2 bg-cinematic-red text-white px-8 py-4 rounded-xl text-sm font-bold hover:bg-cinematic-red-hover transition-all duration-300 shadow-xl hover:scale-[1.02]"
+            >
+              Start onboarding
+              <ArrowUpRight className="size-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+            </Link>
+          </div>
         </div>
       </div>
     </section>
   );
 }
 
-function HeroCard() {
+function LogoStrip() {
   return (
-    <div className="relative">
-      {/* Glow */}
-      <div className="absolute -inset-10 gold-glow blur-3xl opacity-40" />
+    <div id="for-academies" className="border-b border-cinematic-border bg-cinematic-base relative z-10 scroll-mt-24">
+      <div className="max-w-7xl mx-auto px-6 py-8 flex flex-wrap items-center justify-center gap-6">
+        <span className="font-display font-semibold text-sm uppercase tracking-[0.2em] text-cinematic-secondary/60">
+          Built for boxing academy operations
+        </span>
+      </div>
+    </div>
+  );
+}
 
-      {/* Main card */}
-      <div className="relative bg-surface border border-border rounded-2xl shadow-modal p-1 rotate-1 hover:rotate-0 transition-transform duration-700">
-        {/* Top bar */}
-        <div className="bg-foreground rounded-xl p-5">
-          <div className="flex items-center justify-between mb-5">
-            <div className="flex items-center gap-3">
-              <div className="size-9 rounded-lg bg-white/10 grid place-items-center">
-                <Crosshair className="size-4 text-white" strokeWidth={1.75} />
-              </div>
-              <div>
-                <div className="text-[10px] text-white/50 uppercase tracking-widest font-semibold">Athlete profile</div>
-                <div className="font-display font-bold text-white text-sm mt-0.5">Aarav Mehta</div>
-              </div>
-            </div>
-            <span className="badge badge-success">Verified</span>
-          </div>
+function Features() {
+  const FEATURES = [
+    {
+      icon: Users,
+      title: "01 — ATHLETE MANAGEMENT",
+      body: "Profiles, onboarding, documents and athlete status.",
+    },
+    {
+      icon: Receipt,
+      title: "02 — REVENUE & FEES",
+      body: "Plans, payments, reminders, discounts and payment tracking.",
+    },
+    {
+      icon: Activity,
+      title: "03 — TRAINING OPERATIONS",
+      body: "Attendance, sessions and athlete progression.",
+    },
+    {
+      icon: LayoutDashboard,
+      title: "04 — ACADEMY CONTROL",
+      body: "A unified operational view across the entire academy.",
+    },
+  ];
 
-          {/* Stats in dark */}
-          <div className="grid grid-cols-3 gap-2">
-            {[
-              { l: "Discipline", v: "10m Air Pistol" },
-              { l: "Year", v: "Year 3 · Elite" },
-              { l: "Score", v: "583 / 600" },
-            ].map(({ l, v }) => (
-              <div key={l} className="bg-white/8 rounded-lg p-3">
-                <div className="text-[9px] text-white/40 uppercase tracking-wider">{l}</div>
-                <div className="text-xs font-semibold text-white mt-1">{v}</div>
-              </div>
-            ))}
-          </div>
+  return (
+    <section id="platform" className="reveal-section bg-cinematic-base relative z-10 py-24 md:py-32 scroll-mt-24 overflow-hidden">
+      {/* Atmosphere Fog */}
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1200px] h-[1200px] -top-64 -left-64" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] -top-32 -left-32 opacity-80" style={{ animationDelay: '-5s' }} />
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[1000px] h-[1000px] bottom-0 right-0 opacity-60" style={{ animationDelay: '-8s' }} />
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[600px] h-[600px] -bottom-32 -right-32 opacity-80" style={{ animationDelay: '-3s' }} />
+
+      <div className="max-w-7xl mx-auto px-6 relative z-10">
+        <div className="max-w-2xl mb-16">
+          <div className="text-xs font-bold text-cinematic-red uppercase tracking-widest mb-4">The Platform</div>
+          <h2 className="text-4xl md:text-5xl font-display font-bold text-white uppercase tracking-tight">
+            EVERY PART OF THE ACADEMY.<br />UNDER ONE ROOF.
+          </h2>
+          <p className="mt-6 text-cinematic-secondary text-lg leading-relaxed max-w-lg">
+            BOXOS connects the operational side of the academy with the people who train inside it.
+          </p>
         </div>
 
-        {/* Fee card */}
-        <div className="p-4">
-          <div className="bg-subtle rounded-xl p-4">
-            <div className="flex items-center justify-between mb-1">
-              <span className="label-micro">Fee status · Q2 2026</span>
-              <span className="badge badge-success">Paid</span>
-            </div>
-            <div className="text-stat font-display tabular mt-2">₹ 24,000</div>
-            <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground">
-              <span>Next due: 15 Aug 2026</span>
-              <span className="badge badge-gold">Quarterly</span>
-            </div>
-          </div>
-
-          {/* Mini progress */}
-          <div className="mt-4">
-            <div className="flex justify-between text-xs mb-2">
-              <span className="text-muted-foreground">Sessions this month</span>
-              <span className="font-semibold">18 / 20</span>
-            </div>
-            <div className="h-1.5 rounded-full bg-subtle overflow-hidden">
-              <div
-                className="h-full rounded-full bar-fill"
-                style={{ "--fill-width": "90%", background: "linear-gradient(90deg, #9E7C2A, #C9A84C)" } as any}
+        <div className="grid lg:grid-cols-12 gap-8 lg:gap-12 items-start">
+          {/* Gloves Image Column */}
+          <div className="lg:col-span-5 order-last lg:order-first">
+            <div className="rounded-2xl overflow-hidden border border-cinematic-border bg-black/40 relative h-full min-h-[300px]">
+              <div className="absolute inset-0 bg-cinematic-blue/10 mix-blend-overlay z-10" />
+              <img 
+                src="/gloves.png" 
+                alt="Boxing Gloves" 
+                loading="lazy"
+                className="w-full h-full object-cover opacity-90 hover:opacity-100 transition-all duration-700"
               />
             </div>
           </div>
-        </div>
-      </div>
-
-      {/* Floating mini card */}
-      <div className="absolute -bottom-6 -left-8 bento-card p-3.5 flex items-center gap-3 shadow-elevated">
-        <div className="size-9 rounded-lg bg-success/10 grid place-items-center">
-          <CheckCircle2 className="size-4 text-success" />
-        </div>
-        <div>
-          <div className="text-xs text-muted-foreground">Payment received</div>
-          <div className="font-display font-bold text-sm tabular">₹ 24,000</div>
-        </div>
-      </div>
-
-      {/* Floating badge */}
-      <div className="absolute -top-4 -right-4 bento-card px-3.5 py-2 shadow-elevated">
-        <div className="flex items-center gap-2">
-          <span className="size-2 rounded-full bg-success animate-pulse" />
-          <span className="text-xs font-semibold">Live dashboard</span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Logo Strip ─────────────────────────────────────────────────────── */
-function LogoStrip() {
-  const logos = ["NRAI", "SAI", "AAI", "WFI", "ISSF", "Khelo India"];
-  return (
-    <div className="border-y border-border bg-surface">
-      <div className="max-w-7xl mx-auto px-6 py-6 flex flex-wrap items-center justify-between gap-x-8 gap-y-4">
-        <span className="label-micro">Aligned with</span>
-        {logos.map((l) => (
-          <span key={l} className="font-display font-bold text-base text-muted-foreground/50 tracking-tight hover:text-muted-foreground transition-colors">
-            {l}
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── Features ───────────────────────────────────────────────────────── */
-const FEATURES = [
-  {
-    icon: ShieldCheck,
-    title: "Aadhaar OTP Onboarding",
-    body: "Self-serve athlete profiles verified in seconds. Auto-approval flow with admin escalation when anything looks off.",
-    color: "text-success",
-    bg: "bg-success/8",
-  },
-  {
-    icon: Receipt,
-    title: "Automated Fee Invoicing",
-    body: "Recurring plans, partial payments, auto-reminders, late penalties. Razorpay built in for instant checkout.",
-    color: "text-primary-dark",
-    bg: "bg-primary/8",
-  },
-  {
-    icon: LayoutDashboard,
-    title: "Three-Tier Dashboards",
-    body: "Distinct surfaces for athletes, academy admins, and superadmins — the right data for the right role.",
-    color: "text-info",
-    bg: "bg-info/8",
-  },
-  {
-    icon: CreditCard,
-    title: "Razorpay Integration",
-    body: "One-click checkout, instant receipts, refund queue. Reconciliation happens in the background, automatically.",
-    color: "text-primary-dark",
-    bg: "bg-primary/8",
-  },
-  {
-    icon: Tag,
-    title: "Discounts & Scholarships",
-    body: "Sibling, merit, and custom concessions. Override per-athlete with full audit trail and approval workflow.",
-    color: "text-warning",
-    bg: "bg-warning/8",
-  },
-  {
-    icon: Activity,
-    title: "Real-time Dues Tracking",
-    body: "Outstanding balances, collection rate, overdue cohorts. Live, exportable, board-ready reports.",
-    color: "text-info",
-    bg: "bg-info/8",
-  },
-];
-
-function Features() {
-  return (
-    <section className="max-w-7xl mx-auto px-6 py-28">
-      <div className="max-w-2xl mb-16">
-        <div className="label-micro text-primary-dark mb-4">What's inside</div>
-        <h2 className="text-h1 font-display">
-          Built for the rituals<br />of elite training.
-        </h2>
-        <p className="mt-5 text-muted-foreground text-base leading-relaxed max-w-lg">
-          No bloat. No clutter. Every screen earns its place — modeled on how disciplined academies actually run their day.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {FEATURES.map((f, i) => {
-          const Icon = f.icon;
-          return (
-            <div
-              key={f.title}
-              className="bento-card p-7 group cursor-default"
-              style={{ animationDelay: `${i * 60}ms` }}
-            >
-              <div className={`size-11 rounded-xl ${f.bg} grid place-items-center mb-5 transition-transform group-hover:scale-110 duration-200`}>
-                <Icon className={`size-5 ${f.color}`} strokeWidth={1.75} />
-              </div>
-              <h3 className="font-display font-semibold text-base text-foreground">{f.title}</h3>
-              <p className="mt-2.5 text-sm text-muted-foreground leading-relaxed">{f.body}</p>
+          
+          {/* Features Grid Column */}
+          <div className="lg:col-span-7">
+            <div className="grid sm:grid-cols-2 gap-4">
+              {FEATURES.map((f) => (
+                <div key={f.title}>
+                  <CinematicFeatureCard {...f} />
+                </div>
+              ))}
             </div>
-          );
-        })}
+          </div>
+        </div>
       </div>
     </section>
   );
 }
 
-/* ── How It Works ───────────────────────────────────────────────────── */
-const STEPS = [
-  {
-    n: "01",
-    icon: Users,
-    t: "Athlete Onboards",
-    d: "Athlete completes a 7-step profile with Aadhaar OTP verification. Auto-approved in under 6 minutes.",
-    color: "text-primary",
-    bg: "bg-primary/8",
-  },
-  {
-    n: "02",
-    icon: Tag,
-    t: "Admin Assigns Plan",
-    d: "Admin assigns the right fee plan, applies any discounts, sets the billing cycle and reminders.",
-    color: "text-info",
-    bg: "bg-info/8",
-  },
-  {
-    n: "03",
-    icon: CreditCard,
-    t: "Athlete Pays",
-    d: "Athlete pays through Razorpay. Receipt emailed instantly. Books reconciled. Dashboard unlocks.",
-    color: "text-success",
-    bg: "bg-success/8",
-  },
-  {
-    n: "04",
-    icon: Trophy,
-    t: "Train & Track",
-    d: "Athlete tracks attendance, payments, documents. Admin tracks the academy. Together, seamlessly.",
-    color: "text-warning",
-    bg: "bg-warning/8",
-  },
-];
-
 function HowItWorks() {
+  const STEPS = [
+    {
+      n: "01",
+      icon: Users,
+      t: "Athlete Onboards",
+      d: "Athlete completes a 7-step profile with Aadhaar OTP verification. Auto-approved in under 6 minutes.",
+    },
+    {
+      n: "02",
+      icon: Tag,
+      t: "Admin Assigns Plan",
+      d: "Admin assigns the right fee plan, applies any discounts, sets the billing cycle and reminders.",
+    },
+    {
+      n: "03",
+      icon: CreditCard,
+      t: "Athlete Pays",
+      d: "Athlete pays through Razorpay. Receipt emailed instantly. Books reconciled. Dashboard unlocks.",
+    },
+    {
+      n: "04",
+      icon: Trophy,
+      t: "Train & Track",
+      d: "Athlete tracks attendance, payments, documents. Admin tracks the academy. Together, seamlessly.",
+    },
+  ];
+
   return (
-    <section className="bg-surface border-y border-border">
-      <div className="max-w-7xl mx-auto px-6 py-28">
-        <div className="flex items-end justify-between flex-wrap gap-6 mb-16">
+    <section id="how-it-works" className="reveal-section bg-cinematic-base relative z-10 py-24 border-t border-cinematic-border/50 scroll-mt-24 overflow-hidden">
+      {/* Atmosphere Fog */}
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[1600px] h-[1600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 opacity-80" />
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[1200px] h-[1200px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ animationDelay: '-4s' }} />
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[800px] h-[800px] bottom-0 left-1/2 -translate-x-1/2 translate-y-1/4 opacity-90" style={{ animationDelay: '-8s' }} />
+
+      <div className="max-w-4xl mx-auto px-6 relative z-10">
+        <div className="mb-20 text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-6">
           <div>
-            <div className="label-micro text-primary-dark mb-4">How it works</div>
-            <h2 className="text-h1 font-display max-w-lg">Four steps.<br />Zero ambiguity.</h2>
+            <div className="text-xs font-bold text-cinematic-red uppercase tracking-widest mb-4">Workflow</div>
+            <h2 className="text-4xl md:text-5xl font-display font-bold text-white max-w-lg">
+              Four steps.<br />Zero ambiguity.
+            </h2>
           </div>
-          <Link to="/onboarding" className="group inline-flex items-center gap-1.5 text-sm font-semibold text-muted-foreground hover:text-foreground transition-colors">
+          <Link to="/onboarding" className="group hidden md:inline-flex items-center gap-1.5 text-sm font-semibold text-cinematic-secondary hover:text-white transition-colors">
             Start now <ArrowUpRight className="size-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
           </Link>
         </div>
 
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {STEPS.map((s, i) => {
-            const Icon = s.icon;
-            return (
-              <div key={s.n} className="bento-card p-7 relative overflow-hidden group">
-                {/* Step number — large background */}
-                <div className="absolute top-4 right-5 font-display font-bold text-6xl text-border leading-none select-none">
-                  {s.n}
-                </div>
-                <div className={`size-11 rounded-xl ${s.bg} grid place-items-center mb-6 relative z-10 transition-transform group-hover:scale-110 duration-200`}>
-                  <Icon className={`size-5 ${s.color}`} strokeWidth={1.75} />
-                </div>
-                <div className="font-display font-semibold text-base relative z-10">{s.t}</div>
-                <p className="mt-2.5 text-sm text-muted-foreground leading-relaxed relative z-10">{s.d}</p>
-
-                {/* Connector arrow (desktop) */}
-                {i < STEPS.length - 1 && (
-                  <div className="hidden lg:block absolute -right-5 top-1/2 -translate-y-1/2 z-20">
-                    <ChevronRight className="size-5 text-muted-foreground/30" />
+        {/* Vertical Timeline */}
+        <div className="relative pl-6 md:pl-10">
+          {/* Track Line */}
+          <div className="absolute left-0 top-2 bottom-2 w-[2px] bg-gradient-to-b from-cinematic-blue via-white/20 to-cinematic-red opacity-80" />
+          
+          <div className="space-y-16">
+            {STEPS.map((s, i) => {
+              const Icon = s.icon;
+              return (
+                <div key={s.n} className="relative group">
+                  {/* Node Circle */}
+                  <div className="absolute -left-[30px] md:-left-[46px] top-1.5 size-4 rounded-full bg-cinematic-base border-2 border-cinematic-blue group-hover:border-cinematic-red group-hover:scale-125 transition-all duration-300 shadow-[0_0_10px_rgba(59,130,246,0.5)] group-hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
+                  
+                  <div className="flex flex-col md:flex-row md:items-start gap-4 md:gap-8 transition-transform duration-300 ease-out group-hover:translate-x-2">
+                    {/* Step Number */}
+                    <div className="font-display font-bold text-5xl md:text-6xl text-white/30 group-hover:text-cinematic-red transition-colors duration-300 ease-out leading-none select-none shrink-0 md:w-24">
+                      {s.n}
+                    </div>
+                    
+                    {/* Content */}
+                    <div>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="size-8 rounded-lg bg-white/5 border border-white/10 grid place-items-center text-cinematic-secondary">
+                          <Icon className="size-4" strokeWidth={2} />
+                        </div>
+                        <h3 className="font-display font-semibold text-2xl text-white">{s.t}</h3>
+                      </div>
+                      <p className="text-cinematic-secondary leading-relaxed md:text-lg max-w-xl">
+                        {s.d}
+                      </p>
+                    </div>
                   </div>
-                )}
-              </div>
-            );
-          })}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="mt-16 text-center md:hidden">
+          <Link to="/onboarding" className="group inline-flex items-center gap-1.5 text-sm font-semibold text-cinematic-secondary hover:text-white transition-colors">
+            Start now <ArrowUpRight className="size-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
+          </Link>
         </div>
       </div>
     </section>
   );
 }
 
-/* ── Dashboard Preview ──────────────────────────────────────────────── */
-const DASH_CARDS = [
-  {
-    role: "Athlete",
-    emoji: "🏆",
-    title: "Personal & motivational",
-    body: "Profile, payments, documents, training schedule, and personal KPIs.",
-    to: "/athlete",
-    accent: "text-primary-dark",
-    accentBg: "bg-primary/8",
-    border: "hover:border-primary/40",
-    metrics: ["Days Active: 248", "Sessions: 18/20", "Fees: ₹96K paid"],
-  },
-  {
-    role: "Admin",
-    emoji: "⚙️",
-    title: "Operational & clinical",
-    body: "Athletes, invoices, fee plans, reports, and overdue management.",
-    to: "/admin",
-    accent: "text-info",
-    accentBg: "bg-info/8",
-    border: "hover:border-info/40",
-    metrics: ["Athletes: 482", "Collected: ₹11.6L", "Overdue: 14"],
-  },
-  {
-    role: "Superadmin",
-    emoji: "🛡️",
-    title: "Authority & control",
-    body: "Multi-academy view, fee config, refund approvals, and user management.",
-    to: "/superadmin",
-    accent: "text-superadmin",
-    accentBg: "bg-subtle",
-    border: "hover:border-border-strong",
-    metrics: ["Academies: 4", "Revenue: ₹22.7L", "Refunds: 3 pending"],
-  },
-];
-
-function DashboardPreview() {
-  return (
-    <section className="max-w-7xl mx-auto px-6 py-28">
-      <div className="text-center max-w-2xl mx-auto mb-16">
-        <div className="label-micro text-primary-dark mb-4">A glance inside</div>
-        <h2 className="text-h1 font-display">
-          The command surface<br />for your academy.
-        </h2>
-        <p className="mt-5 text-muted-foreground leading-relaxed">
-          Distinct dashboards for athletes, admins and superadmins — each shaped around the decisions that role actually makes.
-        </p>
-      </div>
-
-      <div className="grid md:grid-cols-3 gap-5">
-        {DASH_CARDS.map((c) => (
-          <Link
-            key={c.role}
-            to={c.to}
-            className={`group bento-card p-7 flex flex-col transition-all duration-200 ${c.border}`}
-          >
-            <div className={`size-12 rounded-xl ${c.accentBg} grid place-items-center text-2xl mb-5`}>
-              {c.emoji}
-            </div>
-            <div className={`label-micro ${c.accent} mb-2`}>{c.role}</div>
-            <div className="font-display font-semibold text-base">{c.title}</div>
-            <p className="mt-2 text-sm text-muted-foreground leading-relaxed flex-1">{c.body}</p>
-
-            {/* Mini metric pills */}
-            <div className="mt-5 flex flex-wrap gap-1.5">
-              {c.metrics.map((m) => (
-                <span key={m} className="badge badge-neutral text-[10px]">{m}</span>
-              ))}
-            </div>
-
-            <div className="mt-5 inline-flex items-center gap-1.5 text-sm font-semibold text-foreground group-hover:gap-2.5 transition-all">
-              Open dashboard
-              <ArrowUpRight className={`size-4 ${c.accent} group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform`} />
-            </div>
-          </Link>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-/* ── Testimonials / Stats ───────────────────────────────────────────── */
-function Testimonials() {
-  const stats = [
-    { value: "< 6 min", label: "Athlete onboarding", sub: "End-to-end, verified" },
-    { value: "₹ 22.7L", label: "Monthly revenue tracked", sub: "Across pilot academies" },
-    { value: "99.2%", label: "Collection rate", sub: "With auto-reminders" },
-    { value: "1 day", label: "Academy setup time", sub: "From signup to live" },
+function FinalAction() {
+  const PILLARS = [
+    {
+      n: "01",
+      title: "RUN THE ACADEMY",
+      desc: "Centralize athlete onboarding, attendance, academy records and daily operations.",
+    },
+    {
+      n: "02",
+      title: "CONTROL REVENUE",
+      desc: "Track fee plans, payments, pending dues and financial visibility without scattered records.",
+    },
+    {
+      n: "03",
+      title: "RUN TRAINING",
+      desc: "Keep athlete development and training information connected to the same operational system.",
+    },
+    {
+      n: "04",
+      title: "SEE THE WHOLE ACADEMY",
+      desc: "Give administrators one operational view instead of fragmented information.",
+    },
   ];
 
   return (
-    <section className="bg-foreground text-background">
-      <div className="max-w-7xl mx-auto px-6 py-20">
-        <div className="text-center mb-14">
-          <div className="label-micro text-primary mb-4">By the numbers</div>
-          <h2 className="text-h2 font-display text-background">Platform performance.</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-px bg-white/10">
-          {stats.map((s) => (
-            <div key={s.label} className="bg-foreground p-8 text-center">
-              <div className="text-stat font-display tabular text-gradient-gold">{s.value}</div>
-              <div className="mt-2 font-semibold text-sm text-background">{s.label}</div>
-              <div className="text-xs text-background/50 mt-1">{s.sub}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
+    <section id="why-boxos" className="reveal-section bg-cinematic-base relative z-10 py-40 overflow-hidden border-t border-white/5 scroll-mt-24">
+      {/* Atmosphere Fog */}
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 left-0 -translate-x-1/3 -translate-y-1/4" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-1/4 left-0 -translate-x-1/4" style={{ animationDelay: '-5s' }} />
+      
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[1400px] h-[1400px] bottom-0 right-0 translate-x-1/4 translate-y-1/4" style={{ animationDelay: '-8s' }} />
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[900px] h-[900px] bottom-1/4 right-0 translate-x-1/4" style={{ animationDelay: '-3s' }} />
 
-/* ── CTA ────────────────────────────────────────────────────────────── */
-function CTA() {
-  return (
-    <section className="max-w-7xl mx-auto px-6 py-24">
-      <div className="relative overflow-hidden rounded-3xl bg-surface border border-border p-12 md:p-20 shadow-elevated">
-        <div className="absolute inset-0 dot-pattern opacity-40" />
-        <div className="absolute -right-24 -top-24 size-[500px] gold-glow blur-3xl opacity-60" />
-
-        <div className="relative max-w-2xl">
-          <div className="label-micro text-primary-dark mb-5">Ready when you are</div>
-          <h2 className="text-h1 font-display">
-            Elevate your academy with software that earns its place.
+      <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col md:flex-row gap-16 lg:gap-24">
+        
+        {/* LEFT ~40%: Headline */}
+        <div className="w-full md:w-[40%] flex flex-col justify-start animate-fade-up">
+          <h2 className="font-display font-extrabold text-4xl md:text-5xl lg:text-6xl tracking-tighter uppercase text-white leading-tight">
+            WHY BOXOS?
           </h2>
-          <p className="mt-5 text-muted-foreground leading-relaxed">
-            Pilot programs open through Q3 2026. We onboard one academy at a time, personally, to make sure the setup is perfect.
+          <p className="mt-6 font-sans text-base md:text-lg text-cinematic-secondary leading-relaxed max-w-sm">
+            BOXOS connects the operational parts of an academy that are normally fragmented across spreadsheets, messages, payment records and separate training workflows.
           </p>
+        </div>
 
-          <div className="mt-10 flex flex-wrap gap-3">
-            <Link
-              to="/onboarding"
-              className="group inline-flex items-center gap-2 bg-[#ef4444] text-white px-6 py-3.5 rounded-xl text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-elevated"
-            >
-              Register your academy
-              <ArrowUpRight className="size-4 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
-            </Link>
-            <Link
-              to="/superadmin"
-              className="inline-flex items-center gap-2 border border-border-strong px-6 py-3.5 rounded-xl text-sm font-semibold hover:bg-subtle transition-all"
-            >
-              Talk to founders
-            </Link>
-          </div>
+        {/* RIGHT ~60%: Vertical Proof Points & CTA */}
+        <div className="w-full md:w-[60%] relative pl-10 md:pl-16">
+          {/* Vertical tracking line */}
+          <div className="absolute left-0 top-3 bottom-0 w-px bg-gradient-to-b from-cinematic-blue via-white/20 to-cinematic-red opacity-80" />
 
-          {/* Mini stat row */}
-          <div className="mt-12 flex flex-wrap gap-8">
-            {[
-              ["< 6 min", "Onboard time"],
-              ["1 day", "Setup"],
-              ["Free", "Pilot fee"],
-            ].map(([v, k]) => (
-              <div key={k}>
-                <div className="text-2xl font-display font-bold tabular">{v}</div>
-                <div className="text-xs text-muted-foreground mt-1">{k}</div>
+          <div className="space-y-16">
+            {PILLARS.map((p) => (
+              <div key={p.n} className="relative group animate-fade-up">
+                {/* Node Marker */}
+                <div className="absolute -left-[45px] md:-left-[69px] top-1.5 size-2.5 rounded-full bg-cinematic-base border border-white/60 group-hover:border-cinematic-red group-hover:scale-125 transition-all duration-300 shadow-[0_0_10px_rgba(255,255,255,0.2)] group-hover:shadow-[0_0_15px_rgba(239,68,68,0.5)]" />
+
+                <div className="text-sm font-mono font-bold text-white/50 group-hover:text-white transition-colors duration-300 mb-2 tracking-widest">
+                  {p.n}
+                </div>
+                <h3 className="font-display font-bold text-2xl md:text-3xl text-white tracking-tight mb-3">
+                  {p.title}
+                </h3>
+                <p className="text-cinematic-secondary text-base md:text-lg leading-relaxed max-w-lg group-hover:text-white/80 transition-colors duration-300">
+                  {p.desc}
+                </p>
               </div>
             ))}
+
+            {/* Simple Final CTA integrated into the line */}
+            <div className="relative pt-8 animate-fade-up">
+              {/* Very subtle CTA atmosphere */}
+              <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[400px] h-[400px] top-1/2 left-0 -translate-x-1/2 -translate-y-1/2 pointer-events-none" style={{ opacity: 0.7 }} />
+              <div className="absolute -left-[45px] md:-left-[69px] top-12 size-2.5 rounded-full bg-cinematic-red shadow-[0_0_15px_rgba(239,68,68,0.6)]" />
+              <Link
+                to="/onboarding"
+                className="group inline-flex items-center gap-3 text-white text-lg font-display font-bold tracking-tight hover:text-cinematic-red transition-all duration-300 relative z-10"
+              >
+                REGISTER YOUR ACADEMY
+                <ArrowUpRight className="size-5 group-hover:translate-x-1 group-hover:-translate-y-1 transition-transform" />
+              </Link>
+            </div>
           </div>
         </div>
       </div>

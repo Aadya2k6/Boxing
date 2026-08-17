@@ -3,7 +3,9 @@ import { useState } from "react";
 import { Eye, EyeOff, ArrowRight, AlertCircle } from "lucide-react";
 import { useAuth, getRedirectPath } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
-import Logo from "@/components/site/Logo";
+import { CinematicLayout } from "@/components/auth/CinematicLayout";
+import { CinematicCard } from "@/components/auth/CinematicCard";
+import { CinematicInput } from "@/components/auth/CinematicInput";
 
 export const Route = createFileRoute("/login")({
   head: () => ({ meta: [{ title: "Sign in — Boxos" }] }),
@@ -55,63 +57,61 @@ function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4">
-      <div className="w-full max-w-md animate-fade-up">
-        {/* Logo */}
-        <Link to="/" className="flex items-center justify-center mb-10 group">
-          <Logo className="h-11 sm:h-12 w-auto" textSize="text-2xl" />
-        </Link>
+    <CinematicLayout>
+      {/* Atmospheric Lighting */}
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1000px] h-[1000px] bottom-0 right-0 translate-y-1/4 translate-x-1/4" style={{ animationDelay: '-5s' }} />
 
-        <div className="bento-card p-8">
-          <div className="mb-7">
-            <h1 className="font-display font-bold text-2xl">Welcome back</h1>
-            <p className="text-muted-foreground text-sm mt-1.5">Sign in to your Boxos account</p>
+      <div className="w-full flex flex-col items-center relative z-10">
+        <CinematicCard>
+          <div className="mb-8 text-center">
+            <h1 className="font-display font-bold text-3xl text-white tracking-tight">Welcome Back</h1>
+            <p className="text-cinematic-secondary text-sm mt-2">Sign in to access your dashboard</p>
           </div>
 
           {error && (
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/8 border border-destructive/20 mb-5">
-              <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive">{error}</p>
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-cinematic-red/10 border border-cinematic-red/20 mb-6">
+              <AlertCircle className="size-5 text-cinematic-red shrink-0 mt-0.5" />
+              <p className="text-sm text-cinematic-red font-medium leading-relaxed">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">Email address</label>
-              <input
+              <label className="block text-xs font-semibold text-cinematic-primary mb-2">Email address</label>
+              <CinematicInput
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
                 autoComplete="email"
                 placeholder="aarav@example.com"
-                className="input-premium"
               />
             </div>
 
             <div>
-              <div className="flex items-center justify-between mb-1.5">
-                <label className="text-xs font-semibold text-foreground">Password</label>
-                <button type="button" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-semibold text-cinematic-primary">Password</label>
+                <button type="button" className="text-xs text-cinematic-secondary hover:text-cinematic-primary transition-colors">
                   Forgot password?
                 </button>
               </div>
               <div className="relative">
-                <input
+                <CinematicInput
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
                   placeholder="••••••••"
-                  className="input-premium pr-11"
+                  className="pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-cinematic-secondary hover:text-cinematic-primary transition-colors"
                 >
-                  {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {showPw ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
                 </button>
               </div>
             </div>
@@ -119,28 +119,28 @@ function LoginPage() {
             <button
               type="submit"
               disabled={loading || !email || !password}
-              className="w-full flex items-center justify-center gap-2 bg-[#ef4444] text-white py-3 rounded-xl text-sm font-semibold hover:bg-[#dc2626] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-card mt-2"
+              className="w-full flex items-center justify-center gap-2 bg-cinematic-red text-white py-3.5 rounded-xl text-sm font-bold hover:bg-cinematic-red-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-4"
             >
               {loading ? (
-                <span className="size-4 border-2 border-background/40 border-t-background rounded-full animate-spin" />
+                <span className="size-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               ) : (
-                <>Sign in <ArrowRight className="size-4" /></>
+                <>Sign in <ArrowRight className="size-4.5" /></>
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
+          <div className="mt-8 text-center text-sm text-cinematic-secondary">
             Don't have an account?{" "}
-            <Link to="/onboarding" className="text-foreground font-semibold hover:text-primary-dark transition-colors">
+            <Link to="/signup" className="text-cinematic-primary font-semibold hover:text-cinematic-blue transition-colors">
               Register as athlete
             </Link>
           </div>
-        </div>
+        </CinematicCard>
 
-        <p className="text-center text-xs text-muted-foreground mt-6">
+        <p className="text-center text-xs text-cinematic-secondary mt-8 opacity-70">
           Admin & Superadmin accounts are created by invitation only.
         </p>
       </div>
-    </div>
+    </CinematicLayout>
   );
 }

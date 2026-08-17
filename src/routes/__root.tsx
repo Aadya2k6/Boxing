@@ -1,4 +1,6 @@
+import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import Lenis from "lenis";
 import {
   Outlet,
   Link,
@@ -128,13 +130,61 @@ function RootShell({ children }: { children: React.ReactNode }) {
   );
 }
 
+function SmoothScroll({ children }: { children: React.ReactNode }) {
+  useEffect(() => {
+    const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+    if (mediaQuery.matches) return;
+
+    const lenis = new Lenis({
+      duration: 1.2,
+      easing: (t) => Math.min(1, 1.001 - Math.pow(2, -10 * t)),
+      orientation: 'vertical',
+      gestureOrientation: 'vertical',
+      smoothWheel: true,
+      wheelMultiplier: 1,
+    });
+
+    function raf(time: number) {
+      lenis.raf(time);
+      requestAnimationFrame(raf);
+    }
+
+    requestAnimationFrame(raf);
+
+    const handleHashChange = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      const anchor = target.closest('a');
+      if (anchor && anchor.hash && anchor.hash.startsWith('#')) {
+        const id = anchor.hash.substring(1);
+        const el = document.getElementById(id);
+        if (el) {
+          e.preventDefault();
+          // -96 accounts for the sticky header height
+          lenis.scrollTo(el, { offset: -96 });
+        }
+      }
+    };
+
+    document.documentElement.addEventListener('click', handleHashChange);
+
+    return () => {
+      lenis.destroy();
+      document.documentElement.removeEventListener('click', handleHashChange);
+    };
+  }, []);
+
+  return <>{children}</>;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <Outlet />
+        <SmoothScroll>
+          <Outlet />
+        </SmoothScroll>
         <DevRoleSwitcher />
       </AuthProvider>
     </QueryClientProvider>

@@ -1,8 +1,10 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState, useEffect } from "react";
-import { Crosshair, Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
+import { useState } from "react";
+import { Eye, EyeOff, ArrowRight, AlertCircle, CheckCircle2 } from "lucide-react";
 import { useAuth } from "@/lib/auth";
-import Logo from "@/components/site/Logo";
+import { CinematicLayout } from "@/components/auth/CinematicLayout";
+import { CinematicCard } from "@/components/auth/CinematicCard";
+import { CinematicInput } from "@/components/auth/CinematicInput";
 
 export const Route = createFileRoute("/signup")({
   head: () => ({ meta: [{ title: "Create account — Boxos" }] }),
@@ -10,7 +12,7 @@ export const Route = createFileRoute("/signup")({
 });
 
 function SignupPage() {
-  const { signUp, signOut } = useAuth();
+  const { signUp } = useAuth();
   const navigate = useNavigate();
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState("");
@@ -20,11 +22,6 @@ function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
-
-  // Automatically redirect any access to /signup directly to /onboarding
-  useEffect(() => {
-    navigate({ to: "/onboarding", replace: true });
-  }, [navigate]);
 
   const passwordStrength = password.length >= 8
     ? password.match(/[A-Z]/) && password.match(/[0-9]/) ? "strong" : "medium"
@@ -40,7 +37,7 @@ function SignupPage() {
       if (error) { setError(error.message); return; }
       setSuccess(true);
       // After a short delay navigate to onboarding
-      setTimeout(() => navigate({ to: "/onboarding" }), 2500);
+      setTimeout(() => navigate({ to: "/onboarding" }), 2000);
     } finally {
       setLoading(false);
     }
@@ -48,74 +45,76 @@ function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-background grid place-items-center px-4">
-        <div className="max-w-md text-center animate-fade-up">
-          <div className="size-20 mx-auto rounded-full bg-success/10 grid place-items-center mb-6">
-            <CheckCircle2 className="size-10 text-success" strokeWidth={1.5} />
+      <CinematicLayout>
+        <CinematicCard>
+          <div className="text-center py-6">
+            <div className="size-20 mx-auto rounded-full bg-[#10B981]/10 border border-[#10B981]/20 grid place-items-center mb-6">
+              <CheckCircle2 className="size-10 text-[#10B981]" strokeWidth={1.5} />
+            </div>
+            <h1 className="font-display font-bold text-3xl text-white tracking-tight">Account created!</h1>
+            <p className="text-cinematic-secondary mt-4 leading-relaxed">
+              Welcome to Boxos, {fullName.split(" ")[0]}. Preparing your athlete onboarding profile…
+            </p>
           </div>
-          <h1 className="font-display font-bold text-2xl">Account created!</h1>
-          <p className="text-muted-foreground mt-3">
-            Welcome to Boxos, {fullName.split(" ")[0]}. Redirecting you to onboarding…
-          </p>
-        </div>
-      </div>
+        </CinematicCard>
+      </CinematicLayout>
     );
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center px-4 py-10">
-      <div className="w-full max-w-md animate-fade-up">
-        {/* Logo */}
-        <Link to="/" className="flex items-center justify-center mb-10 group">
-          <Logo className="h-11 sm:h-12 w-auto" textSize="text-2xl" />
-        </Link>
+    <CinematicLayout>
+      {/* Atmospheric Lighting */}
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-1/4 right-0 translate-x-1/3 opacity-70" style={{ animationDelay: '-3s' }} />
+      
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[1200px] h-[1200px] bottom-0 right-0 translate-y-1/4 translate-x-1/4" style={{ animationDelay: '-6s' }} />
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[700px] h-[700px] bottom-1/4 right-0 translate-x-1/3 opacity-80" style={{ animationDelay: '-9s' }} />
 
-        <div className="bento-card p-8">
-          <div className="mb-7">
-            <h1 className="font-display font-bold text-2xl">Register as athlete</h1>
-            <p className="text-muted-foreground text-sm mt-1.5">
+      <div className="w-full flex flex-col items-center relative z-10">
+        <CinematicCard>
+          <div className="mb-8 text-center">
+            <h1 className="font-display font-bold text-3xl text-white tracking-tight">Register as Athlete</h1>
+            <p className="text-cinematic-secondary text-sm mt-2">
               Create your account to start onboarding
             </p>
           </div>
 
           {error && (
-            <div className="flex items-start gap-3 p-3.5 rounded-xl bg-destructive/8 border border-destructive/20 mb-5">
-              <AlertCircle className="size-4 text-destructive shrink-0 mt-0.5" />
-              <p className="text-sm text-destructive">{error}</p>
+            <div className="flex items-start gap-3 p-4 rounded-xl bg-cinematic-red/10 border border-cinematic-red/20 mb-6">
+              <AlertCircle className="size-5 text-cinematic-red shrink-0 mt-0.5" />
+              <p className="text-sm text-cinematic-red font-medium leading-relaxed">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">Full name</label>
-              <input
+              <label className="block text-xs font-semibold text-cinematic-primary mb-2">Full name</label>
+              <CinematicInput
                 type="text"
                 value={fullName}
                 onChange={e => setFullName(e.target.value)}
                 required
                 autoComplete="name"
                 placeholder="Aarav Mehta"
-                className="input-premium"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">Email address</label>
-              <input
+              <label className="block text-xs font-semibold text-cinematic-primary mb-2">Email address</label>
+              <CinematicInput
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
                 autoComplete="email"
                 placeholder="aarav@example.com"
-                className="input-premium"
               />
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-foreground mb-1.5">Password</label>
+              <label className="block text-xs font-semibold text-cinematic-primary mb-2">Password</label>
               <div className="relative">
-                <input
+                <CinematicInput
                   type={showPw ? "text" : "password"}
                   value={password}
                   onChange={e => setPassword(e.target.value)}
@@ -123,74 +122,74 @@ function SignupPage() {
                   minLength={8}
                   autoComplete="new-password"
                   placeholder="Min. 8 characters"
-                  className="input-premium pr-11"
+                  className="pr-12"
                 />
                 <button
                   type="button"
                   onClick={() => setShowPw(v => !v)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-cinematic-secondary hover:text-cinematic-primary transition-colors"
                 >
-                  {showPw ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                  {showPw ? <EyeOff className="size-4.5" /> : <Eye className="size-4.5" />}
                 </button>
               </div>
               {/* Password strength */}
               {passwordStrength && (
-                <div className="flex gap-1.5 mt-2">
+                <div className="flex gap-1.5 mt-3">
                   {(["weak", "medium", "strong"] as const).map((level, i) => (
                     <div
                       key={level}
                       className={`h-1 flex-1 rounded-full transition-all ${
                         (passwordStrength === "weak" && i === 0)
-                          ? "bg-destructive"
+                          ? "bg-cinematic-red"
                           : (passwordStrength === "medium" && i <= 1)
-                          ? "bg-warning"
+                          ? "bg-[#F59E0B]"
                           : (passwordStrength === "strong" && i <= 2)
-                          ? "bg-success"
-                          : "bg-border"
+                          ? "bg-[#10B981]"
+                          : "bg-white/10"
                       }`}
                     />
                   ))}
-                  <span className="text-[11px] text-muted-foreground capitalize w-12">{passwordStrength}</span>
+                  <span className="text-[11px] text-cinematic-secondary capitalize w-12 text-right">{passwordStrength}</span>
                 </div>
               )}
             </div>
 
             {/* Terms */}
-            <label className="flex items-start gap-3 cursor-pointer p-3.5 rounded-xl border border-border hover:bg-elevated transition-all group">
-              <span className={`size-5 rounded-md border-2 grid place-items-center mt-0.5 shrink-0 transition-all ${
-                agreed ? "bg-primary border-primary" : "border-border-strong"
+            <label className="flex items-start gap-3.5 cursor-pointer p-4 rounded-xl border border-cinematic-border bg-white/5 hover:bg-white/10 transition-all group mt-2">
+              <span className={`size-5 rounded-md border-[1.5px] grid place-items-center mt-0.5 shrink-0 transition-all ${
+                agreed ? "bg-cinematic-blue border-cinematic-blue" : "border-cinematic-secondary group-hover:border-cinematic-primary"
               }`}>
-                {agreed && <CheckCircle2 className="size-3 text-primary-foreground" strokeWidth={3} />}
+                {agreed && <CheckCircle2 className="size-3.5 text-white" strokeWidth={3} />}
               </span>
               <input type="checkbox" checked={agreed} onChange={e => setAgreed(e.target.checked)} className="sr-only" />
-              <span className="text-xs text-muted-foreground leading-relaxed">
+              <span className="text-xs text-cinematic-secondary leading-relaxed">
                 I agree to the{" "}
-                <span className="text-foreground font-medium">Terms of Service</span> and{" "}
-                <span className="text-foreground font-medium">Privacy Policy</span>
+                <span className="text-cinematic-primary font-medium hover:underline">Terms of Service</span> and{" "}
+                <span className="text-cinematic-primary font-medium hover:underline">Privacy Policy</span>
               </span>
             </label>
 
             <button
               type="submit"
               disabled={loading || !email || !password || !fullName || !agreed}
-              className="w-full flex items-center justify-center gap-2 bg-[#ef4444] text-white py-3 rounded-xl text-sm font-semibold hover:bg-[#dc2626] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-card mt-2"
+              className="w-full flex items-center justify-center gap-2 bg-cinematic-red text-white py-3.5 rounded-xl text-sm font-bold hover:bg-cinematic-red-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-4"
             >
               {loading ? (
-                <span className="size-4 border-2 border-background/40 border-t-background rounded-full animate-spin" />
+                <span className="size-5 border-2 border-white/40 border-t-white rounded-full animate-spin" />
               ) : (
-                <>Create account <ArrowRight className="size-4" /></>
+                <>Create account <ArrowRight className="size-4.5" /></>
               )}
             </button>
           </form>
 
-          <div className="mt-6 text-center text-sm text-muted-foreground">
+          <div className="mt-8 text-center text-sm text-cinematic-secondary">
             Already have an account?{" "}
-            <Link to="/login" className="text-foreground font-semibold hover:text-primary-dark transition-colors">
+            <Link to="/login" className="text-cinematic-primary font-semibold hover:text-cinematic-blue transition-colors">
               Sign in
             </Link>
           </div>
-        </div>
+        </CinematicCard>
       </div>
-    </div>
+    </CinematicLayout>
   );
 }
