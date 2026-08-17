@@ -186,7 +186,6 @@ function RootComponent() {
           <Outlet />
         </SmoothScroll>
         <Toaster position="top-right" richColors theme="light" />
-        <DevRoleSwitcher />
       </AuthProvider>
     </QueryClientProvider>
   );

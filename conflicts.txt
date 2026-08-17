@@ -1,0 +1,272 @@
+--- CONFLICT 1 ---
+UPSTREAM:
+      </CinematicLayout>
+
+STASHED:
+
+        <div className="flex-1 max-w-6xl mx-auto w-full px-6 py-10 grid lg:grid-cols-12 gap-8">
+          {/* LEFT — step sidebar */}
+          <StepSidebar steps={visibleSteps} current={step} onJump={(i) => i < step && setStep(i)} />
+
+          {/* RIGHT — form content */}
+          <main className="lg:col-span-9">
+            <FormPanel
+              current={current}
+              step={step}
+              totalSteps={totalSteps}
+              data={data}
+              set={set}
+              user={user}
+              isMinor={isMinor}
+              ageCategories={ageCategories}
+              weightCategories={weightCategories}
+              onPrev={() => setStep(s => Math.max(0, s - 1))}
+              onNext={() => {
+                if (step < totalSteps - 1) setStep(s => s + 1);
+                else submitProfile();
+              }}
+              isLast={step === totalSteps - 1}
+              submitting={submitting}
+              submitError={submitError}
+            />
+          </main>
+        </div>
+      </div>
+
+
+--- CONFLICT 2 ---
+UPSTREAM:
+              <h2 className="font-display font-bold text-xl md:text-2xl text-cinematic-primary">{current.label}</h2>
+              <p className="text-sm text-cinematic-secondary mt-1">{current.desc}</p>
+
+STASHED:
+              <div className="label-micro text-primary-dark">Section {step + 1} of {totalSteps}</div>
+              <h2 className="font-display font-bold text-xl mt-0.5">{current.label}</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">{current.desc}</p>
+
+
+--- CONFLICT 3 ---
+UPSTREAM:
+        {/* Form body */}
+        <div className="px-5 md:px-8 py-6">
+
+STASHED:
+        {/* Step form contents */}
+        <div className="p-8">
+
+
+--- CONFLICT 4 ---
+UPSTREAM:
+            className="w-full md:w-auto inline-flex items-center justify-center gap-2 text-sm font-medium px-6 py-3 border border-white/10 rounded-xl text-cinematic-primary hover:bg-white/5 disabled:opacity-30 transition-all"
+
+STASHED:
+            className="inline-flex items-center gap-2 text-sm font-medium px-4 py-2.5 border border-border rounded-lg hover:bg-elevated disabled:opacity-35 disabled:cursor-not-allowed transition-all cursor-pointer"
+
+
+--- CONFLICT 5 ---
+UPSTREAM:
+              className="w-full md:w-auto inline-flex items-center justify-center gap-2 text-sm font-bold bg-cinematic-red text-white px-8 py-3 rounded-xl hover:bg-cinematic-red-hover disabled:opacity-50 transition-all shadow-xl"
+
+STASHED:
+              className="inline-flex items-center gap-2 text-sm font-semibold bg-[#ef4444] text-white px-6 py-2.5 rounded-lg hover:bg-[#dc2626] disabled:opacity-60 transition-all shadow-card cursor-pointer"
+
+
+--- CONFLICT 6 ---
+UPSTREAM:
+              className="w-full md:w-auto inline-flex items-center justify-center gap-2 text-sm font-bold bg-cinematic-blue text-white px-8 py-3 rounded-xl hover:bg-blue-600 transition-all shadow-xl"
+
+STASHED:
+              className="inline-flex items-center gap-2 text-sm font-semibold bg-primary text-primary-foreground px-6 py-2.5 rounded-lg hover:bg-primary-light transition-all shadow-glow cursor-pointer"
+
+
+--- CONFLICT 7 ---
+UPSTREAM:
+        <div className="grid md:grid-cols-2 gap-6">
+          <Field label="Full name" required hint="As per government ID">
+            <CinematicInput value={data.fullName || ""} onChange={e => set("fullName", e.target.value)} placeholder="Aarav Mehta" />
+          </Field>
+          <Field label="Date of birth" required>
+            <CinematicInput type="date" value={data.dob || ""} onChange={e => set("dob", e.target.value)} />
+
+STASHED:
+        <div className="grid md:grid-cols-2 gap-5">
+          <Field label="Full name" required hint="As per official government ID">
+            <Input value={data.fullName || ""} onChange={e => set("fullName", e.target.value)} placeholder="John Doe" />
+          </Field>
+          <Field label="Date of birth" required hint="Used to verify age category and minor status">
+            <Input type="date" value={data.dob || ""} onChange={e => set("dob", e.target.value)} />
+
+
+--- CONFLICT 8 ---
+UPSTREAM:
+          <Field label="Email address" required hint="Used to access your account">
+            <CinematicInput type="email" value={data.email || ""} onChange={e => set("email", e.target.value)} placeholder="aarav@example.com" />
+
+STASHED:
+          <Field label="Email address" required hint="Used to access your athlete dashboard">
+            <Input type="email" value={data.email || ""} onChange={e => set("email", e.target.value)} placeholder="john@example.com" />
+
+
+--- CONFLICT 9 ---
+UPSTREAM:
+            <CinematicInput value={data.country || ""} onChange={e => set("country", e.target.value)} placeholder="e.g. India" />
+
+STASHED:
+            <Input value={data.country || "India"} onChange={e => set("country", e.target.value)} placeholder="e.g. India" />
+
+
+--- CONFLICT 10 ---
+UPSTREAM:
+      <div className="space-y-6">
+        <div className="flex items-start gap-4 p-4 rounded-xl bg-[#F59E0B]/10 border border-[#F59E0B]/20">
+          <AlertCircle className="size-5 text-[#F59E0B] mt-0.5 shrink-0" />
+          <p className="text-sm text-[#F59E0B] leading-relaxed">Required because the participant is under 18. Guardian must provide digital consent before submission.</p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-6">
+          <Field label="Guardian full name" required>
+            <CinematicInput value={data.gName || ""} onChange={e => set("gName", e.target.value)} placeholder="Guardian Name" />
+
+STASHED:
+      <div className="space-y-5">
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-warning/8 border border-warning/25">
+          <AlertCircle className="size-4 text-warning mt-0.5 shrink-0" />
+          <p className="text-sm text-warning font-medium">
+            Participant is under 18 years of age. A parent or legal guardian must provide contact details and consent.
+          </p>
+        </div>
+        <div className="grid md:grid-cols-2 gap-5">
+          <Field label="Guardian Full Name" required>
+            <Input value={data.gName || ""} onChange={e => set("gName", e.target.value)} placeholder="Guardian Name" />
+
+
+--- CONFLICT 11 ---
+UPSTREAM:
+          <Field label="Guardian phone" required>
+            <CinematicInput type="tel" value={data.gPhone || ""} onChange={e => set("gPhone", e.target.value)} placeholder="+91 98765 43210" />
+          </Field>
+          <Field label="Guardian email">
+            <CinematicInput type="email" value={data.gEmail || ""} onChange={e => set("gEmail", e.target.value)} placeholder="guardian@example.com" />
+
+STASHED:
+          <Field label="Guardian Phone" required>
+            <Input type="tel" value={data.gPhone || ""} onChange={e => set("gPhone", e.target.value)} placeholder="+91 98765 43210" />
+          </Field>
+          <Field label="Guardian Email">
+            <Input type="email" value={data.gEmail || ""} onChange={e => set("gEmail", e.target.value)} placeholder="guardian@example.com" />
+
+
+--- CONFLICT 12 ---
+UPSTREAM:
+            className="inline-flex items-center gap-2 text-xs font-semibold px-4 py-2.5 rounded-lg border border-cinematic-blue/30 bg-cinematic-blue/10 text-cinematic-blue hover:bg-cinematic-blue/20 transition-colors"
+
+STASHED:
+            className="inline-flex items-center gap-2 text-xs font-semibold px-3 py-2 rounded-lg border border-info/30 bg-info/6 text-info hover:bg-info/10 transition-colors cursor-pointer"
+
+
+--- CONFLICT 13 ---
+UPSTREAM:
+        <div className="grid md:grid-cols-2 gap-6">
+          <Field label="Emergency contact name" required>
+            <CinematicInput value={data.eName || ""} onChange={e => set("eName", e.target.value)} placeholder="Contact Name" />
+          </Field>
+          <Field label="Relationship" required>
+            <CinematicInput value={data.eRel || ""} onChange={e => set("eRel", e.target.value)} placeholder="e.g. Spouse, Parent" />
+          </Field>
+          <Field label="Emergency phone" required>
+            <CinematicInput type="tel" value={data.ePhone || ""} onChange={e => set("ePhone", e.target.value)} placeholder="+91 98765 43210" />
+
+STASHED:
+        <div className="grid md:grid-cols-2 gap-5">
+          <Field label="Emergency Contact Name" required>
+            <Input value={data.eName || ""} onChange={e => set("eName", e.target.value)} placeholder="Contact Name" />
+          </Field>
+          <Field label="Relationship" required>
+            <Input value={data.eRel || ""} onChange={e => set("eRel", e.target.value)} placeholder="e.g. Parent, Spouse, Sibling" />
+          </Field>
+          <Field label="Emergency Contact Phone" required>
+            <Input type="tel" value={data.ePhone || ""} onChange={e => set("ePhone", e.target.value)} placeholder="+91 98765 43210" />
+
+
+--- CONFLICT 14 ---
+UPSTREAM:
+        <div className="grid md:grid-cols-2 gap-6 pt-2">
+          <Field label="Current Medications" hint="List any ongoing medications (Optional)">
+            <Textarea value={data.meds || ""} onChange={e => set("meds", e.target.value)} placeholder="e.g. None" rows={2} />
+
+STASHED:
+        <div className="grid md:grid-cols-2 gap-5">
+          <Field label="Current Medications" hint="Any daily or routine prescriptions (Optional)">
+            <Textarea value={data.meds || ""} onChange={e => set("meds", e.target.value)} placeholder="e.g. Inhaler as needed or None" rows={2} />
+
+
+--- CONFLICT 15 ---
+UPSTREAM:
+          <Field label="Health Insurance Provider & Policy Number" hint="Optional">
+            <CinematicInput value={data.healthInsuranceProvider || ""} onChange={e => set("healthInsuranceProvider", e.target.value)} placeholder="Provider - Policy #" />
+          </Field>
+
+STASHED:
+
+
+--- CONFLICT 16 ---
+UPSTREAM:
+        <div className="grid md:grid-cols-2 gap-6">
+          <Field label="Boxing Stance" required>
+
+STASHED:
+        <div className="grid md:grid-cols-2 gap-5">
+          <Field label="Boxing Stance" required hint="Your primary fighting stance">
+
+
+--- CONFLICT 17 ---
+UPSTREAM:
+          <Field label="Weight (kg)" required>
+            <CinematicInput type="number" step="0.1" value={data.weightKg || ""} onChange={e => set("weightKg", e.target.value)} placeholder="e.g. 70.5" />
+          </Field>
+          <Field label="Height (cm)" required>
+            <CinematicInput type="number" value={data.heightCm || ""} onChange={e => set("heightCm", e.target.value)} placeholder="e.g. 180" />
+          </Field>
+          <Field label="Reach (cm)" hint="Optional">
+            <CinematicInput type="number" value={data.reachCm || ""} onChange={e => set("reachCm", e.target.value)} placeholder="e.g. 185" />
+          </Field>
+          <Field label="Experience Level" required>
+            <Select value={data.experienceLevel || ""} onChange={e => set("experienceLevel", e.target.value)}>
+              <option value="">Select…</option>
+              <option value="Beginner">Beginner (No prior experience)</option>
+              <option value="Intermediate">Intermediate (Pad work and heavy bag experience)</option>
+              <option value="Advanced">Advanced (Sparring or competition experience)</option>
+
+STASHED:
+
+          <Field label="Weight Category" required hint={!data.ageCategoryId ? "Select an Age Category first" : "Your current weight class"}>
+            <Select value={data.weightCategoryId || ""} onChange={e => set("weightCategoryId", e.target.value)} disabled={!data.ageCategoryId}>
+              <option value="">Select Weight Category…</option>
+              {filteredWeightCategories.map(w => (
+                <option key={w.id} value={w.id}>
+                  {w.name} ({w.min_kg}kg {w.max_kg ? `- ${w.max_kg}kg` : '+'})
+                </option>
+              ))}
+
+
+--- CONFLICT 18 ---
+UPSTREAM:
+          <Field label="Amateur / Fight Record" hint="Optional (Wins-Losses-Draws)">
+            <CinematicInput value={data.fightRecord || ""} onChange={e => set("fightRecord", e.target.value)} placeholder="e.g. 3-1-0 or N/A" />
+          </Field>
+          <Field label="Previous/Current Club" hint="Optional">
+            <CinematicInput value={data.previousClub || ""} onChange={e => set("previousClub", e.target.value)} placeholder="e.g. Kronk Gym" />
+          </Field>
+          <Field label="Coach Name" hint="Optional">
+            <CinematicInput value={data.coachName || ""} onChange={e => set("coachName", e.target.value)} placeholder="Coach Name" />
+          </Field>
+          <Field label="Preferred Class Schedule & Time Slots" hint="Optional">
+            <CinematicInput value={data.preferredClassSchedule || ""} onChange={e => set("preferredClassSchedule", e.target.value)} placeholder="e.g. Weekdays Evening, Weekends Morning" />
+
+STASHED:
+          <Field label="Height (cm)" required hint="Standing height">
+            <Input type="number" step="0.5" value={data.heightCm || ""} onChange={e => set("heightCm", e.target.value)} placeholder="e.g. 178" />
+          </Field>
+          <Field label="Reach (cm)" hint="Fingertip-to-fingertip wingspan (Optional)">
+            <Input type="number" step="0.5" value={data.reachCm || ""} onChange={e => set("reachCm", e.target.value)} placeholder="e.g. 182" />
+
+
