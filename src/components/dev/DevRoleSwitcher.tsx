@@ -23,6 +23,8 @@ export function DevRoleSwitcher() {
   const { pathname } = useLocation();
   const [isOpen, setIsOpen] = useState(false);
 
+  if (pathname === '/') return null;
+
   const roles: { key: UserRole; label: string; path: string; icon: any; color: string; desc: string }[] = [
     {
       key: "athlete",

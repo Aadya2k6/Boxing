@@ -57,6 +57,15 @@
   --shadow-focus:  0 0 0 3px rgba(201,168,76,0.18);
   --shadow-sidebar: 1px 0 0 0 rgba(15,15,20,0.06);
   --shadow-header: 0 1px 0 0 rgba(15,15,20,0.06);
+
+  --color-cinematic-base: #050811;
+  --color-cinematic-panel: rgba(11, 15, 23, 0.75);
+  --color-cinematic-border: rgba(255, 255, 255, 0.1);
+  --color-cinematic-primary: #F8FAFC;
+  --color-cinematic-secondary: #94A3B8;
+  --color-cinematic-red: #EF4444;
+  --color-cinematic-red-hover: #DC2626;
+  --color-cinematic-blue: #3B82F6;
 }
 
 /* ── Root (Light Theme) ─────────────────────────────────────────────── */
@@ -118,7 +127,7 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    scroll-behavior: smooth;
+
   }
 
   body {
@@ -379,4 +388,135 @@
       padding-right: 1rem;
     }
   }
+
+  /* ── Cinematic Theme ────────────────────────────────────────────────── */
+  .theme-cinematic-dark {
+    --cinematic-base: #050811;
+    --cinematic-panel: rgba(11, 15, 23, 0.75);
+    --cinematic-border: rgba(255, 255, 255, 0.1);
+    --cinematic-primary: #F8FAFC;
+    --cinematic-secondary: #94A3B8;
+    --cinematic-red: #EF4444;
+    --cinematic-red-hover: #DC2626;
+    --cinematic-blue: #3B82F6;
+  }
+
+  .bg-cinematic-base {
+    background-color: var(--cinematic-base);
+  }
+
+  .text-cinematic-primary {
+    color: var(--cinematic-primary);
+  }
+
+  .text-cinematic-secondary {
+    color: var(--cinematic-secondary);
+  }
+
+  .glass-cinematic {
+    background-color: var(--cinematic-panel);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+  }
+
+  .border-cinematic-border {
+    border-color: var(--cinematic-border);
+  }
 }
+
+@theme {
+  --animate-fade-up: fade-up 0.8s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  --animate-fade-in: fade-in 1s ease-out forwards;
+  --animate-fog-1: fog-1 16s ease-in-out infinite alternate;
+  --animate-fog-2: fog-2 20s ease-in-out infinite alternate;
+  --animate-fog-3: fog-3 14s ease-in-out infinite alternate;
+  
+  @keyframes fade-up {
+    0% { opacity: 0; transform: translateY(20px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  @keyframes fade-in {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+  @keyframes fog-1 {
+    0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+    100% { transform: translate(3%, 3%) scale(1.05); opacity: 0.7; }
+  }
+  @keyframes fog-2 {
+    0% { transform: translate(0, 0) scale(1); opacity: 0.4; }
+    100% { transform: translate(-3%, -2%) scale(1.03); opacity: 0.6; }
+  }
+  @keyframes fog-3 {
+    0% { transform: translate(0, 0) scale(1); opacity: 0.3; }
+    100% { transform: translate(2%, -3%) scale(1.06); opacity: 0.5; }
+  }
+}
+
+.reveal-section {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 800ms cubic-bezier(0.16, 1, 0.3, 1), transform 800ms cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal-section.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reveal-section {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
+
+/* ── Cinematic Atmosphere ────────────────────────────────────────────────── */
+.atmosphere-base {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+  mix-blend-mode: screen;
+  z-index: 0;
+}
+
+.atmosphere-blue {
+  background: radial-gradient(circle, rgba(59, 130, 246, 0.08) 0%, transparent 60%);
+  filter: blur(120px);
+}
+
+.atmosphere-red {
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.06) 0%, transparent 60%);
+  filter: blur(120px);
+}
+
+.atmosphere-warm {
+  background: radial-gradient(circle, rgba(239, 68, 68, 0.03) 0%, transparent 60%);
+  filter: blur(100px);
+}
+
+/* Subtle environmental movement */
+@keyframes ambient-drift {
+  0% { transform: translate(0, 0) scale(1); opacity: 0.9; }
+  33% { transform: translate(2%, 3%) scale(1.03); opacity: 1; }
+  66% { transform: translate(-1%, 2%) scale(0.98); opacity: 0.95; }
+  100% { transform: translate(0, 0) scale(1); opacity: 0.9; }
+}
+
+.animate-ambient-drift {
+  animation: ambient-drift 24s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-ambient-drift {
+    animation: none !important;
+  }
+}
+
+
+
+
+
+
+
