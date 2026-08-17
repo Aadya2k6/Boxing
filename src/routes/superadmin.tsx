@@ -3,14 +3,32 @@ import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import {
   Building2, Cog, Wallet, Tag, Undo2, BarChart3,
   ShieldCheck, Settings, MapPin, Users2, ClipboardList, Bell, CalendarCheck,
-  Swords, Gavel, Layers
+  Swords, Gavel, Layers, UserCog, ShieldAlert
 } from "lucide-react";
 import { useRequireAuth } from "@/lib/guards";
+
+import { useState, useEffect } from "react";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/superadmin")({ component: SuperLayout });
 
 function SuperLayout() {
   const { profile, loading } = useRequireAuth("superadmin");
+  const [academyName, setAcademyName] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (profile?.academy_id) {
+      supabase
+        .from("academies")
+        .select("name")
+        .eq("id", profile.academy_id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.name) setAcademyName(data.name);
+        });
+    }
+  }, [profile?.academy_id]);
+
   if (loading) return (
     <div className="min-h-screen bg-background grid place-items-center">
       <span className="size-6 border-2 border-muted-foreground border-t-transparent rounded-full animate-spin" />
@@ -21,7 +39,7 @@ function SuperLayout() {
       basePath="/superadmin"
       role="Superadmin"
       userName={profile?.full_name ?? "Superadmin"}
-      userMeta="Platform Owner"
+      userMeta={academyName ? `${academyName} · Superadmin` : "Academy Superadmin"}
       accentClass="text-superadmin"
       accentBg="bg-subtle"
       dotColor="bg-superadmin"
@@ -32,6 +50,8 @@ function SuperLayout() {
           items: [
             { to: "", label: "Academy Overview", icon: Building2 },
             { to: "athletes", label: "Athletes", icon: Users2 },
+            { to: "coaches", label: "Coaches", icon: UserCog },
+            { to: "admins", label: "Admins", icon: ShieldAlert },
             { to: "academies", label: "Academy Locations", icon: MapPin },
             { to: "config", label: "Academy Config", icon: Cog },
             { to: "fees", label: "Fee Structure", icon: Wallet },
@@ -39,7 +59,6 @@ function SuperLayout() {
             { to: "class-assigning", label: "Class Assigning", icon: ClipboardList },
             { to: "bouts", label: "Bout Management", icon: Swords },
             { to: "judges", label: "External Judges", icon: Gavel },
-            { to: "categories", label: "Age & Weight Categories", icon: Layers },
           ],
         },
         {

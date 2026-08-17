@@ -96,7 +96,7 @@ function generateAcademyPaymentReportPdf(data: {
         <tr>
           <td>${p.payment_date ? new Date(p.payment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : new Date(p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
           <td style="font-family:monospace">${p.invoices?.invoice_number ?? p.invoice_id ?? "—"}</td>
-          <td>${data.athleteMap[p.athlete_profile_id] ?? p.invoices?.athlete_profiles?.full_name ?? "Athlete"}</td>
+          <td>${data.athleteMap[p.boxer_profile_id] ?? p.invoices?.boxer_profiles?.full_name ?? "Athlete"}</td>
           <td style="text-transform:capitalize">${p.payment_mode ?? "online"}</td>
           <td style="font-family:monospace;font-size:11px">${p.transaction_reference || p.razorpay_payment_id || "—"}</td>
           <td class="text-right text-success">${fmt(Number(p.amount ?? 0))}</td>
@@ -122,7 +122,7 @@ function generateAcademyPaymentReportPdf(data: {
       ${data.invoices.length === 0 ? '<tr><td colSpan="7" style="text-align:center;padding:20px;color:#888;">No invoices found.</td></tr>' : data.invoices.map((inv: any) => `
         <tr>
           <td style="font-family:monospace">${inv.invoice_number}</td>
-          <td>${data.athleteMap[inv.athlete_profile_id] ?? "Athlete"}</td>
+          <td>${data.athleteMap[inv.boxer_profile_id] ?? "Athlete"}</td>
           <td>${inv.billing_period ?? "Standard"}</td>
           <td>${inv.due_date ? new Date(inv.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}</td>
           <td style="text-transform:capitalize;font-weight:600">${inv.status}</td>
@@ -177,7 +177,7 @@ function SAReports() {
   // ── Outstanding dues ──
   const overdueInvoices = invoices.filter((i: any) => i.status !== "paid").map((i: any) => {
     const days = Math.max(0, Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86400000));
-    const athlete = athletes.find((a: any) => a.id === i.athlete_profile_id);
+    const athlete = athletes.find((a: any) => a.id === i.boxer_profile_id);
     return { ...i, daysOverdue: days, athleteName: athlete?.full_name ?? "Unknown" };
   }).sort((a: any, b: any) => b.daysOverdue - a.daysOverdue);
 
@@ -433,7 +433,7 @@ function SAReports() {
                 <tbody>
                   {refunds.map((r: any) => (
                     <tr key={r.id} className="border-b border-border">
-                      <td className="py-3 font-medium">{r.athlete_profiles?.full_name ?? "—"}</td>
+                      <td className="py-3 font-medium">{r.boxer_profiles?.full_name ?? "—"}</td>
                       <td className="py-3 text-right tabular">{fmt(Number(r.refund_amount ?? 0))}</td>
                       <td className="py-3 text-muted-foreground text-xs max-w-[200px] truncate">{r.reason ?? "—"}</td>
                       <td className="py-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${r.status === "approved" ? "bg-success/10 text-success" : r.status === "rejected" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"}`}>{r.status ?? "pending"}</span></td>
@@ -492,14 +492,14 @@ function SAReports() {
 
         const targetAcademyInvoices = invoices.filter((i: any) => {
           if (selectedAcademy.id === "unassigned") {
-            return !i.academy_id && !athleteAcademy[i.athlete_profile_id];
+            return !i.academy_id && !athleteAcademy[i.boxer_profile_id];
           }
-          return i.academy_id === selectedAcademy.id || athleteAcademy[i.athlete_profile_id] === selectedAcademy.id;
+          return i.academy_id === selectedAcademy.id || athleteAcademy[i.boxer_profile_id] === selectedAcademy.id;
         });
 
         const targetAcademyPayments = payments.filter((p: any) => {
           const inv = invoices.find((i: any) => i.id === p.invoice_id);
-          const aId = inv?.academy_id ?? athleteAcademy[p.athlete_profile_id] ?? "unassigned";
+          const aId = inv?.academy_id ?? athleteAcademy[p.boxer_profile_id] ?? "unassigned";
           if (selectedAcademy.id === "unassigned") return aId === "unassigned";
           return aId === selectedAcademy.id;
         });
@@ -617,7 +617,7 @@ function SAReports() {
                         ) : (
                           targetAcademyPayments.map((p: any) => {
                             const inv = invoices.find((i: any) => i.id === p.invoice_id);
-                            const athName = athleteMap[p.athlete_profile_id] ?? inv?.athlete_profiles?.full_name ?? "Athlete";
+                            const athName = athleteMap[p.boxer_profile_id] ?? inv?.boxer_profiles?.full_name ?? "Athlete";
                             return (
                               <tr key={p.id} className="border-t border-border hover:bg-subtle transition">
                                 <td className="px-4 py-3 text-xs text-muted-foreground tabular">
@@ -690,7 +690,7 @@ function SAReports() {
                           </tr>
                         ) : (
                           targetAcademyInvoices.map((inv: any) => {
-                            const athName = athleteMap[inv.athlete_profile_id] ?? "Athlete";
+                            const athName = athleteMap[inv.boxer_profile_id] ?? "Athlete";
                             return (
                               <tr key={inv.id} className="border-t border-border hover:bg-subtle transition">
                                 <td className="px-4 py-3 font-mono text-xs font-medium">{inv.invoice_number}</td>

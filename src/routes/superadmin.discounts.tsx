@@ -44,25 +44,20 @@ function CouponsPage() {
         { data: cData },
         { data: fpData },
         { data: acData },
-        { data: invData },
       ] = await Promise.all([
         supabase.from("coupons").select("*").order("created_at", { ascending: false }),
-        supabase.from("fee_plans").select("id, plan_name, amount, billing_cycle").order("plan_name"),
+        supabase.from("fee_plans").select("id, name, amount, cycle").order("name"),
         supabase.from("academies").select("id, name, city").order("name"),
-        // Only count CONFIRMED (paid) invoices for coupon usage
-        supabase.from("invoices").select("coupon_id").eq("status", "paid").not("coupon_id", "is", null),
       ]);
 
       setCoupons(cData || []);
-      setFeePlans(fpData || []);
+      setFeePlans((fpData || []).map(p => ({ ...p, plan_name: p.name, billing_cycle: p.cycle })));
       setAcademies(acData || []);
 
-      // Calculate CONFIRMED usage counts per coupon from paid invoices in Supabase
+      // Calculate usage counts directly from coupons table used_count column
       const counts: Record<string, number> = {};
-      (invData || []).forEach((i: any) => {
-        if (i.coupon_id) {
-          counts[i.coupon_id] = (counts[i.coupon_id] || 0) + 1;
-        }
+      (cData || []).forEach((c: any) => {
+        counts[c.id] = c.used_count || 0;
       });
       setInvoiceCouponCounts(counts);
 

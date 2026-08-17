@@ -45,7 +45,7 @@ function ProfilePage() {
         return;
       }
       const { data } = await supabase
-        .from("athlete_profiles")
+        .from("boxer_profiles")
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
@@ -104,7 +104,7 @@ function ProfilePage() {
       return;
     }
 
-    const { error: athleteError } = await supabase.from("athlete_profiles").update({
+    const { error: athleteError } = await supabase.from("boxer_profiles").update({
       full_name: form.full_name.trim(),
       phone: form.phone.trim() || null,
       mobile_number: form.mobile_number.trim() || null,
@@ -130,7 +130,7 @@ function ProfilePage() {
     }
 
     const { data } = await supabase
-      .from("athlete_profiles")
+      .from("boxer_profiles")
       .select("*")
       .eq("user_id", user.id)
       .maybeSingle();
@@ -167,14 +167,14 @@ function ProfilePage() {
           <div className="font-display font-semibold text-lg mt-4">{athleteProfile.full_name}</div>
           <div className="text-sm text-muted-foreground">Athlete · ID #{athleteProfile.id.substring(0, 8)}</div>
           <div className="mt-3 flex justify-center gap-2">
-            <Badge tone={athleteProfile.verification_status === "approved" ? "success" : "warning"}>
-              {athleteProfile.verification_status === "approved" ? "Active" : "Pending"}
+            <Badge tone={athleteProfile.verification_status === "verified" ? "success" : "warning"}>
+              {athleteProfile.verification_status === "verified" ? "Verified" : athleteProfile.verification_status === "rejected" ? "Rejected" : "Pending"}
             </Badge>
-            <Badge tone="gold">{athleteProfile.training_year || "New"}</Badge>
+            <Badge tone="gold">{athleteProfile.national_federation_boxer_id ? "Registered" : "New"}</Badge>
           </div>
           <div className="mt-6 pt-6 border-t border-border space-y-2 text-left text-sm">
             <Row icon={Mail} k={profile?.email || "—"} />
-            <Row icon={Phone} k={athleteProfile.mobile_number || "—"} />
+            <Row icon={Phone} k={athleteProfile.phone || "—"} />
             <Row icon={MapPin} k={`${athleteProfile.city || "—"}, ${athleteProfile.state || "—"}`} />
             <Row icon={Hash} k={`DOB · ${athleteProfile.date_of_birth || "—"}`} />
           </div>

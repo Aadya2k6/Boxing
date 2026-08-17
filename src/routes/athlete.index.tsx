@@ -57,7 +57,7 @@ function AthleteOverview() {
       // Athletes cannot set fee_assignment to 'online_pending' per RLS WITH CHECK.
       (async () => {
         const { data: ap } = await supabase
-          .from("athlete_profiles")
+          .from("boxer_profiles")
           .select("id")
           .eq("user_id", user.id)
           .maybeSingle();
@@ -118,14 +118,14 @@ function AthleteOverview() {
     if (!user) return;
     try {
       let { data: ap } = await supabase
-        .from("athlete_profiles")
+        .from("boxer_profiles")
         .select("*")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (!ap) {
         const { data: newAp } = await supabase
-          .from("athlete_profiles")
+          .from("boxer_profiles")
           .upsert({
             user_id: user.id,
             full_name: profile?.full_name || user.email?.split("@")[0] || "Athlete",
@@ -155,18 +155,28 @@ function AthleteOverview() {
       // Fetch latest fee assignment with plan details
       const { data: fa } = await supabase
         .from("fee_assignments")
-        .select("*, fee_plans(plan_name, amount, billing_cycle, custom_duration_days)")
-        .eq("athlete_profile_id", ap.id)
+        .select("*, fee_plans(name, amount, cycle)")
+        .eq("boxer_profile_id", ap.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
-      setFeeAssignment(fa);
+
+      const normalizedFa = fa ? {
+        ...fa,
+        plan_name: (fa.fee_plans as any)?.name ?? "Fee Package",
+        fee_plans: fa.fee_plans ? {
+          ...fa.fee_plans,
+          plan_name: (fa.fee_plans as any).name,
+          billing_cycle: (fa.fee_plans as any).cycle,
+        } : null,
+      } : null;
+      setFeeAssignment(normalizedFa);
 
       // Fetch latest unpaid invoice first, else latest invoice
       const { data: unpaidInv } = await supabase
         .from("invoices")
         .select("*")
-        .eq("athlete_profile_id", ap.id)
+        .eq("boxer_profile_id", ap.id)
         .in("status", ["unpaid", "partially_paid", "overdue"])
         .order("created_at", { ascending: false })
         .limit(1)
@@ -178,7 +188,7 @@ function AthleteOverview() {
         const { data: anyInv } = await supabase
           .from("invoices")
           .select("*")
-          .eq("athlete_profile_id", ap.id)
+          .eq("boxer_profile_id", ap.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();
@@ -189,7 +199,7 @@ function AthleteOverview() {
       const { data: unclearedRollover } = await supabase
         .from("fee_assignments")
         .select("id")
-        .eq("athlete_profile_id", ap.id)
+        .eq("boxer_profile_id", ap.id)
         .in("assignment_status", ["rollover_pending", "rollover_approved"])
         .limit(1);
       
@@ -336,18 +346,16 @@ function AthleteOverview() {
           <StatCard
             label="Verification"
             value={
-              athleteProfile?.verification_status === "approved"
-                ? "Approved"
-                : athleteProfile?.verification_status === "manual_review"
-                  ? "Under Review"
-                  : athleteProfile?.verification_status === "flagged"
-                    ? "Flagged"
-                    : "Pending"
+              athleteProfile?.verification_status === "verified"
+                ? "Verified"
+                : athleteProfile?.verification_status === "rejected"
+                  ? "Rejected"
+                  : "Pending"
             }
             hint="Profile status"
             icon={CheckCircle2}
             accent={
-              athleteProfile?.verification_status === "approved" ? "bg-success/10" : "bg-warning/10"
+              athleteProfile?.verification_status === "verified" ? "bg-success/10" : "bg-warning/10"
             }
           />
         </div>
@@ -456,7 +464,7 @@ function PaymentWall({
     if (!user) return;
     (async () => {
       const { data: ap } = await supabase
-        .from("athlete_profiles")
+        .from("boxer_profiles")
         .select("academy_id")
         .eq("user_id", user.id)
         .maybeSingle();
@@ -515,11 +523,7 @@ function PaymentWall({
       try {
         const currentPlanId = assignment?.fee_plan_id ?? assignment?.fee_plans?.id;
 
-        const [{ data: coupons }, { data: paidInvCoupons }] = await Promise.all([
-          supabase.from("coupons").select("*").eq("is_active", true),
-          // Only count CONFIRMED paid invoices for usage enforcement
-          supabase.from("invoices").select("coupon_id").eq("status", "paid").not("coupon_id", "is", null),
-        ]);
+        const { data: coupons } = await supabase.from("coupons").select("*").eq("is_active", true);
 
         if (!coupons || coupons.length === 0) {
           setAvailableCoupons([]);
@@ -527,16 +531,11 @@ function PaymentWall({
           return;
         }
 
-        // Count how many confirmed (paid) invoices used each coupon
-        const confirmedUsageMap: Record<string, number> = {};
-        (paidInvCoupons || []).forEach(i => {
-          if (i.coupon_id) {
-            confirmedUsageMap[i.coupon_id] = (confirmedUsageMap[i.coupon_id] || 0) + 1;
-          }
-        });
-
         const eligible: any[] = [];
         for (const c of coupons) {
+          if (c.max_uses && c.used_count >= c.max_uses) {
+            continue;
+          }
           // Check package restriction
           const planIds = c.valid_fee_plan_ids ?? [];
           if (planIds.length > 0 && currentPlanId && !planIds.includes(currentPlanId)) {
@@ -550,16 +549,18 @@ function PaymentWall({
 
           // Enforce max_uses from coupons table column (null = unlimited)
           const maxUses: number | null = c.max_uses ?? null;
-          const confirmedUses = confirmedUsageMap[c.id] || 0;
+          const confirmedUses = c.used_count || 0;
           if (maxUses !== null && maxUses > 0 && confirmedUses >= maxUses) {
             continue; // Coupon has reached its confirmed usage limit
           }
 
           let dAmt = 0;
-          if (c.value_type === "percentage") {
-            dAmt = Math.round((planAmount * Number(c.value)) / 100);
+          const discType = c.discount_type || c.value_type;
+          const discVal = Number(c.discount_value || c.value || 0);
+          if (discType === "percentage") {
+            dAmt = Math.round((planAmount * discVal) / 100);
           } else {
-            dAmt = Math.min(planAmount, Number(c.value));
+            dAmt = Math.min(planAmount, discVal);
           }
 
           eligible.push({
@@ -667,7 +668,7 @@ function PaymentWall({
           amount: finalPayableAmount,
           invoiceId: payableInvoice.id,
           invoiceNumber: payableInvoice.invoice_number ?? "",
-          athleteProfileId: payableInvoice.athlete_profile_id ?? "",
+          athleteProfileId: payableInvoice.boxer_profile_id ?? "",
           name: profile?.full_name ?? "Athlete",
           email: profile?.email ?? "",
           academyId: athleteAcademyId ?? undefined,
@@ -683,7 +684,7 @@ function PaymentWall({
           amount: finalPayableAmount,
           invoiceId: payableInvoice.id,
           invoiceNumber: payableInvoice.invoice_number ?? "",
-          athleteProfileId: payableInvoice.athlete_profile_id ?? "",
+          athleteProfileId: payableInvoice.boxer_profile_id ?? "",
           name: profile?.full_name ?? "Athlete",
           email: profile?.email ?? undefined,
           academyId: athleteAcademyId ?? undefined,
@@ -693,7 +694,7 @@ function PaymentWall({
             // fee_assignment as 'online_paid'. RLS blocks athletes from setting 'online_pending'.
             await recordPayment(supabase, {
               invoiceId: payableInvoice.id!,
-              athleteProfileId: payableInvoice.athlete_profile_id ?? "",
+              athleteProfileId: payableInvoice.boxer_profile_id ?? "",
               amount: finalPayableAmount,
               razorpayPaymentId: rzpResponse.razorpay_payment_id,
               razorpayOrderId: rzpResponse.razorpay_order_id,

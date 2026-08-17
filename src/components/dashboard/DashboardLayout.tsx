@@ -21,7 +21,7 @@ export interface NavSection {
 interface DashboardLayoutProps {
   navSections: NavSection[];
   basePath: string;
-  role: "Athlete" | "Admin" | "Superadmin" | "Coach" | "Judge";
+  role: "Athlete" | "Admin" | "Superadmin" | "Coach" | "Judge" | "BOXOS Admin";
   userName: string;
   userMeta: string;
   accentClass?: string;

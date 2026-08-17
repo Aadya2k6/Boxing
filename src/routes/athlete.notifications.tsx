@@ -71,12 +71,12 @@ function NotifPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "notifications" }, loadNotifs)
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "class_assignment_polls" },
+        { event: "*", schema: "public", table: "ring_assignment_polls" },
         loadNotifs,
       )
       .on(
         "postgres_changes",
-        { event: "*", schema: "public", table: "class_assignment_poll_responses" },
+        { event: "*", schema: "public", table: "ring_assignment_poll_responses" },
         loadNotifs,
       )
       .subscribe();
@@ -90,7 +90,7 @@ function NotifPage() {
 
     // Fetch athlete profile ID and joining date
     const { data: ap } = await supabase
-      .from("athlete_profiles")
+      .from("boxer_profiles")
       .select("id, created_at, academy_id")
       .eq("user_id", user.id)
       .maybeSingle();
@@ -118,7 +118,7 @@ function NotifPage() {
 
     // 2. Fetch class assignment polls created ON or AFTER joining
     let pollsQuery = supabase
-      .from("class_assignment_polls")
+      .from("ring_assignment_polls")
       .select("id, title, message, poll_date, created_at")
       .order("created_at", { ascending: false })
       .limit(30);
@@ -132,7 +132,7 @@ function NotifPage() {
     // Synthesize date-specific polls from active academy schedule templates
     if (ap?.academy_id && apId) {
       const { data: academyTemplates } = await supabase
-        .from("class_schedule_templates")
+        .from("ring_schedule_templates")
         .select("id, name, academy_id, valid_from, valid_to, days_of_week, created_at")
         .eq("is_active", true)
         .eq("academy_id", ap.academy_id);
@@ -140,7 +140,7 @@ function NotifPage() {
       if (academyTemplates && academyTemplates.length > 0) {
         const tmplIds = academyTemplates.map((t) => t.id);
         const { data: academyPitches } = await supabase
-          .from("class_schedule_pitches")
+          .from("ring_sessions")
           .select("*")
           .in("template_id", tmplIds);
 
@@ -207,15 +207,15 @@ function NotifPage() {
 
     if (apId) {
       const { data: responses } = await supabase
-        .from("class_assignment_poll_responses")
-        .select("poll_id, status, reason, responded_at, class_assignment_polls(pitch_id, poll_date)")
-        .eq("athlete_profile_id", apId);
+        .from("ring_assignment_poll_responses")
+        .select("poll_id, status, reason, responded_at, ring_assignment_polls(pitch_id, poll_date)")
+        .eq("boxer_profile_id", apId);
 
       const mapped: any = {};
       (responses ?? []).forEach((r: any) => {
         mapped[r.poll_id] = r;
-        if (r.class_assignment_polls) {
-          const synthId = `poll-${r.class_assignment_polls.pitch_id}_${r.class_assignment_polls.poll_date}`;
+        if (r.ring_assignment_polls) {
+          const synthId = `poll-${r.ring_assignment_polls.pitch_id}_${r.ring_assignment_polls.poll_date}`;
           mapped[synthId] = r;
         }
       });
@@ -300,7 +300,7 @@ function NotifPage() {
       const [pitchId, dateStr = fallbackDate] = raw.split("_");
 
       const { data: realPoll } = await supabase
-        .from("class_assignment_polls")
+        .from("ring_assignment_polls")
         .select("id")
         .eq("pitch_id", pitchId)
         .eq("poll_date", dateStr)
@@ -311,20 +311,20 @@ function NotifPage() {
       } else {
         const newPollId = crypto.randomUUID();
         const { data: pitchData } = await supabase
-          .from("class_schedule_pitches")
-          .select("*, class_schedule_templates(name, valid_from, academy_id)")
+          .from("ring_sessions")
+          .select("*, ring_schedule_templates(name, valid_from, academy_id)")
           .eq("id", pitchId)
           .maybeSingle();
 
-        await supabase.from("class_assignment_polls").insert({
+        await supabase.from("ring_assignment_polls").insert({
           id: newPollId,
           sent_by: user?.id || null,
           template_id: pitchData?.template_id || crypto.randomUUID(),
           pitch_id: pitchId,
           poll_date: dateStr,
-          title: `Practice Class: ${pitchData?.class_schedule_templates?.name ?? "Scheduled"} (${pitchData?.name ?? "Pitch"}) — ${dateStr}`,
+          title: `Practice Class: ${pitchData?.ring_schedule_templates?.name ?? "Scheduled"} (${pitchData?.name ?? "Pitch"}) — ${dateStr}`,
           message: `Practice class scheduled for ${dateStr}. Please confirm attendance.`,
-          academy_id: pitchData?.class_schedule_templates?.academy_id || null,
+          academy_id: pitchData?.ring_schedule_templates?.academy_id || null,
         });
         targetPollId = newPollId;
       }
@@ -332,26 +332,26 @@ function NotifPage() {
 
     const responsePayload = {
       poll_id: targetPollId,
-      athlete_profile_id: athleteId,
-      status: isAttending ? "attending" : "not_attending",
+      boxer_profile_id: athleteId,
+      response: isAttending ? "attending" : "not_attending",
       reason: isAttending ? null : currentState.reason.trim(),
       responded_at: new Date().toISOString(),
     };
 
     const { data: existingResponse } = await supabase
-      .from("class_assignment_poll_responses")
+      .from("ring_assignment_poll_responses")
       .select("id")
       .eq("poll_id", targetPollId)
-      .eq("athlete_profile_id", athleteId)
+      .eq("boxer_profile_id", athleteId)
       .maybeSingle();
 
     if (existingResponse?.id) {
       await supabase
-        .from("class_assignment_poll_responses")
+        .from("ring_assignment_poll_responses")
         .update(responsePayload)
         .eq("id", existingResponse.id);
     } else {
-      await supabase.from("class_assignment_poll_responses").insert(responsePayload);
+      await supabase.from("ring_assignment_poll_responses").insert(responsePayload);
     }
 
     setClassPollResponses((prev) => ({ ...prev, [pollId]: responsePayload as any }));

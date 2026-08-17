@@ -28,7 +28,7 @@ function SettingsPage() {
 
   async function loadData() {
     const { data: ap } = await supabase
-      .from("athlete_profiles")
+      .from("boxer_profiles")
       .select("*")
       .eq("user_id", user!.id)
       .maybeSingle();

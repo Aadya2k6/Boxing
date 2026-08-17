@@ -59,11 +59,11 @@ function InvoicesPage() {
     try {
       const [{ data: invData }, { data: cashData }] = await Promise.all([
         supabase.from("invoices")
-          .select("*, athlete_profiles(id, full_name, email, phone, user_id)")
+          .select("*, boxer_profiles(id, full_name, email, phone, user_id)")
           .order("due_date", { ascending: true }),
         supabase.from("fee_assignments")
-          .select("id, athlete_profile_id, assignment_status, payment_mode, athlete_profiles(full_name, email, user_id), fee_plans(plan_name, amount, billing_cycle)")
-          .in("assignment_status", ["cash_pending", "online_pending"]),
+          .select("id, boxer_profile_id, status, boxer_profiles(full_name, email, user_id), fee_plans(name, amount, cycle)")
+          .eq("status", "active"),
       ]);
       setInvoices(invData || []);
       setCashPending(cashData || []);
@@ -81,12 +81,12 @@ function InvoicesPage() {
       const recordedAmount = Number(payAmount);
       const { error } = await supabase.from("payments").insert({
         invoice_id: selectedInv.id,
-        athlete_profile_id: selectedInv.athlete_profile_id,
+        boxer_profile_id: selectedInv.boxer_profile_id,
+        academy_id: selectedInv.academy_id || profile?.academy_id,
         amount: recordedAmount,
-        payment_mode: payMode,
-        transaction_reference: payRef || null,
+        payment_mode: payMode === "cash" ? "cash" : "online",
+        reference: payRef || null,
         recorded_by: user?.id,
-        payment_date: new Date().toISOString().split("T")[0],
       });
       if (error) throw error;
 
@@ -98,8 +98,6 @@ function InvoicesPage() {
         .update({
           status: newStatus,
           amount_paid: newAmountPaid,
-          balance_outstanding: Math.max(0, newBalance),
-          is_overdue: false,
           updated_at: new Date().toISOString(),
         })
         .eq("id", selectedInv.id);
@@ -107,8 +105,8 @@ function InvoicesPage() {
       // If fully paid, also update fee_assignment
       if (newStatus === "paid") {
         await supabase.from("fee_assignments")
-          .update({ assignment_status: payMode === "cash" ? "cash_approved" : "online_paid", payment_mode: payMode })
-          .eq("athlete_profile_id", selectedInv.athlete_profile_id);
+          .update({ status: "active", updated_at: new Date().toISOString() })
+          .eq("boxer_profile_id", selectedInv.boxer_profile_id);
       }
 
       setSelectedInv(null);
@@ -133,7 +131,7 @@ function InvoicesPage() {
       .eq("id", assignmentId);
 
     // 2. Find the athlete's invoice and mark it paid
-    const athleteInvoice = invoices.find(i => i.athlete_profile_id === athleteProfileId && i.status !== "paid")
+    const athleteInvoice = invoices.find(i => i.boxer_profile_id === athleteProfileId && i.status !== "paid")
       ?? await ensureInvoiceForAssignment(assignment, null);
 
     if (athleteInvoice) {
@@ -141,12 +139,11 @@ function InvoicesPage() {
       if (payAmount > 0) {
         await supabase.from("payments").insert({
           invoice_id: athleteInvoice.id,
-          athlete_profile_id: athleteProfileId,
+          boxer_profile_id: athleteProfileId,
           amount: payAmount,
           payment_mode: pMode,
-          payment_date: new Date().toISOString().split("T")[0],
           recorded_by: user?.id,
-          transaction_reference: `${pMode.toUpperCase()}-${Date.now()}`,
+          reference: `${pMode.toUpperCase()}-${Date.now()}`,
         });
       }
       await supabase.from("invoices")
@@ -162,9 +159,9 @@ function InvoicesPage() {
     }
 
     // 3. Notify athlete
-    if (assignment?.athlete_profiles?.user_id) {
+    if (assignment?.boxer_profiles?.user_id) {
       await supabase.from("notifications").insert({
-        recipient_id: assignment.athlete_profiles.user_id,
+        recipient_id: assignment.boxer_profiles.user_id,
         type: "cash_approved",
         title: "Payment confirmed ✓",
         body: `Your ${pMode === "cash" ? "cash" : "online"} payment has been confirmed by your admin. Your dashboard is now unlocked!`,
@@ -177,7 +174,7 @@ function InvoicesPage() {
     setRemindingId(inv.id);
     try {
       await supabase.from("notifications").insert({
-        recipient_id: inv.athlete_profiles?.user_id,
+        recipient_id: inv.boxer_profiles?.user_id,
         type: "payment_reminder",
         title: "Payment reminder",
         body: `Invoice ${inv.invoice_number} of ₹${Number(inv.balance_outstanding ?? inv.amount_due).toLocaleString("en-IN")} is ${inv.status === "overdue" ? "overdue" : "due soon"}. Please complete your payment to maintain access.`,
@@ -195,7 +192,7 @@ function InvoicesPage() {
     setRefunding(true);
     try {
       await supabase.from("refunds").insert({
-        athlete_profile_id: refundInv.athlete_profile_id,
+        boxer_profile_id: refundInv.boxer_profile_id,
         amount: Number(refundAmount),
         reason: refundReason,
         status: "pending",
@@ -220,7 +217,7 @@ function InvoicesPage() {
   }).reduce((s, i) => s + Number(i.amount_paid ?? 0), 0);
 
   const filtered = invoices.filter(i => {
-    const matchQ = !q || i.athlete_profiles?.full_name?.toLowerCase().includes(q.toLowerCase()) || i.invoice_number?.toLowerCase().includes(q.toLowerCase());
+    const matchQ = !q || i.boxer_profiles?.full_name?.toLowerCase().includes(q.toLowerCase()) || i.invoice_number?.toLowerCase().includes(q.toLowerCase());
     const matchS = statusFilter === "all" || i.status === statusFilter;
     return matchQ && matchS;
   });
@@ -261,14 +258,14 @@ function InvoicesPage() {
             {cashPending.map(a => (
               <div key={a.id} className="flex items-center justify-between bg-surface border border-border rounded-lg px-4 py-3">
                 <div>
-                  <div className="text-sm font-medium">{a.athlete_profiles?.full_name}</div>
-                  <div className="text-xs text-muted-foreground">{a.athlete_profiles?.email}</div>
+                  <div className="text-sm font-medium">{a.boxer_profiles?.full_name}</div>
+                  <div className="text-xs text-muted-foreground">{a.boxer_profiles?.email}</div>
                 </div>
                 <div className="flex items-center gap-2">
                   <Badge tone="warning">
                     {a.payment_mode === "cash" || a.assignment_status === "cash_pending" ? "Cash pending" : "PayU online pending"}
                   </Badge>
-                  <button onClick={() => handleApproveCash(a.id, a.athlete_profile_id)}
+                  <button onClick={() => handleApproveCash(a.id, a.boxer_profile_id)}
                     className="inline-flex items-center gap-1.5 text-xs font-semibold px-3 py-1.5 bg-success text-white rounded-lg hover:bg-success/90 transition">
                     <Check className="size-3" /> Confirm receipt
                   </button>
@@ -326,7 +323,7 @@ function InvoicesPage() {
                       <div className="text-[10px] text-muted-foreground mt-0.5">{inv.billing_period ?? "—"}</div>
                     </td>
                     <td className="py-3.5">
-                      <div className="font-medium text-sm">{inv.athlete_profiles?.full_name ?? "—"}</div>
+                      <div className="font-medium text-sm">{inv.boxer_profiles?.full_name ?? "—"}</div>
                     </td>
                     <td className="py-3.5 text-right tabular">₹ {Number(inv.amount_due).toLocaleString("en-IN")}</td>
                     <td className="py-3.5 text-right tabular text-success">₹ {Number(inv.amount_paid ?? 0).toLocaleString("en-IN")}</td>
@@ -395,7 +392,7 @@ function InvoicesPage() {
             <div className="px-6 py-4 border-b border-border flex items-center justify-between">
               <div>
                 <h3 className="font-display font-semibold">Record payment</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">{selectedInv.invoice_number} · {selectedInv.athlete_profiles?.full_name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{selectedInv.invoice_number} · {selectedInv.boxer_profiles?.full_name}</p>
               </div>
               <button onClick={() => setSelectedInv(null)} className="size-8 grid place-items-center rounded-md hover:bg-subtle text-muted-foreground"><X className="size-4" /></button>
             </div>

@@ -35,25 +35,25 @@ function Overview() {
           { data: recentAths },
           { data: invs },
         ] = await Promise.all([
-          supabase.from("athlete_profiles").select("*", { count: "exact", head: true }).eq("onboarding_complete", true),
-          supabase.from("athlete_profiles").select("*", { count: "exact", head: true }).eq("onboarding_complete", false),
-          supabase.from("attendance").select("status").eq("date", today).eq("status", "present"),
+          supabase.from("boxer_profiles").select("*", { count: "exact", head: true }).eq("onboarding_complete", true),
+          supabase.from("boxer_profiles").select("*", { count: "exact", head: true }).eq("onboarding_complete", false),
+          supabase.from("attendance").select("status").eq("session_date", today).eq("status", "present"),
           supabase.from("leave_applications")
-            .select("id, leave_date, reason, athlete_profiles!leave_applications_athlete_profile_id_fkey(full_name)")
+            .select("id, start_date, end_date, reason, boxer_profiles!leave_applications_boxer_profile_id_fkey(full_name)")
             .eq("status", "pending")
-            .order("leave_date", { ascending: true })
+            .order("start_date", { ascending: true })
             .limit(5),
-          supabase.from("athlete_profiles")
-            .select("id, full_name, city, bow_type, created_at")
+          supabase.from("boxer_profiles")
+            .select("id, full_name, city, stance, created_at")
             .eq("onboarding_complete", true)
             .order("created_at", { ascending: false })
             .limit(6),
-          supabase.from("invoices").select("amount_due, amount_paid, balance_outstanding, status"),
+          supabase.from("invoices").select("amount_due, amount_paid, status"),
         ]);
 
         const totalInvoiced = (invs ?? []).reduce((a: number, i: any) => a + Number(i.amount_due ?? 0), 0);
         const totalCollected = (invs ?? []).reduce((a: number, i: any) => a + Number(i.amount_paid ?? 0), 0);
-        const totalOutstanding = (invs ?? []).filter((i: any) => i.status !== "paid").reduce((a: number, i: any) => a + Number(i.balance_outstanding ?? 0), 0);
+        const totalOutstanding = (invs ?? []).filter((i: any) => i.status !== "paid").reduce((a: number, i: any) => a + Math.max(0, Number(i.amount_due ?? 0) - Number(i.amount_paid ?? 0)), 0);
         const rate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
 
         setStats({
@@ -153,7 +153,7 @@ function Overview() {
                   <div key={l.id} className="flex items-start gap-3 p-3 rounded-lg bg-subtle hover:bg-elevated transition">
                     <Clock className="size-4 text-warning mt-0.5 shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{l.athlete_profiles?.full_name ?? "Unknown"}</p>
+                      <p className="text-sm font-medium truncate">{l.boxer_profiles?.full_name ?? "Unknown"}</p>
                       <p className="text-xs text-muted-foreground">
                         {new Date(l.leave_date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
                       </p>

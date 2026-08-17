@@ -29,14 +29,14 @@ function AthleteLayout() {
     if (!authUser?.id) return;
     try {
       let { data: ap, error: apErr } = await supabase
-        .from("athlete_profiles")
+        .from("boxer_profiles")
         .select("id")
         .eq("user_id", authUser.id)
         .maybeSingle();
 
       if (!ap?.id) {
         const { data: newAp } = await supabase
-          .from("athlete_profiles")
+          .from("boxer_profiles")
           .upsert({
             user_id: authUser.id,
             full_name: profile?.full_name || authUser.email?.split("@")[0] || "Athlete",
@@ -61,7 +61,7 @@ function AthleteLayout() {
       const { data: assignment, error: faErr } = await supabase
         .from("fee_assignments")
         .select("id, assignment_status")
-        .eq("athlete_profile_id", ap.id)
+        .eq("boxer_profile_id", ap.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -108,7 +108,7 @@ function AthleteLayout() {
       const { data: unpaidInvoices } = await supabase
         .from("invoices")
         .select("id, status")
-        .eq("athlete_profile_id", ap.id)
+        .eq("boxer_profile_id", ap.id)
         .neq("status", "paid")
         .limit(1);
 
@@ -117,7 +117,7 @@ function AthleteLayout() {
         const { count } = await supabase
           .from("invoices")
           .select("*", { count: "exact", head: true })
-          .eq("athlete_profile_id", ap.id);
+          .eq("boxer_profile_id", ap.id);
 
         if (count && count > 0) {
           console.log("[ACCESS] → unlocked (all invoices paid)");
@@ -164,7 +164,7 @@ function AthleteLayout() {
     async function loadAcademy() {
       if (!authUser?.id) return;
       const { data: ap } = await supabase
-        .from("athlete_profiles")
+        .from("boxer_profiles")
         .select("academy_id")
         .eq("user_id", authUser.id)
         .maybeSingle();

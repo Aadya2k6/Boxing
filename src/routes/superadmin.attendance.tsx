@@ -44,7 +44,7 @@ function SAAttendance() {
     Promise.all([
       loadPolls(),
       supabase
-        .from("athlete_profiles")
+        .from("boxer_profiles")
         .select("id, full_name")
         .eq("onboarding_complete", true)
         .order("full_name")
@@ -71,7 +71,7 @@ function SAAttendance() {
     setLoadingResponses(true);
     const { data } = await supabase
       .from("attendance_poll_responses")
-      .select("*, athlete_profiles!attendance_poll_responses_athlete_profile_id_fkey(full_name)")
+      .select("*, boxer_profiles!attendance_poll_responses_boxer_profile_id_fkey(full_name)")
       .eq("poll_id", pollId)
       .order("responded_at", { ascending: false });
     setResponses(data ?? []);
@@ -84,11 +84,11 @@ function SAAttendance() {
   const noResponseCount = athletes.length - responses.length;
 
   const filteredResponses = responses.filter(r =>
-    !q || r.athlete_profiles?.full_name?.toLowerCase().includes(q.toLowerCase())
+    !q || r.boxer_profiles?.full_name?.toLowerCase().includes(q.toLowerCase())
   );
 
   // Athletes who haven't responded yet
-  const respondedIds = new Set(responses.map(r => r.athlete_profile_id));
+  const respondedIds = new Set(responses.map(r => r.boxer_profile_id));
   const noResponseAthletes = athletes.filter(a =>
     !respondedIds.has(a.id) &&
     (!q || a.full_name?.toLowerCase().includes(q.toLowerCase()))
@@ -225,7 +225,7 @@ function SAAttendance() {
                   <tbody>
                     {filteredResponses.map(r => (
                       <tr key={r.id} className="border-t border-border hover:bg-subtle transition">
-                        <td className="px-5 py-3.5 font-medium">{r.athlete_profiles?.full_name ?? "—"}</td>
+                        <td className="px-5 py-3.5 font-medium">{r.boxer_profiles?.full_name ?? "—"}</td>
                         <td className="px-4 py-3.5">
                           <Badge tone={r.status === "attending" ? "success" : "danger"}>
                             {r.status === "attending" ? "Attending ✓" : "Not Attending"}

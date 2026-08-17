@@ -69,10 +69,10 @@ function SchedulePage() {
     if (!user) return;
     const ch = supabase
       .channel("athlete-schedule-realtime")
-      .on("postgres_changes", { event: "*", schema: "public", table: "class_schedule_templates" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "ring_schedule_templates" }, () => {
         if (athleteProfile) loadCalendarSessions(athleteProfile, currentYear);
       })
-      .on("postgres_changes", { event: "*", schema: "public", table: "class_schedule_pitches" }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "ring_sessions" }, () => {
         if (athleteProfile) loadCalendarSessions(athleteProfile, currentYear);
       })
       .on("postgres_changes", { event: "*", schema: "public", table: "sessions" }, () => {
@@ -98,7 +98,7 @@ function SchedulePage() {
     }
 
     const { data: ap } = await supabase
-      .from("athlete_profiles")
+      .from("boxer_profiles")
       .select("id, user_id, academy_id, experience_level, primary_goal, full_name, email")
       .eq("user_id", user.id)
       .maybeSingle();
@@ -127,7 +127,7 @@ function SchedulePage() {
     try {
       // Build queries — filter templates by the athlete's academy when known
       let templatesQuery = supabase
-        .from("class_schedule_templates")
+        .from("ring_schedule_templates")
         .select("*")
         .eq("is_active", true);
       if (academyId) {
@@ -137,26 +137,30 @@ function SchedulePage() {
       const [
         { data: dbTemplates },
         { data: dbPitches },
-        { data: dbSessions },
         { data: att },
         { data: dbInstances },
       ] = await Promise.all([
         templatesQuery,
         supabase
-          .from("class_schedule_pitches")
+          .from("ring_sessions")
           .select("*"),
-        Promise.resolve({ data: [] }),
         supabase
           .from("attendance")
-          .select("date, status")
-          .eq("athlete_profile_id", athleteProfileId)
-          .order("date", { ascending: false }),
+          .select("session_date, status")
+          .eq("boxer_profile_id", athleteProfileId)
+          .order("session_date", { ascending: false }),
         supabase
-          .from("class_schedule_instances")
+          .from("ring_instances")
           .select("template_id, date, is_cancelled")
           .gte("date", `${year}-01-01`)
           .lte("date", `${year}-12-31`),
       ]);
+
+      // Normalize attendance rows for mapping
+      const normalizedAtt = (att ?? []).map((a: any) => ({
+        date: a.session_date ?? a.date,
+        status: a.status,
+      }));
 
       // Build set of cancelled dates (where ALL templates for that academy are cancelled)
       const cancelledSet = new Set<string>();
@@ -245,17 +249,7 @@ function SchedulePage() {
         }
       });
 
-      // ── Also include individually assigned sessions from 'sessions' table ──
-      (dbSessions ?? []).forEach((s: any) => {
-        if (s.session_date) {
-          dateSet.add(s.session_date);
-          generatedSessions.push({
-            ...s,
-            role: s.focus || "Assigned Session",
-            focus: s.focus || "Assigned Session",
-          });
-        }
-      });
+
 
       const todayStr = new Date().toISOString().split("T")[0];
       // Filter out cancelled sessions

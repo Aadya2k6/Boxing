@@ -93,6 +93,8 @@ function SAFees() {
         setPlans(
           plansData.map((p) => ({
             ...p,
+            plan_name: p.name ?? p.plan_name ?? "Unnamed Plan",
+            billing_cycle: p.cycle ?? p.billing_cycle ?? "monthly",
             count: assignments?.filter((a) => a.fee_plan_id === p.id).length || 0,
             academy_name: acs?.find((a) => a.id === p.academy_id)?.name || "Global",
           })),
@@ -115,26 +117,11 @@ function SAFees() {
   function openEdit(plan: any) {
     setEditingPlan(plan);
     setForm({
-      plan_name: plan.plan_name,
-      amount: String(plan.amount),
-      billing_cycle: plan.billing_cycle,
-      custom_duration_days: plan.custom_duration_days ? String(plan.custom_duration_days) : "",
-      accepted_payment_methods: plan.accepted_payment_methods ?? ["cash", "upi", "online"],
-      online_gateway_enabled: plan.online_gateway_enabled ?? true,
-      late_penalty_enabled: plan.late_penalty_enabled ?? false,
-      penalty_type: plan.penalty_type ?? "percentage",
-      penalty_value: String(plan.penalty_value ?? ""),
-      grace_period_days: String(plan.grace_period_days ?? "7"),
-      reminder_days_before: String(plan.reminder_days_before ?? "5"),
-      reminder_days_after: Array.isArray(plan.reminder_days_after)
-        ? plan.reminder_days_after.join(",")
-        : "1,3,7",
-      discount_sibling: plan.discount_types?.includes("sibling") ?? false,
-      discount_merit: plan.discount_types?.includes("merit") ?? false,
-      discount_scholarship: plan.discount_types?.includes("scholarship") ?? false,
-      discount_custom: plan.discount_types?.includes("custom") ?? false,
-      discount_approval_required: plan.discount_approval_required ?? false,
-      academy_id: plan.academy_id || academies?.[0]?.id || "",
+      ...emptyForm,
+      plan_name: plan.name ?? plan.plan_name ?? "",
+      amount: String(plan.amount ?? ""),
+      billing_cycle: plan.cycle ?? plan.billing_cycle ?? "monthly",
+      academy_id: plan.academy_id || "",
     });
     setShowModal(true);
   }
@@ -143,28 +130,18 @@ function SAFees() {
     e.preventDefault();
     setSaving(true);
     try {
-      const discountTypes = DISCOUNT_TYPES.filter((t) => (form as any)[`discount_${t}`]);
-      const isCustom = form.billing_cycle?.toLowerCase().trim() === "custom";
+      const rawCycle = (form.billing_cycle || "monthly").toLowerCase().trim();
+      const validCycle = rawCycle === "annual" ? "yearly" : rawCycle === "custom" ? "one_time" : (["monthly", "quarterly", "half_yearly", "yearly", "one_time"].includes(rawCycle) ? rawCycle : "monthly");
+
       const payload = {
-        plan_name: form.plan_name,
+        name: form.plan_name.trim(),
         amount: Number(form.amount),
-        billing_cycle: form.billing_cycle,
-        custom_duration_days: isCustom && form.custom_duration_days ? Number(form.custom_duration_days) : null,
-        accepted_payment_methods: form.accepted_payment_methods,
-        online_gateway_enabled: form.online_gateway_enabled,
-        late_penalty_enabled: form.late_penalty_enabled,
-        penalty_type: form.penalty_type,
-        penalty_value: form.late_penalty_enabled ? Number(form.penalty_value) : 0,
-        grace_period_days: Number(form.grace_period_days),
-        reminder_days_before: Number(form.reminder_days_before),
-        reminder_days_after: form.reminder_days_after
-          .split(",")
-          .map((n) => Number(n.trim()))
-          .filter(Boolean),
-        discount_types: discountTypes,
-        discount_approval_required: form.discount_approval_required,
+        cycle: validCycle,
+        description: `Fee plan for ${form.plan_name.trim()}`,
+        is_active: true,
         created_by: user?.id,
         academy_id: form.academy_id || profile?.preferred_academy_id || profile?.academy_id || academies?.[0]?.id,
+        updated_at: new Date().toISOString(),
       };
       if (editingPlan) {
         await supabase.from("fee_plans").update(payload).eq("id", editingPlan.id);

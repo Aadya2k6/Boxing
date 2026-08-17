@@ -15,12 +15,14 @@ import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as JudgeRouteImport } from './routes/judge'
 import { Route as CoachRouteImport } from './routes/coach'
+import { Route as BoxosAdminRouteImport } from './routes/boxos-admin'
 import { Route as AthleteRouteImport } from './routes/athlete'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuperadminIndexRouteImport } from './routes/superadmin.index'
 import { Route as JudgeIndexRouteImport } from './routes/judge.index'
 import { Route as CoachIndexRouteImport } from './routes/coach.index'
+import { Route as BoxosAdminIndexRouteImport } from './routes/boxos-admin.index'
 import { Route as AthleteIndexRouteImport } from './routes/athlete.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as SuperadminUsersRouteImport } from './routes/superadmin.users'
@@ -32,17 +34,21 @@ import { Route as SuperadminJudgesRouteImport } from './routes/superadmin.judges
 import { Route as SuperadminFeesRouteImport } from './routes/superadmin.fees'
 import { Route as SuperadminDiscountsRouteImport } from './routes/superadmin.discounts'
 import { Route as SuperadminConfigRouteImport } from './routes/superadmin.config'
+import { Route as SuperadminCoachesRouteImport } from './routes/superadmin.coaches'
 import { Route as SuperadminClassAssigningRouteImport } from './routes/superadmin.class-assigning'
-import { Route as SuperadminCategoriesRouteImport } from './routes/superadmin.categories'
 import { Route as SuperadminBoutsRouteImport } from './routes/superadmin.bouts'
 import { Route as SuperadminAttendanceRouteImport } from './routes/superadmin.attendance'
 import { Route as SuperadminAthletesRouteImport } from './routes/superadmin.athletes'
+import { Route as SuperadminAdminsRouteImport } from './routes/superadmin.admins'
 import { Route as SuperadminAcademiesRouteImport } from './routes/superadmin.academies'
 import { Route as JudgeExpiredRouteImport } from './routes/judge.expired'
 import { Route as CoachSettingsRouteImport } from './routes/coach.settings'
 import { Route as CoachNotificationsRouteImport } from './routes/coach.notifications'
 import { Route as CoachBoxersRouteImport } from './routes/coach.boxers'
 import { Route as CoachAttendanceRouteImport } from './routes/coach.attendance'
+import { Route as BoxosAdminSettingsRouteImport } from './routes/boxos-admin.settings'
+import { Route as BoxosAdminReportsRouteImport } from './routes/boxos-admin.reports'
+import { Route as BoxosAdminActivityRouteImport } from './routes/boxos-admin.activity'
 import { Route as AthleteSettingsRouteImport } from './routes/athlete.settings'
 import { Route as AthleteScheduleRouteImport } from './routes/athlete.schedule'
 import { Route as AthleteProfileRouteImport } from './routes/athlete.profile'
@@ -61,6 +67,7 @@ import { Route as AdminFeesRouteImport } from './routes/admin.fees'
 import { Route as AdminBoutsRouteImport } from './routes/admin.bouts'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAthletesRouteImport } from './routes/admin.athletes'
+import { Route as BoxosAdminAcademiesAcademyIdRouteImport } from './routes/boxos-admin.academies.$academyId'
 
 const SuperadminRoute = SuperadminRouteImport.update({
   id: '/superadmin',
@@ -92,6 +99,11 @@ const CoachRoute = CoachRouteImport.update({
   path: '/coach',
   getParentRoute: () => rootRouteImport,
 } as any)
+const BoxosAdminRoute = BoxosAdminRouteImport.update({
+  id: '/boxos-admin',
+  path: '/boxos-admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AthleteRoute = AthleteRouteImport.update({
   id: '/athlete',
   path: '/athlete',
@@ -121,6 +133,11 @@ const CoachIndexRoute = CoachIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => CoachRoute,
+} as any)
+const BoxosAdminIndexRoute = BoxosAdminIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => BoxosAdminRoute,
 } as any)
 const AthleteIndexRoute = AthleteIndexRouteImport.update({
   id: '/',
@@ -177,17 +194,17 @@ const SuperadminConfigRoute = SuperadminConfigRouteImport.update({
   path: '/config',
   getParentRoute: () => SuperadminRoute,
 } as any)
+const SuperadminCoachesRoute = SuperadminCoachesRouteImport.update({
+  id: '/coaches',
+  path: '/coaches',
+  getParentRoute: () => SuperadminRoute,
+} as any)
 const SuperadminClassAssigningRoute =
   SuperadminClassAssigningRouteImport.update({
     id: '/class-assigning',
     path: '/class-assigning',
     getParentRoute: () => SuperadminRoute,
   } as any)
-const SuperadminCategoriesRoute = SuperadminCategoriesRouteImport.update({
-  id: '/categories',
-  path: '/categories',
-  getParentRoute: () => SuperadminRoute,
-} as any)
 const SuperadminBoutsRoute = SuperadminBoutsRouteImport.update({
   id: '/bouts',
   path: '/bouts',
@@ -201,6 +218,11 @@ const SuperadminAttendanceRoute = SuperadminAttendanceRouteImport.update({
 const SuperadminAthletesRoute = SuperadminAthletesRouteImport.update({
   id: '/athletes',
   path: '/athletes',
+  getParentRoute: () => SuperadminRoute,
+} as any)
+const SuperadminAdminsRoute = SuperadminAdminsRouteImport.update({
+  id: '/admins',
+  path: '/admins',
   getParentRoute: () => SuperadminRoute,
 } as any)
 const SuperadminAcademiesRoute = SuperadminAcademiesRouteImport.update({
@@ -232,6 +254,21 @@ const CoachAttendanceRoute = CoachAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
   getParentRoute: () => CoachRoute,
+} as any)
+const BoxosAdminSettingsRoute = BoxosAdminSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => BoxosAdminRoute,
+} as any)
+const BoxosAdminReportsRoute = BoxosAdminReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
+  getParentRoute: () => BoxosAdminRoute,
+} as any)
+const BoxosAdminActivityRoute = BoxosAdminActivityRouteImport.update({
+  id: '/activity',
+  path: '/activity',
+  getParentRoute: () => BoxosAdminRoute,
 } as any)
 const AthleteSettingsRoute = AthleteSettingsRouteImport.update({
   id: '/settings',
@@ -323,11 +360,18 @@ const AdminAthletesRoute = AdminAthletesRouteImport.update({
   path: '/athletes',
   getParentRoute: () => AdminRoute,
 } as any)
+const BoxosAdminAcademiesAcademyIdRoute =
+  BoxosAdminAcademiesAcademyIdRouteImport.update({
+    id: '/academies/$academyId',
+    path: '/academies/$academyId',
+    getParentRoute: () => BoxosAdminRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/athlete': typeof AthleteRouteWithChildren
+  '/boxos-admin': typeof BoxosAdminRouteWithChildren
   '/coach': typeof CoachRouteWithChildren
   '/judge': typeof JudgeRouteWithChildren
   '/login': typeof LoginRoute
@@ -352,17 +396,21 @@ export interface FileRoutesByFullPath {
   '/athlete/profile': typeof AthleteProfileRoute
   '/athlete/schedule': typeof AthleteScheduleRoute
   '/athlete/settings': typeof AthleteSettingsRoute
+  '/boxos-admin/activity': typeof BoxosAdminActivityRoute
+  '/boxos-admin/reports': typeof BoxosAdminReportsRoute
+  '/boxos-admin/settings': typeof BoxosAdminSettingsRoute
   '/coach/attendance': typeof CoachAttendanceRoute
   '/coach/boxers': typeof CoachBoxersRoute
   '/coach/notifications': typeof CoachNotificationsRoute
   '/coach/settings': typeof CoachSettingsRoute
   '/judge/expired': typeof JudgeExpiredRoute
   '/superadmin/academies': typeof SuperadminAcademiesRoute
+  '/superadmin/admins': typeof SuperadminAdminsRoute
   '/superadmin/athletes': typeof SuperadminAthletesRoute
   '/superadmin/attendance': typeof SuperadminAttendanceRoute
   '/superadmin/bouts': typeof SuperadminBoutsRoute
-  '/superadmin/categories': typeof SuperadminCategoriesRoute
   '/superadmin/class-assigning': typeof SuperadminClassAssigningRoute
+  '/superadmin/coaches': typeof SuperadminCoachesRoute
   '/superadmin/config': typeof SuperadminConfigRoute
   '/superadmin/discounts': typeof SuperadminDiscountsRoute
   '/superadmin/fees': typeof SuperadminFeesRoute
@@ -374,9 +422,11 @@ export interface FileRoutesByFullPath {
   '/superadmin/users': typeof SuperadminUsersRoute
   '/admin/': typeof AdminIndexRoute
   '/athlete/': typeof AthleteIndexRoute
+  '/boxos-admin/': typeof BoxosAdminIndexRoute
   '/coach/': typeof CoachIndexRoute
   '/judge/': typeof JudgeIndexRoute
   '/superadmin/': typeof SuperadminIndexRoute
+  '/boxos-admin/academies/$academyId': typeof BoxosAdminAcademiesAcademyIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -401,17 +451,21 @@ export interface FileRoutesByTo {
   '/athlete/profile': typeof AthleteProfileRoute
   '/athlete/schedule': typeof AthleteScheduleRoute
   '/athlete/settings': typeof AthleteSettingsRoute
+  '/boxos-admin/activity': typeof BoxosAdminActivityRoute
+  '/boxos-admin/reports': typeof BoxosAdminReportsRoute
+  '/boxos-admin/settings': typeof BoxosAdminSettingsRoute
   '/coach/attendance': typeof CoachAttendanceRoute
   '/coach/boxers': typeof CoachBoxersRoute
   '/coach/notifications': typeof CoachNotificationsRoute
   '/coach/settings': typeof CoachSettingsRoute
   '/judge/expired': typeof JudgeExpiredRoute
   '/superadmin/academies': typeof SuperadminAcademiesRoute
+  '/superadmin/admins': typeof SuperadminAdminsRoute
   '/superadmin/athletes': typeof SuperadminAthletesRoute
   '/superadmin/attendance': typeof SuperadminAttendanceRoute
   '/superadmin/bouts': typeof SuperadminBoutsRoute
-  '/superadmin/categories': typeof SuperadminCategoriesRoute
   '/superadmin/class-assigning': typeof SuperadminClassAssigningRoute
+  '/superadmin/coaches': typeof SuperadminCoachesRoute
   '/superadmin/config': typeof SuperadminConfigRoute
   '/superadmin/discounts': typeof SuperadminDiscountsRoute
   '/superadmin/fees': typeof SuperadminFeesRoute
@@ -423,15 +477,18 @@ export interface FileRoutesByTo {
   '/superadmin/users': typeof SuperadminUsersRoute
   '/admin': typeof AdminIndexRoute
   '/athlete': typeof AthleteIndexRoute
+  '/boxos-admin': typeof BoxosAdminIndexRoute
   '/coach': typeof CoachIndexRoute
   '/judge': typeof JudgeIndexRoute
   '/superadmin': typeof SuperadminIndexRoute
+  '/boxos-admin/academies/$academyId': typeof BoxosAdminAcademiesAcademyIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/athlete': typeof AthleteRouteWithChildren
+  '/boxos-admin': typeof BoxosAdminRouteWithChildren
   '/coach': typeof CoachRouteWithChildren
   '/judge': typeof JudgeRouteWithChildren
   '/login': typeof LoginRoute
@@ -456,17 +513,21 @@ export interface FileRoutesById {
   '/athlete/profile': typeof AthleteProfileRoute
   '/athlete/schedule': typeof AthleteScheduleRoute
   '/athlete/settings': typeof AthleteSettingsRoute
+  '/boxos-admin/activity': typeof BoxosAdminActivityRoute
+  '/boxos-admin/reports': typeof BoxosAdminReportsRoute
+  '/boxos-admin/settings': typeof BoxosAdminSettingsRoute
   '/coach/attendance': typeof CoachAttendanceRoute
   '/coach/boxers': typeof CoachBoxersRoute
   '/coach/notifications': typeof CoachNotificationsRoute
   '/coach/settings': typeof CoachSettingsRoute
   '/judge/expired': typeof JudgeExpiredRoute
   '/superadmin/academies': typeof SuperadminAcademiesRoute
+  '/superadmin/admins': typeof SuperadminAdminsRoute
   '/superadmin/athletes': typeof SuperadminAthletesRoute
   '/superadmin/attendance': typeof SuperadminAttendanceRoute
   '/superadmin/bouts': typeof SuperadminBoutsRoute
-  '/superadmin/categories': typeof SuperadminCategoriesRoute
   '/superadmin/class-assigning': typeof SuperadminClassAssigningRoute
+  '/superadmin/coaches': typeof SuperadminCoachesRoute
   '/superadmin/config': typeof SuperadminConfigRoute
   '/superadmin/discounts': typeof SuperadminDiscountsRoute
   '/superadmin/fees': typeof SuperadminFeesRoute
@@ -478,9 +539,11 @@ export interface FileRoutesById {
   '/superadmin/users': typeof SuperadminUsersRoute
   '/admin/': typeof AdminIndexRoute
   '/athlete/': typeof AthleteIndexRoute
+  '/boxos-admin/': typeof BoxosAdminIndexRoute
   '/coach/': typeof CoachIndexRoute
   '/judge/': typeof JudgeIndexRoute
   '/superadmin/': typeof SuperadminIndexRoute
+  '/boxos-admin/academies/$academyId': typeof BoxosAdminAcademiesAcademyIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -488,6 +551,7 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/athlete'
+    | '/boxos-admin'
     | '/coach'
     | '/judge'
     | '/login'
@@ -512,17 +576,21 @@ export interface FileRouteTypes {
     | '/athlete/profile'
     | '/athlete/schedule'
     | '/athlete/settings'
+    | '/boxos-admin/activity'
+    | '/boxos-admin/reports'
+    | '/boxos-admin/settings'
     | '/coach/attendance'
     | '/coach/boxers'
     | '/coach/notifications'
     | '/coach/settings'
     | '/judge/expired'
     | '/superadmin/academies'
+    | '/superadmin/admins'
     | '/superadmin/athletes'
     | '/superadmin/attendance'
     | '/superadmin/bouts'
-    | '/superadmin/categories'
     | '/superadmin/class-assigning'
+    | '/superadmin/coaches'
     | '/superadmin/config'
     | '/superadmin/discounts'
     | '/superadmin/fees'
@@ -534,9 +602,11 @@ export interface FileRouteTypes {
     | '/superadmin/users'
     | '/admin/'
     | '/athlete/'
+    | '/boxos-admin/'
     | '/coach/'
     | '/judge/'
     | '/superadmin/'
+    | '/boxos-admin/academies/$academyId'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -561,17 +631,21 @@ export interface FileRouteTypes {
     | '/athlete/profile'
     | '/athlete/schedule'
     | '/athlete/settings'
+    | '/boxos-admin/activity'
+    | '/boxos-admin/reports'
+    | '/boxos-admin/settings'
     | '/coach/attendance'
     | '/coach/boxers'
     | '/coach/notifications'
     | '/coach/settings'
     | '/judge/expired'
     | '/superadmin/academies'
+    | '/superadmin/admins'
     | '/superadmin/athletes'
     | '/superadmin/attendance'
     | '/superadmin/bouts'
-    | '/superadmin/categories'
     | '/superadmin/class-assigning'
+    | '/superadmin/coaches'
     | '/superadmin/config'
     | '/superadmin/discounts'
     | '/superadmin/fees'
@@ -583,14 +657,17 @@ export interface FileRouteTypes {
     | '/superadmin/users'
     | '/admin'
     | '/athlete'
+    | '/boxos-admin'
     | '/coach'
     | '/judge'
     | '/superadmin'
+    | '/boxos-admin/academies/$academyId'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/athlete'
+    | '/boxos-admin'
     | '/coach'
     | '/judge'
     | '/login'
@@ -615,17 +692,21 @@ export interface FileRouteTypes {
     | '/athlete/profile'
     | '/athlete/schedule'
     | '/athlete/settings'
+    | '/boxos-admin/activity'
+    | '/boxos-admin/reports'
+    | '/boxos-admin/settings'
     | '/coach/attendance'
     | '/coach/boxers'
     | '/coach/notifications'
     | '/coach/settings'
     | '/judge/expired'
     | '/superadmin/academies'
+    | '/superadmin/admins'
     | '/superadmin/athletes'
     | '/superadmin/attendance'
     | '/superadmin/bouts'
-    | '/superadmin/categories'
     | '/superadmin/class-assigning'
+    | '/superadmin/coaches'
     | '/superadmin/config'
     | '/superadmin/discounts'
     | '/superadmin/fees'
@@ -637,15 +718,18 @@ export interface FileRouteTypes {
     | '/superadmin/users'
     | '/admin/'
     | '/athlete/'
+    | '/boxos-admin/'
     | '/coach/'
     | '/judge/'
     | '/superadmin/'
+    | '/boxos-admin/academies/$academyId'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AthleteRoute: typeof AthleteRouteWithChildren
+  BoxosAdminRoute: typeof BoxosAdminRouteWithChildren
   CoachRoute: typeof CoachRouteWithChildren
   JudgeRoute: typeof JudgeRouteWithChildren
   LoginRoute: typeof LoginRoute
@@ -698,6 +782,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CoachRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/boxos-admin': {
+      id: '/boxos-admin'
+      path: '/boxos-admin'
+      fullPath: '/boxos-admin'
+      preLoaderRoute: typeof BoxosAdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/athlete': {
       id: '/athlete'
       path: '/athlete'
@@ -739,6 +830,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/coach/'
       preLoaderRoute: typeof CoachIndexRouteImport
       parentRoute: typeof CoachRoute
+    }
+    '/boxos-admin/': {
+      id: '/boxos-admin/'
+      path: '/'
+      fullPath: '/boxos-admin/'
+      preLoaderRoute: typeof BoxosAdminIndexRouteImport
+      parentRoute: typeof BoxosAdminRoute
     }
     '/athlete/': {
       id: '/athlete/'
@@ -817,18 +915,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperadminConfigRouteImport
       parentRoute: typeof SuperadminRoute
     }
+    '/superadmin/coaches': {
+      id: '/superadmin/coaches'
+      path: '/coaches'
+      fullPath: '/superadmin/coaches'
+      preLoaderRoute: typeof SuperadminCoachesRouteImport
+      parentRoute: typeof SuperadminRoute
+    }
     '/superadmin/class-assigning': {
       id: '/superadmin/class-assigning'
       path: '/class-assigning'
       fullPath: '/superadmin/class-assigning'
       preLoaderRoute: typeof SuperadminClassAssigningRouteImport
-      parentRoute: typeof SuperadminRoute
-    }
-    '/superadmin/categories': {
-      id: '/superadmin/categories'
-      path: '/categories'
-      fullPath: '/superadmin/categories'
-      preLoaderRoute: typeof SuperadminCategoriesRouteImport
       parentRoute: typeof SuperadminRoute
     }
     '/superadmin/bouts': {
@@ -850,6 +948,13 @@ declare module '@tanstack/react-router' {
       path: '/athletes'
       fullPath: '/superadmin/athletes'
       preLoaderRoute: typeof SuperadminAthletesRouteImport
+      parentRoute: typeof SuperadminRoute
+    }
+    '/superadmin/admins': {
+      id: '/superadmin/admins'
+      path: '/admins'
+      fullPath: '/superadmin/admins'
+      preLoaderRoute: typeof SuperadminAdminsRouteImport
       parentRoute: typeof SuperadminRoute
     }
     '/superadmin/academies': {
@@ -893,6 +998,27 @@ declare module '@tanstack/react-router' {
       fullPath: '/coach/attendance'
       preLoaderRoute: typeof CoachAttendanceRouteImport
       parentRoute: typeof CoachRoute
+    }
+    '/boxos-admin/settings': {
+      id: '/boxos-admin/settings'
+      path: '/settings'
+      fullPath: '/boxos-admin/settings'
+      preLoaderRoute: typeof BoxosAdminSettingsRouteImport
+      parentRoute: typeof BoxosAdminRoute
+    }
+    '/boxos-admin/reports': {
+      id: '/boxos-admin/reports'
+      path: '/reports'
+      fullPath: '/boxos-admin/reports'
+      preLoaderRoute: typeof BoxosAdminReportsRouteImport
+      parentRoute: typeof BoxosAdminRoute
+    }
+    '/boxos-admin/activity': {
+      id: '/boxos-admin/activity'
+      path: '/activity'
+      fullPath: '/boxos-admin/activity'
+      preLoaderRoute: typeof BoxosAdminActivityRouteImport
+      parentRoute: typeof BoxosAdminRoute
     }
     '/athlete/settings': {
       id: '/athlete/settings'
@@ -1020,6 +1146,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminAthletesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/boxos-admin/academies/$academyId': {
+      id: '/boxos-admin/academies/$academyId'
+      path: '/academies/$academyId'
+      fullPath: '/boxos-admin/academies/$academyId'
+      preLoaderRoute: typeof BoxosAdminAcademiesAcademyIdRouteImport
+      parentRoute: typeof BoxosAdminRoute
+    }
   }
 }
 
@@ -1080,6 +1213,26 @@ const AthleteRouteChildren: AthleteRouteChildren = {
 const AthleteRouteWithChildren =
   AthleteRoute._addFileChildren(AthleteRouteChildren)
 
+interface BoxosAdminRouteChildren {
+  BoxosAdminActivityRoute: typeof BoxosAdminActivityRoute
+  BoxosAdminReportsRoute: typeof BoxosAdminReportsRoute
+  BoxosAdminSettingsRoute: typeof BoxosAdminSettingsRoute
+  BoxosAdminIndexRoute: typeof BoxosAdminIndexRoute
+  BoxosAdminAcademiesAcademyIdRoute: typeof BoxosAdminAcademiesAcademyIdRoute
+}
+
+const BoxosAdminRouteChildren: BoxosAdminRouteChildren = {
+  BoxosAdminActivityRoute: BoxosAdminActivityRoute,
+  BoxosAdminReportsRoute: BoxosAdminReportsRoute,
+  BoxosAdminSettingsRoute: BoxosAdminSettingsRoute,
+  BoxosAdminIndexRoute: BoxosAdminIndexRoute,
+  BoxosAdminAcademiesAcademyIdRoute: BoxosAdminAcademiesAcademyIdRoute,
+}
+
+const BoxosAdminRouteWithChildren = BoxosAdminRoute._addFileChildren(
+  BoxosAdminRouteChildren,
+)
+
 interface CoachRouteChildren {
   CoachAttendanceRoute: typeof CoachAttendanceRoute
   CoachBoxersRoute: typeof CoachBoxersRoute
@@ -1112,11 +1265,12 @@ const JudgeRouteWithChildren = JudgeRoute._addFileChildren(JudgeRouteChildren)
 
 interface SuperadminRouteChildren {
   SuperadminAcademiesRoute: typeof SuperadminAcademiesRoute
+  SuperadminAdminsRoute: typeof SuperadminAdminsRoute
   SuperadminAthletesRoute: typeof SuperadminAthletesRoute
   SuperadminAttendanceRoute: typeof SuperadminAttendanceRoute
   SuperadminBoutsRoute: typeof SuperadminBoutsRoute
-  SuperadminCategoriesRoute: typeof SuperadminCategoriesRoute
   SuperadminClassAssigningRoute: typeof SuperadminClassAssigningRoute
+  SuperadminCoachesRoute: typeof SuperadminCoachesRoute
   SuperadminConfigRoute: typeof SuperadminConfigRoute
   SuperadminDiscountsRoute: typeof SuperadminDiscountsRoute
   SuperadminFeesRoute: typeof SuperadminFeesRoute
@@ -1131,11 +1285,12 @@ interface SuperadminRouteChildren {
 
 const SuperadminRouteChildren: SuperadminRouteChildren = {
   SuperadminAcademiesRoute: SuperadminAcademiesRoute,
+  SuperadminAdminsRoute: SuperadminAdminsRoute,
   SuperadminAthletesRoute: SuperadminAthletesRoute,
   SuperadminAttendanceRoute: SuperadminAttendanceRoute,
   SuperadminBoutsRoute: SuperadminBoutsRoute,
-  SuperadminCategoriesRoute: SuperadminCategoriesRoute,
   SuperadminClassAssigningRoute: SuperadminClassAssigningRoute,
+  SuperadminCoachesRoute: SuperadminCoachesRoute,
   SuperadminConfigRoute: SuperadminConfigRoute,
   SuperadminDiscountsRoute: SuperadminDiscountsRoute,
   SuperadminFeesRoute: SuperadminFeesRoute,
@@ -1156,6 +1311,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AthleteRoute: AthleteRouteWithChildren,
+  BoxosAdminRoute: BoxosAdminRouteWithChildren,
   CoachRoute: CoachRouteWithChildren,
   JudgeRoute: JudgeRouteWithChildren,
   LoginRoute: LoginRoute,

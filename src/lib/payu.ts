@@ -260,14 +260,13 @@ export async function recordPayUPayment(
   try {
     const { error } = await supabase.from("payments").insert({
       invoice_id: opts.invoiceId,
-      athlete_profile_id: opts.athleteProfileId,
+      boxer_profile_id: opts.athleteProfileId,
       amount: opts.amount,
-      payment_mode: "payu",
-      payment_date: new Date().toISOString().split("T")[0],
-      transaction_reference: opts.payuMihpayId || opts.payuTxnId,
-      razorpay_payment_id: null,
-      razorpay_order_id: null,
-      razorpay_signature: null,
+      payment_mode: "online",
+      gateway: "payu",
+      gateway_payment_id: opts.payuMihpayId ?? null,
+      reference: opts.payuTxnId ?? null,
+      status: "success",
     });
     if (error) {
       console.warn("[recordPayUPayment] insert skipped (handled by Edge Function):", error.message);

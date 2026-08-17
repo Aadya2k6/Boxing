@@ -23,7 +23,7 @@ function RefundsPage() {
     try {
       const { data } = await supabase
         .from("refunds")
-        .select("*, athlete_profiles(full_name, email), profiles!refunds_requested_by_fkey(full_name)")
+        .select("*, boxer_profiles(full_name, email), profiles!refunds_requested_by_fkey(full_name)")
         .order("created_at", { ascending: false });
       setRefunds(data || []);
     } finally {
@@ -116,8 +116,8 @@ function RefundsPage() {
                 {pending.map(r => (
                   <tr key={r.id} className="border-t border-border hover:bg-subtle transition">
                     <td className="px-5 py-3.5">
-                      <div className="font-medium">{r.athlete_profiles?.full_name}</div>
-                      <div className="text-xs text-muted-foreground">{r.athlete_profiles?.email}</div>
+                      <div className="font-medium">{r.boxer_profiles?.full_name}</div>
+                      <div className="text-xs text-muted-foreground">{r.boxer_profiles?.email}</div>
                     </td>
                     <td className="py-3.5 text-right tabular font-bold">₹ {Number(r.amount).toLocaleString("en-IN")}</td>
                     <td className="py-3.5 pl-5 text-muted-foreground max-w-xs">{r.reason}</td>
@@ -130,7 +130,7 @@ function RefundsPage() {
                         <button onClick={() => setRejectId(r.id)} className="inline-flex items-center gap-1 text-xs font-medium px-3 py-1.5 border border-destructive/30 text-destructive rounded-lg hover:bg-destructive/8 transition">
                           <X className="size-3" /> Reject
                         </button>
-                        <button onClick={() => handleApprove(r.id, r.athlete_profiles?.user_id)} disabled={processing && actionId === r.id}
+                        <button onClick={() => handleApprove(r.id, r.boxer_profiles?.user_id)} disabled={processing && actionId === r.id}
                           className="inline-flex items-center gap-1 text-xs font-semibold px-3 py-1.5 bg-success text-white rounded-lg hover:bg-success/90 disabled:opacity-50 transition">
                           {processing && actionId === r.id ? <Loader2 className="size-3 animate-spin" /> : <Check className="size-3" />}
                           Approve
@@ -167,7 +167,7 @@ function RefundsPage() {
               ) : (
                 historical.map(r => (
                   <tr key={r.id} className="border-t border-border hover:bg-subtle transition">
-                    <td className="px-5 py-3.5 font-medium">{r.athlete_profiles?.full_name}</td>
+                    <td className="px-5 py-3.5 font-medium">{r.boxer_profiles?.full_name}</td>
                     <td className="py-3.5 text-right tabular font-semibold">₹ {Number(r.amount).toLocaleString("en-IN")}</td>
                     <td className="py-3.5 pl-5 text-muted-foreground text-xs max-w-xs">{r.reason}</td>
                     <td className="py-3.5">
@@ -195,7 +195,7 @@ function RefundsPage() {
             <textarea rows={3} value={rejectNote} onChange={e => setRejectNote(e.target.value)} className="input-premium resize-none mb-4" placeholder="Reason for rejection…" />
             <div className="flex gap-3">
               <button onClick={() => { setRejectId(null); setRejectNote(""); }} className="flex-1 px-4 py-2.5 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition">Cancel</button>
-              <button onClick={() => handleReject(rejectId, refunds.find(r => r.id === rejectId)?.athlete_profiles?.user_id)} disabled={processing}
+              <button onClick={() => handleReject(rejectId, refunds.find(r => r.id === rejectId)?.boxer_profiles?.user_id)} disabled={processing}
                 className="flex-1 px-4 py-2.5 text-sm font-semibold bg-destructive text-white rounded-xl hover:bg-destructive/90 disabled:opacity-50 transition flex items-center justify-center gap-2">
                 {processing ? <Loader2 className="size-4 animate-spin" /> : <X className="size-4" />}
                 Reject

@@ -29,7 +29,6 @@ function LoginPage() {
       const { error } = await signIn(email, password);
       if (error) { setError(error.message); return; }
 
-      // Fetch profile to get role + onboarding status
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) { setError("Login failed. Please try again."); return; }
 
@@ -41,16 +40,18 @@ function LoginPage() {
 
       let onboardingComplete: boolean | undefined;
       if (profile?.role === "athlete") {
-        const { data: ap } = await supabase
-          .from("athlete_profiles")
+        const { data: bp } = await supabase
+          .from("boxer_profiles")
           .select("onboarding_complete")
           .eq("user_id", user.id)
           .maybeSingle();
-        onboardingComplete = ap?.onboarding_complete ?? false;
+        onboardingComplete = bp?.onboarding_complete ?? false;
       }
 
       const dest = getRedirectPath(profile?.role ?? null, onboardingComplete);
       navigate({ to: dest });
+    } catch (err: any) {
+      setError(err.message || "An error occurred. Please try again.");
     } finally {
       setLoading(false);
     }

@@ -10,7 +10,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth";
-import { DevRoleSwitcher } from "@/components/dev/DevRoleSwitcher";
+import { Toaster } from "sonner";
 
 import appCss from "../styles.css?url";
 
@@ -185,6 +185,7 @@ function RootComponent() {
         <SmoothScroll>
           <Outlet />
         </SmoothScroll>
+        <Toaster position="top-right" richColors theme="light" />
         <DevRoleSwitcher />
       </AuthProvider>
     </QueryClientProvider>

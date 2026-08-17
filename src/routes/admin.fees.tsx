@@ -3,10 +3,12 @@ import { PageHeader, Badge, AvatarInitials } from "@/components/dashboard/Dashbo
 import { Plus, Pencil, Users, Loader2, X } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin/fees")({ component: FeesPage });
 
 function FeesPage() {
+  const { user, profile } = useAuth();
   const [tab, setTab] = useState<"plans" | "assignments">("plans");
   const [plans, setPlans] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
@@ -33,18 +35,30 @@ function FeesPage() {
       { data: athData }
     ] = await Promise.all([
       supabase.from("fee_plans").select("*").order("created_at"),
-      supabase.from("fee_assignments").select("*, fee_plans(*), athlete_profiles(full_name)"),
-      supabase.from("athlete_profiles").select("id, full_name").eq("onboarding_complete", true)
+      supabase.from("fee_assignments").select("*, fee_plans(*), boxer_profiles(full_name)"),
+      supabase.from("boxer_profiles").select("id, full_name").eq("onboarding_complete", true)
     ]);
 
     if (pData) {
       const enrichedPlans = pData.map(plan => {
         const count = aData?.filter((a: any) => a.fee_plan_id === plan.id).length || 0;
-        return { ...plan, count };
+        return {
+          ...plan,
+          plan_name: plan.name ?? plan.plan_name ?? "Fee Plan",
+          billing_cycle: plan.cycle ?? plan.billing_cycle ?? "monthly",
+          count,
+        };
       });
       setPlans(enrichedPlans);
     }
-    setAssignments(aData || []);
+    setAssignments((aData || []).map((a: any) => ({
+      ...a,
+      fee_plans: a.fee_plans ? {
+        ...a.fee_plans,
+        plan_name: a.fee_plans.name ?? a.fee_plans.plan_name ?? "Plan",
+        billing_cycle: a.fee_plans.cycle ?? a.fee_plans.billing_cycle ?? "monthly",
+      } : null,
+    })));
     setAthletes(athData || []);
     setLoading(false);
   }
@@ -53,11 +67,13 @@ function FeesPage() {
     e.preventDefault();
     if (!athleteId || !planId) return;
     setSaving(true);
+    const selectedPlan = plans.find(p => p.id === planId);
     const { error } = await supabase.from("fee_assignments").insert({
-      athlete_profile_id: athleteId,
+      boxer_profile_id: athleteId,
       fee_plan_id: planId,
-      discount_value: Number(discountValue),
-      discount_reason: discountReason || null,
+      academy_id: selectedPlan?.academy_id || profile?.academy_id,
+      assigned_by: user?.id,
+      status: "active",
     });
     if (!error) {
       setShowModal(false);
@@ -127,7 +143,7 @@ function FeesPage() {
                 </tr>
               ) : (
                 assignments.map((a) => {
-                  const n = a.athlete_profiles?.full_name || "Unknown";
+                  const n = a.boxer_profiles?.full_name || "Unknown";
                   const planName = a.fee_plans?.plan_name || "—";
                   const base = Number(a.fee_plans?.amount || 0);
                   const disc = Number(a.discount_value || 0);

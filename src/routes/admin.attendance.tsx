@@ -44,21 +44,21 @@ function AdminAttendancePage() {
     setLoading(true);
     try {
       const [{ data: aps }, { data: att }, { data: leaves }, { data: todayPoll }] = await Promise.all([
-        supabase.from("athlete_profiles").select("id, full_name, user_id, academy_id").eq("onboarding_complete", true).order("full_name"),
-        supabase.from("attendance").select("athlete_profile_id, status, date, marked_at, distance_meters"),
+        supabase.from("boxer_profiles").select("id, full_name, user_id, academy_id").eq("onboarding_complete", true).order("full_name"),
+        supabase.from("attendance").select("boxer_profile_id, status, date, marked_at, distance_meters"),
         supabase.from("leave_applications")
-          .select("*, athlete_profiles!leave_applications_athlete_profile_id_fkey(full_name)")
+          .select("*, boxer_profiles!leave_applications_boxer_profile_id_fkey(full_name)")
           .order("leave_date", { ascending: false }),
         supabase.from("attendance_polls").select("id").eq("poll_date", todayStr).maybeSingle(),
       ]);
 
       const sums = (aps ?? []).map(ap => {
-        const records = (att ?? []).filter(a => a.athlete_profile_id === ap.id);
-        const pending = (leaves ?? []).filter(l => l.athlete_profile_id === ap.id && l.status === "pending").length;
-        const approved = (leaves ?? []).filter(l => l.athlete_profile_id === ap.id && l.status === "approved").length;
+        const records = (att ?? []).filter(a => a.boxer_profile_id === ap.id);
+        const pending = (leaves ?? []).filter(l => l.boxer_profile_id === ap.id && l.status === "pending").length;
+        const approved = (leaves ?? []).filter(l => l.boxer_profile_id === ap.id && l.status === "approved").length;
         const lastRecord = records.sort((a, b) => b.date.localeCompare(a.date))[0];
         return {
-          athlete_profile_id: ap.id,
+          boxer_profile_id: ap.id,
           user_id: ap.user_id,
           full_name: ap.full_name,
           total_present: records.filter(r => r.status === "present").length,
@@ -85,7 +85,7 @@ function AdminAttendancePage() {
   async function loadPollResponses(pollId: string) {
     const { data } = await supabase
       .from("attendance_poll_responses")
-      .select("*, athlete_profiles!attendance_poll_responses_athlete_profile_id_fkey(full_name)")
+      .select("*, boxer_profiles!attendance_poll_responses_boxer_profile_id_fkey(full_name)")
       .eq("poll_id", pollId)
       .order("responded_at", { ascending: false });
     setPollResponses(data ?? []);
@@ -148,7 +148,7 @@ function AdminAttendancePage() {
   async function loadDailyRecords(date: string) {
     const { data } = await supabase
       .from("attendance")
-      .select("*, athlete_profiles!attendance_athlete_profile_id_fkey(full_name)")
+      .select("*, boxer_profiles!attendance_boxer_profile_id_fkey(full_name)")
       .eq("date", date)
       .order("marked_at", { ascending: false });
     setDailyRecords(data ?? []);
@@ -160,7 +160,7 @@ function AdminAttendancePage() {
     const { data } = await supabase
       .from("attendance")
       .select("*")
-      .eq("athlete_profile_id", athleteId)
+      .eq("boxer_profile_id", athleteId)
       .order("date", { ascending: false })
       .limit(30);
     setAthleteHistory(data ?? []);
@@ -181,7 +181,7 @@ function AdminAttendancePage() {
       const leave = leaveRequests.find(l => l.id === id);
       if (leave) {
         const { data: ap } = await supabase
-          .from("athlete_profiles").select("user_id").eq("id", leave.athlete_profile_id).maybeSingle();
+          .from("boxer_profiles").select("user_id").eq("id", leave.boxer_profile_id).maybeSingle();
         if (ap?.user_id) {
           await supabase.from("notifications").insert({
             recipient_id: ap.user_id,
@@ -206,7 +206,7 @@ function AdminAttendancePage() {
   const pendingLeaves = leaveRequests.filter(l => l.status === "pending");
   const filteredSummaries = summaries.filter(s => !q || s.full_name?.toLowerCase().includes(q.toLowerCase()));
   const filteredLeaves = leaveRequests.filter(l =>
-    !q || l.athlete_profiles?.full_name?.toLowerCase().includes(q.toLowerCase())
+    !q || l.boxer_profiles?.full_name?.toLowerCase().includes(q.toLowerCase())
   );
   const attendingCount = pollResponses.filter(r => r.status === "attending").length;
   const notAttendingCount = pollResponses.filter(r => r.status === "not_attending").length;
@@ -302,7 +302,7 @@ function AdminAttendancePage() {
                 <tbody>
                   {filteredSummaries.map(s => (
                     <>
-                      <tr key={s.athlete_profile_id} className="border-t border-border hover:bg-subtle transition">
+                      <tr key={s.boxer_profile_id} className="border-t border-border hover:bg-subtle transition">
                         <td className="px-5 py-3.5 font-medium">{s.full_name}</td>
                         <td className="px-4 py-3.5 text-right"><span className="text-success font-semibold">{s.total_present}</span></td>
                         <td className="px-4 py-3.5 text-right"><span className="text-destructive font-semibold">{s.total_absent}</span></td>
@@ -316,15 +316,15 @@ function AdminAttendancePage() {
                           {s.last_marked_date ? new Date(s.last_marked_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Never"}
                         </td>
                         <td className="px-5 py-3.5 text-right">
-                          <button onClick={() => expandAthlete(s.athlete_profile_id)}
+                          <button onClick={() => expandAthlete(s.boxer_profile_id)}
                             className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition">
-                            {expandedAthlete === s.athlete_profile_id ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                            {expandedAthlete === s.boxer_profile_id ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                             History
                           </button>
                         </td>
                       </tr>
-                      {expandedAthlete === s.athlete_profile_id && (
-                        <tr key={`${s.athlete_profile_id}-hist`} className="border-t border-border bg-subtle/40">
+                      {expandedAthlete === s.boxer_profile_id && (
+                        <tr key={`${s.boxer_profile_id}-hist`} className="border-t border-border bg-subtle/40">
                           <td colSpan={7} className="px-5 py-4">
                             <p className="text-xs font-semibold text-muted-foreground mb-3">Last 30 records</p>
                             <div className="flex flex-wrap gap-1.5">
@@ -370,7 +370,7 @@ function AdminAttendancePage() {
                   <tbody>
                     {dailyRecords.map(r => (
                       <tr key={r.id} className="border-t border-border hover:bg-subtle">
-                        <td className="px-5 py-3.5 font-medium">{r.athlete_profiles?.full_name ?? "—"}</td>
+                        <td className="px-5 py-3.5 font-medium">{r.boxer_profiles?.full_name ?? "—"}</td>
                         <td className="px-4 py-3.5"><Badge tone={r.status === "present" ? "success" : "danger"}>{r.status}</Badge></td>
                         <td className="px-4 py-3.5 text-xs text-muted-foreground">
                           {r.marked_at ? new Date(r.marked_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
@@ -411,7 +411,7 @@ function AdminAttendancePage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-sm">{l.athlete_profiles?.full_name ?? "Unknown"}</span>
+                      <span className="font-semibold text-sm">{l.boxer_profiles?.full_name ?? "Unknown"}</span>
                       <Badge tone={l.status === "approved" ? "success" : l.status === "rejected" ? "danger" : "warning"}>
                         {l.status}
                       </Badge>
@@ -490,7 +490,7 @@ function AdminAttendancePage() {
                       <tbody>
                         {pollResponses.map(r => (
                           <tr key={r.id} className="border-t border-border hover:bg-subtle">
-                            <td className="px-5 py-3.5 font-medium">{r.athlete_profiles?.full_name ?? "—"}</td>
+                            <td className="px-5 py-3.5 font-medium">{r.boxer_profiles?.full_name ?? "—"}</td>
                             <td className="px-4 py-3.5">
                               <Badge tone={r.status === "attending" ? "success" : "danger"}>
                                 {r.status === "attending" ? "Attending ✓" : "Not Attending"}

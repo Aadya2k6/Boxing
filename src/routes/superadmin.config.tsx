@@ -3,12 +3,12 @@ import { PageHeader, Badge } from "@/components/dashboard/DashboardLayout";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { Loader2, Check, Save, Key, Plus, Shield, Copy, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Check, Save, Key, KeyRound, Plus, Shield, Copy, CheckCircle2, AlertCircle } from "lucide-react";
 
 export const Route = createFileRoute("/superadmin/config")({ component: ConfigPage });
 
 function ConfigPage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
@@ -35,14 +35,23 @@ function ConfigPage() {
 
   useEffect(() => {
     loadData();
-  }, []);
+  }, [profile?.academy_id]);
 
   async function loadData() {
     setLoading(true);
     try {
+      const targetAcademyId = profile?.academy_id;
+      const acQuery = targetAcademyId
+        ? supabase.from("academies").select("*").eq("id", targetAcademyId).maybeSingle()
+        : supabase.from("academies").select("*").limit(1).maybeSingle();
+
+      const codeQuery = targetAcademyId
+        ? supabase.from("academy_codes").select("*").eq("academy_id", targetAcademyId).order("created_at", { ascending: false })
+        : supabase.from("academy_codes").select("*").order("created_at", { ascending: false });
+
       const [{ data: acData }, { data: codeData }] = await Promise.all([
-        supabase.from("academies").select("*").limit(1).maybeSingle(),
-        supabase.from("academy_codes").select("*").order("created_at", { ascending: false }),
+        acQuery,
+        codeQuery,
       ]);
 
       if (acData) {
@@ -62,11 +71,18 @@ function ConfigPage() {
     e.preventDefault();
     setSaving(true);
 
-    const { data: firstAc } = await supabase.from("academies").select("id").limit(1).maybeSingle();
-    if (firstAc?.id) {
+    const targetId = profile?.academy_id;
+    if (targetId) {
       await supabase.from("academies").update({
         name: settings.academy_name,
-      }).eq("id", firstAc.id);
+      }).eq("id", targetId);
+    } else {
+      const { data: firstAc } = await supabase.from("academies").select("id").limit(1).maybeSingle();
+      if (firstAc?.id) {
+        await supabase.from("academies").update({
+          name: settings.academy_name,
+        }).eq("id", firstAc.id);
+      }
     }
 
     setSaving(false);
@@ -78,7 +94,6 @@ function ConfigPage() {
     const randomNum = Math.floor(1000 + Math.random() * 9000);
     setNewCodeInput(`BOX-${randomNum}`);
   }
-
   async function handleCreateCode(e: React.FormEvent) {
     e.preventDefault();
     if (!newCodeInput.trim()) return;
@@ -86,11 +101,21 @@ function ConfigPage() {
     setCodeError(null);
     try {
       const formatted = newCodeInput.trim().toUpperCase();
+      let academyId = profile?.academy_id;
+      if (!academyId && user?.id) {
+        const { data: p } = await supabase.from("profiles").select("academy_id").eq("id", user.id).maybeSingle();
+        academyId = p?.academy_id;
+      }
+      if (!academyId) {
+        const { data: ac } = await supabase.from("academies").select("id").limit(1).maybeSingle();
+        academyId = ac?.id;
+      }
+
       const { error } = await supabase.from("academy_codes").insert({
         code: formatted,
         created_by: user?.id || null,
+        academy_id: academyId || null,
         is_active: true,
-        uses_count: 0,
       });
 
       if (error) throw new Error(error.message);
@@ -104,14 +129,18 @@ function ConfigPage() {
     }
   }
 
-  async function toggleCodeStatus(id: string, currentActive: boolean) {
+  async function toggleCodeStatus(id: string, currentStatus: boolean) {
     setTogglingId(id);
     try {
-      await supabase
+      const { error } = await supabase
         .from("academy_codes")
-        .update({ is_active: !currentActive })
+        .update({ is_active: !currentStatus, updated_at: new Date().toISOString() })
         .eq("id", id);
+
+      if (error) throw new Error(error.message);
       loadData();
+    } catch (err: any) {
+      alert(`Failed to update code: ${err.message}`);
     } finally {
       setTogglingId(null);
     }
@@ -143,76 +172,60 @@ function ConfigPage() {
   ] as const;
 
   return (
-    <div className="space-y-8 max-w-4xl">
+    <div className="animate-fade-up space-y-6 max-w-4xl">
       <PageHeader
-        title="Academy configuration & access codes"
-        subtitle="Manage platform parameters & academy access codes for athlete registration"
+        title="Settings & Access Control"
+        subtitle="Configure academy parameters and athlete onboarding access codes"
       />
 
-      {/* Section 1: Academy Access Codes Management */}
+      {/* Access Code Management Section */}
       <div className="bg-surface border border-border rounded-xl p-6 shadow-card space-y-6">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-4">
-          <div className="flex items-center gap-3">
-            <div className="size-10 rounded-xl bg-primary/10 grid place-items-center text-primary-dark shrink-0">
-              <Key className="size-5" />
-            </div>
-            <div>
-              <h2 className="font-display font-semibold text-lg">Academy Access Codes</h2>
-              <p className="text-xs text-muted-foreground mt-0.5">
-                Athletes must enter an active code to unlock onboarding. Prevents unauthorized signups.
-              </p>
-            </div>
+        <div>
+          <div className="flex items-center gap-2 text-foreground font-semibold text-base">
+            <KeyRound className="size-4 text-brand-primary" />
+            Academy Access Codes
           </div>
+          <p className="text-xs text-muted-foreground mt-1">
+            Athletes must enter an active code during registration to link their profile to your academy.
+          </p>
         </div>
 
         {/* Create Code Form */}
-        <form onSubmit={handleCreateCode} className="space-y-3">
-          <label className="block text-xs font-semibold text-foreground">
-            Generate or enter new Academy Access Code
-          </label>
-          <div className="flex flex-col sm:flex-row items-stretch gap-2.5">
-            <div className="relative flex-1">
-              <input
-                type="text"
-                required
-                value={newCodeInput}
-                onChange={(e) => setNewCodeInput(e.target.value.toUpperCase())}
-                placeholder="e.g. BOXOS1 or BOX-8842"
-                className="w-full bg-elevated border border-border rounded-xl px-4 py-2.5 text-sm font-mono font-bold uppercase tracking-wider focus:outline-none focus:border-primary"
-              />
-            </div>
-            <button
-              type="button"
-              onClick={generateRandomCode}
-              className="px-3.5 py-2.5 text-xs font-semibold border border-border rounded-xl hover:bg-subtle transition cursor-pointer shrink-0"
-            >
-              Generate Random
-            </button>
-            <button
-              type="submit"
-              disabled={codeLoading || !newCodeInput.trim()}
-              className="px-5 py-2.5 bg-[#ef4444] text-white text-xs font-semibold rounded-xl hover:bg-[#dc2626] disabled:opacity-50 transition cursor-pointer flex items-center justify-center gap-1.5 shrink-0 shadow-card"
-            >
-              {codeLoading ? <Loader2 className="size-3.5 animate-spin" /> : <Plus className="size-3.5" />}
-              {codeLoading ? "Saving..." : "Create Code"}
-            </button>
+        <form onSubmit={handleCreateCode} className="flex flex-wrap items-center gap-3">
+          <div className="relative flex-1 min-w-[200px]">
+            <input
+              type="text"
+              placeholder="e.g. BOXING2026"
+              value={newCodeInput}
+              onChange={(e) => setNewCodeInput(e.target.value.toUpperCase())}
+              disabled={codeLoading}
+              className="w-full bg-subtle border border-border rounded-lg px-3.5 py-2 text-sm font-mono tracking-wider uppercase text-foreground placeholder:text-muted-foreground placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:border-brand-primary transition"
+            />
           </div>
-          {codeError && (
-            <div className="flex items-center gap-2 text-xs text-destructive mt-1">
-              <AlertCircle className="size-3.5 shrink-0" />
-              <span>{codeError}</span>
-            </div>
-          )}
+          <button
+            type="submit"
+            disabled={codeLoading || !newCodeInput.trim()}
+            className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition disabled:opacity-50 cursor-pointer"
+          >
+            {codeLoading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
+            Generate Code
+          </button>
         </form>
 
+        {codeError && (
+          <div className="flex items-center gap-2 text-xs text-[#ef4444] bg-[#ef4444]/10 border border-[#ef4444]/20 p-2.5 rounded-lg">
+            <AlertCircle className="size-4 shrink-0" />
+            {codeError}
+          </div>
+        )}
+
         {/* Existing Codes Table */}
-        <div className="border border-border rounded-xl overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-elevated">
-              <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                <th className="text-left font-medium px-4 py-3">Code</th>
+        <div className="border border-border rounded-lg overflow-hidden">
+          <table className="w-full text-left text-sm">
+            <thead className="bg-elevated text-xs text-muted-foreground border-b border-border">
+              <tr>
+                <th className="font-medium px-4 py-3">Access Code</th>
                 <th className="text-left font-medium px-4 py-3">Status</th>
-                <th className="text-right font-medium px-4 py-3">Uses</th>
                 <th className="text-left font-medium px-4 py-3">Created Date</th>
                 <th className="text-right font-medium px-4 py-3">Action</th>
               </tr>
@@ -220,7 +233,7 @@ function ConfigPage() {
             <tbody>
               {codes.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="py-8 text-center text-xs text-muted-foreground">
+                  <td colSpan={4} className="py-8 text-center text-xs text-muted-foreground">
                     No access codes configured yet. Create a code above to allow athletes to register.
                   </td>
                 </tr>
@@ -234,7 +247,6 @@ function ConfigPage() {
                           type="button"
                           onClick={() => handleCopy(c.code)}
                           className="text-muted-foreground hover:text-foreground transition cursor-pointer"
-                          title="Copy Code"
                         >
                           {copiedCode === c.code ? <CheckCircle2 className="size-3.5 text-success" /> : <Copy className="size-3.5" />}
                         </button>
@@ -244,9 +256,6 @@ function ConfigPage() {
                       <Badge tone={c.is_active ? "success" : undefined}>
                         {c.is_active ? "Active" : "Inactive"}
                       </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-right tabular text-xs font-semibold">
-                      {c.uses_count ?? 0} athlete{(c.uses_count ?? 0) !== 1 ? "s" : ""}
                     </td>
                     <td className="px-4 py-3 text-xs text-muted-foreground tabular">
                       {new Date(c.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}

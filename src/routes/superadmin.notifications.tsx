@@ -83,7 +83,7 @@ function SuperadminNotifications() {
     if (leaveIds.length > 0) {
       const { data: laData } = await supabase
         .from("leave_applications")
-        .select("id, status, athlete_profile_id, leave_date, athlete_profiles(user_id)")
+        .select("id, status, boxer_profile_id, start_date, end_date, boxer_profiles(user_id)")
         .in("id", leaveIds);
       if (laData) {
         const mapping = laData.reduce((acc, curr) => {
@@ -102,11 +102,16 @@ function SuperadminNotifications() {
     if (rolloverIds.length > 0) {
       const { data: faData } = await supabase
         .from("fee_assignments")
-        .select("id, assignment_status, athlete_profile_id, payment_mode, athlete_profiles(user_id, full_name), fee_plans(plan_name, amount)")
+        .select("id, status, boxer_profile_id, boxer_profiles(user_id, full_name), fee_plans(name, amount)")
         .in("id", rolloverIds);
       if (faData) {
-        const mapping = faData.reduce((acc, curr) => {
-          acc[curr.id] = curr;
+        const mapping = faData.reduce((acc, curr: any) => {
+          acc[curr.id] = {
+            ...curr,
+            assignment_status: curr.status,
+            payment_mode: "rollover",
+            fee_plans: curr.fee_plans ? { ...curr.fee_plans, plan_name: curr.fee_plans.name } : null,
+          };
           return acc;
         }, {} as Record<string, any>);
         setRolloverAssignments(mapping);
@@ -143,7 +148,7 @@ function SuperadminNotifications() {
     }));
 
     // 2. Notify athlete
-    const athleteUserId = leaveApp.athlete_profiles?.user_id;
+    const athleteUserId = leaveApp.boxer_profiles?.user_id;
     if (athleteUserId) {
       await supabase.from("notifications").insert({
         recipient_id: athleteUserId,
@@ -169,7 +174,7 @@ function SuperadminNotifications() {
           })
           .eq("id", assignmentId);
 
-        const athleteUserId = fa.athlete_profiles?.user_id;
+        const athleteUserId = fa.boxer_profiles?.user_id;
         if (athleteUserId) {
           await supabase.from("notifications").insert({
             recipient_id: athleteUserId,
@@ -183,7 +188,7 @@ function SuperadminNotifications() {
           .update({ assignment_status: "sent", payment_mode: null })
           .eq("id", assignmentId);
 
-        const athleteUserId = fa.athlete_profiles?.user_id;
+        const athleteUserId = fa.boxer_profiles?.user_id;
         if (athleteUserId) {
           await supabase.from("notifications").insert({
             recipient_id: athleteUserId,

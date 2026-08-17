@@ -348,15 +348,15 @@ function ClassAssigningPage() {
       const [{ data: rawAttData }, { data: polls }] = await Promise.all([
         supabase.from("attendance").select("*"),
         pitchIds.length > 0
-          ? supabase.from("class_assignment_polls").select("id, pitch_id").in("pitch_id", pitchIds).eq("poll_date", dateKey)
+          ? supabase.from("ring_assignment_polls").select("id, pitch_id").in("pitch_id", pitchIds).eq("poll_date", dateKey)
           : { data: [] },
       ]);
 
       const pollIds = (polls ?? []).map(p => p.id);
       const { data: pollResponses } = pollIds.length > 0
         ? await supabase
-            .from("class_assignment_poll_responses")
-            .select("athlete_profile_id, status, reason")
+            .from("ring_assignment_poll_responses")
+            .select("boxer_profile_id, status, reason")
             .in("poll_id", pollIds)
         : { data: [] };
 
@@ -370,7 +370,7 @@ function ClassAssigningPage() {
       const notAttendingList: { id: string; name: string; reason?: string }[] = [];
 
       (pollResponses ?? []).forEach((r: any) => {
-        const athId = String(r.athlete_profile_id);
+        const athId = String(r.boxer_profile_id);
         const name = studentMap.get(athId) || "Athlete";
         if (r.status === "attending") {
           attendingList.push({ id: athId, name });
@@ -383,7 +383,7 @@ function ClassAssigningPage() {
       const dateAttData = (rawAttData ?? []).filter((a: any) => a.date && String(a.date).substring(0, 10) === dateKey);
       dateAttData.forEach((a: any) => {
         if (a.status && (String(a.status).toLowerCase() === "present" || String(a.status).toLowerCase() === "attending")) {
-          const athId = a.athlete_profile_id ? String(a.athlete_profile_id) : a.user_id ? String(a.user_id) : "";
+          const athId = a.boxer_profile_id ? String(a.boxer_profile_id) : a.user_id ? String(a.user_id) : "";
           const name = studentMap.get(athId) || "Athlete";
           presentList.push({ id: athId, name, checkInTime: a.check_in_time });
         }
@@ -410,7 +410,7 @@ function ClassAssigningPage() {
       const { schedule, dateKey } = activeDateModal;
       let instId = dbInstances.find(i => String(i.template_id) === String(schedule.id) && String(i.date).substring(0, 10) === dateKey)?.id;
       if (!instId) {
-        const { data: newInst, error: instErr } = await supabase.from("class_schedule_instances").insert({
+        const { data: newInst, error: instErr } = await supabase.from("ring_instances").insert({
           template_id: schedule.id,
           academy_id: schedule.academy_id,
           date: dateKey,
@@ -426,14 +426,14 @@ function ClassAssigningPage() {
 
         const existingOver = dbPitchOverrides.find(o => String(o.instance_id) === String(instId) && String(o.pitch_id) === String(pitch.id));
         if (existingOver) {
-          await supabase.from("class_instance_pitch_overrides").update({
+          await supabase.from("ring_instance_overrides").update({
             batsmen: studObj.batsmen,
             bowlers: studObj.bowlers,
             extras: studObj.extras,
             updated_at: new Date().toISOString(),
           }).eq("id", existingOver.id);
         } else {
-          await supabase.from("class_instance_pitch_overrides").insert({
+          await supabase.from("ring_instance_overrides").insert({
             instance_id: instId,
             pitch_id: pitch.id,
             batsmen: studObj.batsmen,
@@ -472,7 +472,7 @@ function ClassAssigningPage() {
       const { schedule, dateKey } = activeDateModal;
       let instId = dbInstances.find(i => String(i.template_id) === String(schedule.id) && String(i.date).substring(0, 10) === dateKey)?.id;
       if (!instId) {
-        const { data: newInst, error: instErr } = await supabase.from("class_schedule_instances").insert({
+        const { data: newInst, error: instErr } = await supabase.from("ring_instances").insert({
           template_id: schedule.id,
           academy_id: schedule.academy_id,
           date: dateKey,
@@ -489,14 +489,14 @@ function ClassAssigningPage() {
 
         const existingOver = dbPitchOverrides.find(o => String(o.instance_id) === String(instId) && String(o.pitch_id) === String(pitch.id));
         if (existingOver) {
-          await supabase.from("class_instance_pitch_overrides").update({
+          await supabase.from("ring_instance_overrides").update({
             custom_location: newLoc,
             custom_lat: newLat,
             custom_lng: newLng,
             updated_at: new Date().toISOString(),
           }).eq("id", existingOver.id);
         } else {
-          await supabase.from("class_instance_pitch_overrides").insert({
+          await supabase.from("ring_instance_overrides").insert({
             instance_id: instId,
             pitch_id: pitch.id,
             custom_location: newLoc,
@@ -537,12 +537,12 @@ function ClassAssigningPage() {
       const { schedule, dateKey } = activeDateModal;
       let instId = dbInstances.find(i => String(i.template_id) === String(schedule.id) && String(i.date).substring(0, 10) === dateKey)?.id;
       if (instId) {
-        await supabase.from("class_schedule_instances").update({
+        await supabase.from("ring_instances").update({
           is_cancelled: true,
           cancel_reason: "Cancelled by Superadmin",
         }).eq("id", instId);
       } else {
-        await supabase.from("class_schedule_instances").insert({
+        await supabase.from("ring_instances").insert({
           template_id: schedule.id,
           academy_id: schedule.academy_id,
           date: dateKey,
@@ -591,11 +591,11 @@ function ClassAssigningPage() {
       for (const s of activeSchedules) {
         const existingInst = dbInstances.find(i => String(i.template_id) === String(s.id) && String(i.date).substring(0, 10) === dateKey);
         if (existingInst) {
-          await supabase.from("class_schedule_instances")
+          await supabase.from("ring_instances")
             .update({ is_cancelled: cancel, cancel_reason: cancel ? "Cancelled by Superadmin" : null })
             .eq("id", existingInst.id);
         } else {
-          await supabase.from("class_schedule_instances").insert({
+          await supabase.from("ring_instances").insert({
             template_id: s.id,
             academy_id: s.academy_id,
             date: dateKey,
@@ -650,14 +650,14 @@ function ClassAssigningPage() {
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, () => loadData(true))
       .on("postgres_changes", { event: "*", schema: "public", table: "sessions" }, () => loadData(true))
       .on("postgres_changes", { event: "*", schema: "public", table: "leave_applications" }, () => loadData(true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "class_assignment_polls" }, () => loadData(true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "class_assignment_poll_responses" }, () => loadData(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ring_assignment_polls" }, () => loadData(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ring_assignment_poll_responses" }, () => loadData(true))
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance_polls" }, () => loadData(true))
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance_poll_responses" }, () => loadData(true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "class_schedule_templates" }, () => loadData(true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "class_schedule_pitches" }, () => loadData(true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "class_schedule_instances" }, () => loadData(true))
-      .on("postgres_changes", { event: "*", schema: "public", table: "class_instance_pitch_overrides" }, () => loadData(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ring_schedule_templates" }, () => loadData(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ring_sessions" }, () => loadData(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ring_instances" }, () => loadData(true))
+      .on("postgres_changes", { event: "*", schema: "public", table: "ring_instance_overrides" }, () => loadData(true))
       .subscribe();
 
     return () => { supabase.removeChannel(ch); };
@@ -668,18 +668,18 @@ function ClassAssigningPage() {
     if (!isSilent) setLoading(true);
     try {
       const [studentsRes, pollsRes, academiesRes, sessionsRes, attendanceRes, leavesRes, dbTemplatesRes, dbPitchesRes, instancesRes, pitchOverridesRes] = await Promise.all([
-        supabase.from("athlete_profiles").select("id, full_name, user_id, academy_id, experience_level, primary_goal")
+        supabase.from("boxer_profiles").select("id, full_name, user_id, academy_id, stance, declared_weight_kg")
           .order("full_name",{ascending:true}),
-        supabase.from("class_assignment_polls").select("id, template_id, pitch_id, expires_at, created_at")
-          .gte("expires_at",new Date().toISOString()).order("created_at",{ascending:false}),
+        supabase.from("ring_assignment_polls").select("id, ring_instance_id, sent_by, sent_at")
+          .order("sent_at",{ascending:false}),
         supabase.from("academies").select("id, name, city").order("name"),
         Promise.resolve({ data: [], error: null }),
-        supabase.from("attendance").select("*").order("date",{ascending:false}),
-        supabase.from("leave_applications").select("*, athlete_profiles(full_name)").order("leave_date",{ascending:false}),
-        supabase.from("class_schedule_templates").select("*"),
-        supabase.from("class_schedule_pitches").select("*"),
-        supabase.from("class_schedule_instances").select("*"),
-        supabase.from("class_instance_pitch_overrides").select("*"),
+        supabase.from("attendance").select("*").order("session_date",{ascending:false}),
+        supabase.from("leave_applications").select("*, boxer_profiles(full_name)").order("start_date",{ascending:false}),
+        supabase.from("ring_schedule_templates").select("*"),
+        supabase.from("ring_sessions").select("*"),
+        supabase.from("ring_instances").select("*"),
+        supabase.from("ring_instance_overrides").select("*"),
       ]);
 
       if (studentsRes.error) console.error("studentsRes error:", studentsRes.error.message);
@@ -693,8 +693,8 @@ function ClassAssigningPage() {
 
       const pollIds = (pollsRes.data ?? []).map((p: any) => p.id);
       const responsesRes = pollIds.length > 0
-        ? await supabase.from("class_assignment_poll_responses")
-            .select("poll_id, athlete_profile_id, status, reason, responded_at")
+        ? await supabase.from("ring_assignment_poll_responses")
+            .select("poll_id, boxer_profile_id, status, reason, responded_at")
             .in("poll_id", pollIds)
         : { data: [] as any[] };
 
@@ -702,12 +702,12 @@ function ClassAssigningPage() {
       (pollsRes.data ?? []).forEach((poll: any) => {
         const pr = responsesByPitch.get(poll.pitch_id) ?? {};
         (responsesRes.data ?? []).filter((r: any) => r.poll_id === poll.id).forEach((r: any) => {
-          pr[r.athlete_profile_id] = { status: r.status, reason: r.reason ?? undefined };
+          pr[r.boxer_profile_id] = { status: r.status, reason: r.reason ?? undefined };
         });
         responsesByPitch.set(poll.pitch_id, pr);
       });
 
-      // ── Map class_schedule_templates rows into Schedule[] ────────────
+      // ── Map ring_schedule_templates rows into Schedule[] ────────────
       const dbSchedules: Schedule[] = (dbTemplatesRes.data ?? [])
         .filter((t: any) => t.is_active !== false)
         .map((t: any) => {
@@ -784,7 +784,7 @@ function ClassAssigningPage() {
     try {
       if (editingScheduleId) {
         // ── Update existing template row ──────────────────────────────
-        const { error: tErr } = await supabase.from("class_schedule_templates").update({
+        const { error: tErr } = await supabase.from("ring_schedule_templates").update({
           name: sName.trim(),
           academy_id: sAcademyId,
           days_of_week: sDaysOfWeek,
@@ -796,9 +796,9 @@ function ClassAssigningPage() {
         if (tErr) throw tErr;
 
         // Sync pitches: delete all old pitches then re-insert
-        await supabase.from("class_schedule_pitches").delete().eq("template_id", editingScheduleId);
+        await supabase.from("ring_sessions").delete().eq("template_id", editingScheduleId);
         if (draftPitches.length > 0) {
-          const { error: pErr } = await supabase.from("class_schedule_pitches").insert(
+          const { error: pErr } = await supabase.from("ring_sessions").insert(
             draftPitches.map(p => ({
               id: p.id || crypto.randomUUID(),
               template_id: editingScheduleId,
@@ -816,7 +816,7 @@ function ClassAssigningPage() {
       } else {
         // ── Insert new template row ───────────────────────────────────
         const newId = crypto.randomUUID();
-        const { error: tErr } = await supabase.from("class_schedule_templates").insert({
+        const { error: tErr } = await supabase.from("ring_schedule_templates").insert({
           id: newId,
           name: sName.trim(),
           academy_id: sAcademyId || null,
@@ -829,7 +829,7 @@ function ClassAssigningPage() {
         if (tErr) throw tErr;
 
         if (draftPitches.length > 0) {
-          const { error: pErr } = await supabase.from("class_schedule_pitches").insert(
+          const { error: pErr } = await supabase.from("ring_sessions").insert(
             draftPitches.map(p => ({
               id: p.id || crypto.randomUUID(),
               template_id: newId,
@@ -845,12 +845,12 @@ function ClassAssigningPage() {
           if (pErr) throw pErr;
         }
 
-        // Send notifications & class_assignment_polls for new schedule
+        // Send notifications & ring_assignment_polls for new schedule
         if (sAcademyId && draftPitches.length > 0) {
           try {
             for (const p of draftPitches) {
               const pollId = crypto.randomUUID();
-              await supabase.from("class_assignment_polls").insert({
+              await supabase.from("ring_assignment_polls").insert({
                 id: pollId,
                 sent_by: user?.id,
                 template_id: newId,
@@ -868,7 +868,7 @@ function ClassAssigningPage() {
                 targetStudentIds = pitchAssigned;
               } else {
                 const { data: academyStudents } = await supabase
-                  .from("athlete_profiles")
+                  .from("boxer_profiles")
                   .select("id")
                   .eq("academy_id", sAcademyId);
                 targetStudentIds = (academyStudents || []).map(s => s.id);
@@ -876,7 +876,7 @@ function ClassAssigningPage() {
 
               if (targetStudentIds.length > 0) {
                 const { data: userProfiles } = await supabase
-                  .from("athlete_profiles")
+                  .from("boxer_profiles")
                   .select("user_id")
                   .in("id", targetStudentIds)
                   .not("user_id", "is", null);
@@ -912,8 +912,8 @@ function ClassAssigningPage() {
   async function handleDeleteSchedule(id: string) {
     try {
       // Delete pitches first (FK constraint), then the template
-      await supabase.from("class_schedule_pitches").delete().eq("template_id", id);
-      await supabase.from("class_schedule_templates").delete().eq("id", id);
+      await supabase.from("ring_sessions").delete().eq("template_id", id);
+      await supabase.from("ring_schedule_templates").delete().eq("id", id);
       setDeleteScheduleId(null);
       if (selectedScheduleId === id) setSelectedScheduleId(null);
       await loadData(true);
@@ -974,7 +974,7 @@ function ClassAssigningPage() {
     try {
       if (editingPitchId) {
         // Update existing pitch row
-        const { error: updateErr } = await supabase.from("class_schedule_pitches").update({
+        const { error: updateErr } = await supabase.from("ring_sessions").update({
           name: cleaned.name,
           from_time: cleaned.fromTime,
           to_time: cleaned.toTime,
@@ -987,7 +987,7 @@ function ClassAssigningPage() {
         if (updateErr) throw updateErr;
       } else {
         // Insert new pitch row
-        const { error: insertErr } = await supabase.from("class_schedule_pitches").insert({
+        const { error: insertErr } = await supabase.from("ring_sessions").insert({
           id: crypto.randomUUID(),
           template_id: selectedScheduleId,
           name: cleaned.name,
@@ -1035,7 +1035,7 @@ function ClassAssigningPage() {
     }
     // Delete from DB directly
     try {
-      await supabase.from("class_schedule_pitches").delete().eq("id", pitchId);
+      await supabase.from("ring_sessions").delete().eq("id", pitchId);
       await loadData(true);
     } catch (err) {
       console.error("handleDeletePitch error:", err);
@@ -1046,13 +1046,13 @@ function ClassAssigningPage() {
     setNotifyingPitchId(pitch.id);
     try {
       const { data: existing, error: exErr } = await supabase
-        .from("class_assignment_polls").select("id, expires_at, created_at")
+        .from("ring_assignment_polls").select("id, expires_at, created_at")
         .eq("pitch_id", pitch.id).order("created_at",{ascending:false}).limit(1).maybeSingle();
       if (exErr) throw exErr;
       if (existing && new Date(existing.expires_at ?? existing.created_at).getTime() > Date.now()) {
         alert("This pitch can only be notified again after 24 hours."); return;
       }
-      const { data: poll, error: pollErr } = await supabase.from("class_assignment_polls").insert({
+      const { data: poll, error: pollErr } = await supabase.from("ring_assignment_polls").insert({
         sent_by: user?.id, template_id: schedule.id, pitch_id: pitch.id,
         poll_date: new Date().toISOString().split("T")[0],
         title: "Boxing Practice Scheduled",
@@ -1209,7 +1209,7 @@ function ClassAssigningPage() {
         const presentSet = new Set<string>();
 
         dayAttendance.forEach(a => {
-          const apId = a.athlete_profile_id ? String(a.athlete_profile_id) : "";
+          const apId = a.boxer_profile_id ? String(a.boxer_profile_id) : "";
           const uId = a.user_id ? String(a.user_id) : "";
 
           if (assignedIds.size > 0) {
@@ -1217,7 +1217,7 @@ function ClassAssigningPage() {
             if (expandedAssignedIds.has(apId) || (uId && expandedAssignedIds.has(uId))) {
               presentSet.add(apId || uId);
             } else {
-              // Try resolving via student map (athlete_profile_id ↔ user_id)
+              // Try resolving via student map (boxer_profile_id ↔ user_id)
               const st = studentMapById.get(apId) || studentMapByUserId.get(uId);
               if (st && (expandedAssignedIds.has(String(st.id)) || (st.user_id && expandedAssignedIds.has(String(st.user_id))))) {
                 presentSet.add(String(st.id));
@@ -1264,14 +1264,14 @@ function ClassAssigningPage() {
       if (sess.session_date && String(sess.session_date).substring(0, 10) === selectedDateKey) {
         if (selectedAcademyFilter === "all" || String(sess.academy_id) === String(selectedAcademyFilter)) {
           const academyName = sess.academies?.name || academies.find(a => String(a.id) === String(sess.academy_id))?.name;
-          const isAthleteAssigned = Boolean(sess.athlete_profile_id);
+          const isAthleteAssigned = Boolean(sess.boxer_profile_id);
 
           let present = 0;
           if (isAthleteAssigned) {
-            const targetId = String(sess.athlete_profile_id);
+            const targetId = String(sess.boxer_profile_id);
             const targetSt = studentMapById.get(targetId) || studentMapByUserId.get(targetId);
             present = dayAttendance.filter(a => {
-              const apId = a.athlete_profile_id ? String(a.athlete_profile_id) : "";
+              const apId = a.boxer_profile_id ? String(a.boxer_profile_id) : "";
               const uId = a.user_id ? String(a.user_id) : "";
               if (apId === targetId || uId === targetId) return true;
               if (targetSt && (apId === String(targetSt.id) || (targetSt.user_id && uId === String(targetSt.user_id)))) return true;
@@ -1538,7 +1538,7 @@ function ClassAssigningPage() {
                           <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                             {selectedDateLeaves.map((l: any) => (
                               <div key={l.id} className="text-xs p-2 rounded-lg bg-warning/5 border border-warning/20">
-                                <div className="font-medium text-foreground">{l.athlete_profiles?.full_name || "Athlete"}</div>
+                                <div className="font-medium text-foreground">{l.boxer_profiles?.full_name || "Athlete"}</div>
                                 <div className="text-[11px] text-muted-foreground italic mt-0.5">"{l.reason}"</div>
                               </div>
                             ))}

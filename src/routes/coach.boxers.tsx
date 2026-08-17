@@ -5,7 +5,7 @@ import { Users, Trophy, TrendingDown, Award, ChevronRight, X, Swords, Eye } from
 
 export const Route = createFileRoute("/coach/boxers")({ component: CoachBoxers });
 
-// ── Stub data — TODO: wire to boxer profiles from athlete_profiles joined through coach_athlete_assignments
+// ── Stub data — TODO: wire to boxer profiles from boxer_profiles joined through coach_athlete_assignments
 interface Boxer {
   id: string;
   name: string;

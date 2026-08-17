@@ -110,7 +110,7 @@ function UsersPage() {
     setCleaningUp(true);
     try {
       const expiredIds = expiredUsers.map(u => u.id);
-      await supabase.from("athlete_profiles").delete().in("user_id", expiredIds);
+      await supabase.from("boxer_profiles").delete().in("user_id", expiredIds);
       await supabase.from("profiles").delete().in("id", expiredIds);
       setCleanupCount(expiredUsers.length);
       setTimeout(() => setCleanupCount(null), 3000);

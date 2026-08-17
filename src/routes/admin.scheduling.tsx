@@ -10,7 +10,7 @@ import { toast } from "sonner";
 export const Route = createFileRoute("/admin/scheduling")({ component: AdminScheduling });
 
 // ── Stub data — same class_schedule_* tables as superadmin.class-assigning
-// TODO: wire to real class_schedule_templates / class_schedule_instances queries
+// TODO: wire to real ring_schedule_templates / ring_instances queries
 const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
 
 interface ScheduleTemplate {

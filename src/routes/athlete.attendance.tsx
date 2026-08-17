@@ -65,7 +65,7 @@ function AttendancePage() {
     try {
       // Get athlete profile + assigned academy
       const { data: ap } = await supabase
-        .from("athlete_profiles")
+        .from("boxer_profiles")
         .select("*")
         .eq("user_id", user!.id)
         .maybeSingle();
@@ -81,8 +81,8 @@ function AttendancePage() {
 
       if (ap?.id) {
         const [{ data: attData }, { data: lvData }] = await Promise.all([
-          supabase.from("attendance").select("*").eq("athlete_profile_id", ap.id).order("date", { ascending: false }).limit(30),
-          supabase.from("leave_applications").select("*").eq("athlete_profile_id", ap.id).order("created_at", { ascending: false }),
+          supabase.from("attendance").select("*").eq("boxer_profile_id", ap.id).order("session_date", { ascending: false }).limit(30),
+          supabase.from("leave_applications").select("*").eq("boxer_profile_id", ap.id).order("created_at", { ascending: false }),
         ]);
         setAttendanceLog(attData ?? []);
         setLeaves(lvData ?? []);
@@ -103,7 +103,7 @@ function AttendancePage() {
       const todayDayOfWeek = today.getDay(); 
 
       const { data: templates } = await supabase
-        .from("class_schedule_templates")
+        .from("ring_schedule_templates")
         .select("*")
         .eq("is_active", true)
         .eq("academy_id", ac.id)
@@ -123,7 +123,7 @@ function AttendancePage() {
       const templateIds = todayTemplates.map((t: any) => t.id);
 
       const { data: instances } = await supabase
-        .from("class_schedule_instances")
+        .from("ring_instances")
         .select("*")
         .in("template_id", templateIds)
         .eq("date", todayStr);
@@ -132,16 +132,16 @@ function AttendancePage() {
       const instanceIds = (instances || []).map((i: any) => i.id);
 
       const { data: pitches } = await supabase
-        .from("class_schedule_pitches")
+        .from("ring_sessions")
         .select("*")
         .in("template_id", templateIds);
 
       let overrides: any[] = [];
       if (instanceIds.length > 0) {
         const { data: overData } = await supabase
-          .from("class_instance_pitch_overrides")
+          .from("ring_instance_overrides")
           .select("*")
-          .in("instance_id", instanceIds);
+          .in("ring_instance_id", instanceIds);
         overrides = overData || [];
       }
 
@@ -231,7 +231,7 @@ function AttendancePage() {
 
       // 1. Fetch active templates for the academy or tournaments
       const { data: templates } = await supabase
-        .from("class_schedule_templates")
+        .from("ring_schedule_templates")
         .select("*")
         .eq("is_active", true)
         .eq("academy_id", academy.id)
@@ -253,7 +253,7 @@ function AttendancePage() {
 
       // 2. Fetch instances for today
       const { data: instances } = await supabase
-        .from("class_schedule_instances")
+        .from("ring_instances")
         .select("*")
         .in("template_id", templateIds)
         .eq("date", todayStr);
@@ -263,7 +263,7 @@ function AttendancePage() {
 
       // 3. Fetch pitches
       const { data: pitches } = await supabase
-        .from("class_schedule_pitches")
+        .from("ring_sessions")
         .select("*")
         .in("template_id", templateIds);
 
@@ -271,9 +271,9 @@ function AttendancePage() {
       let overrides: any[] = [];
       if (instanceIds.length > 0) {
         const { data: overData } = await supabase
-          .from("class_instance_pitch_overrides")
+          .from("ring_instance_overrides")
           .select("*")
-          .in("instance_id", instanceIds);
+          .in("ring_instance_id", instanceIds);
         overrides = overData || [];
       }
 
@@ -384,7 +384,7 @@ function AttendancePage() {
           const { data: existingRecord } = await supabase
             .from("attendance")
             .select("id")
-            .eq("athlete_profile_id", athleteProfile.id)
+            .eq("boxer_profile_id", athleteProfile.id)
             .eq("date", todayStr)
             .maybeSingle();
 
@@ -406,7 +406,7 @@ function AttendancePage() {
             const { error: insertErr } = await supabase
               .from("attendance")
               .insert({
-                athlete_profile_id: athleteProfile.id,
+                boxer_profile_id: athleteProfile.id,
                 academy_id: academy.id,
                 date: todayStr,
                 check_in_time: new Date().toISOString(),
@@ -456,7 +456,7 @@ function AttendancePage() {
       const { data: existing } = await supabase
         .from("leave_applications")
         .select("id")
-        .eq("athlete_profile_id", athleteProfile.id)
+        .eq("boxer_profile_id", athleteProfile.id)
         .eq("leave_date", leaveDate)
         .maybeSingle();
 
@@ -468,7 +468,7 @@ function AttendancePage() {
       const { data: newLeave, error } = await supabase
         .from("leave_applications")
         .insert({
-          athlete_profile_id: athleteProfile.id,
+          boxer_profile_id: athleteProfile.id,
           leave_date: leaveDate,
           reason: leaveReason,
           status: "pending",

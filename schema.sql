@@ -710,3 +710,10 @@ CREATE TABLE public.notifications (
   CONSTRAINT notifications_academy_id_fkey FOREIGN KEY (academy_id) REFERENCES public.academies(id),
   CONSTRAINT notifications_recipient_id_fkey FOREIGN KEY (recipient_id) REFERENCES public.profiles(id)
 );
+CREATE TABLE public.platform_settings (
+  id boolean NOT NULL DEFAULT true CHECK (id),
+  academy_code_verification_days integer NOT NULL DEFAULT 7,
+  current_terms_version text NOT NULL DEFAULT '2026-01-01'::text,
+  updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  CONSTRAINT platform_settings_pkey PRIMARY KEY (id)
+);

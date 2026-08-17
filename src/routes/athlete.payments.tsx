@@ -72,7 +72,7 @@ function PaymentsPage() {
 
     // Strictly fetch athlete_profile for the currently logged-in user only
     const { data: ap } = await supabase
-      .from("athlete_profiles")
+      .from("boxer_profiles")
       .select("id, academy_id")
       .eq("user_id", user.id)
       .maybeSingle();
@@ -89,34 +89,43 @@ function PaymentsPage() {
       supabase
         .from("invoices")
         .select("*")
-        .eq("athlete_profile_id", ap.id)
+        .eq("boxer_profile_id", ap.id)
         .order("created_at", { ascending: false }),
       supabase
         .from("fee_assignments")
-        .select("*, fee_plans(plan_name, amount, billing_cycle, custom_duration_days)")
-        .eq("athlete_profile_id", ap.id)
+        .select("*, fee_plans(name, amount, cycle)")
+        .eq("boxer_profile_id", ap.id)
         .order("created_at", { ascending: false })
         .limit(1)
         .maybeSingle(),
       supabase
         .from("payments")
         .select(
-          "*, invoices(invoice_number, billing_period, due_date, fee_assignments(fee_plans(plan_name, billing_cycle)))",
+          "*, invoices(invoice_number, due_date, fee_assignments(fee_plans(name, cycle)))",
         )
-        .eq("athlete_profile_id", ap.id)
+        .eq("boxer_profile_id", ap.id)
         .order("created_at", { ascending: false }),
     ]);
     
-    // Check if athlete has an UNCLEARED rollover (i.e. rollover pending or approved, but not yet paid)
+    // Check if athlete has an UNCLEARED rollover
     const { data: unclearedRollover } = await supabase
       .from("fee_assignments")
       .select("id")
-      .eq("athlete_profile_id", ap.id)
-      .in("assignment_status", ["rollover_pending", "rollover_approved"])
+      .eq("boxer_profile_id", ap.id)
+      .not("rollover_of", "is", null)
       .limit(1);
 
     setInvoices(invs || []);
-    setFeeAssignment(fa);
+    const normalizedFa = fa ? {
+      ...fa,
+      plan_name: (fa.fee_plans as any)?.name ?? "Fee Package",
+      fee_plans: fa.fee_plans ? {
+        ...fa.fee_plans,
+        plan_name: (fa.fee_plans as any).name,
+        billing_cycle: (fa.fee_plans as any).cycle,
+      } : null,
+    } : null;
+    setFeeAssignment(normalizedFa);
     setPayments(paymentRows || []);
     setHasUsedRollover(!!(unclearedRollover && unclearedRollover.length > 0));
 
@@ -322,7 +331,7 @@ function PaymentsPage() {
           amount: paidAmount,
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoice_number,
-          athleteProfileId: invoice.athlete_profile_id,
+          athleteProfileId: invoice.boxer_profile_id,
           name: profile.full_name ?? "",
           email: profile.email ?? "",
           academyId: athleteAcademyId ?? undefined,
@@ -336,7 +345,7 @@ function PaymentsPage() {
           amount: paidAmount,
           invoiceId: invoice.id,
           invoiceNumber: invoice.invoice_number,
-          athleteProfileId: invoice.athlete_profile_id,
+          athleteProfileId: invoice.boxer_profile_id,
           name: profile.full_name ?? "",
           email: profile.email ?? "",
           academyId: athleteAcademyId ?? undefined,
@@ -347,7 +356,7 @@ function PaymentsPage() {
             // Athletes cannot directly set fee_assignment to 'online_paid' per RLS policy.
             await recordPayment(supabase, {
               invoiceId: invoice.id,
-              athleteProfileId: invoice.athlete_profile_id,
+              athleteProfileId: invoice.boxer_profile_id,
               amount: paidAmount,
               razorpayPaymentId: rzp.razorpay_payment_id,
               razorpayOrderId: rzp.razorpay_order_id,

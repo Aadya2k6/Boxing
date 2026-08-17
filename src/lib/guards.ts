@@ -23,7 +23,9 @@ export function useRequireAuth(requiredRole?: UserRole) {
 
     // Wrong role -> navigate to correct role dashboard
     if (requiredRole && profile.role !== requiredRole) {
-      if (profile.role === "admin") {
+      if (profile.role === "boxos_admin") {
+        navigate({ to: "/boxos-admin" as any });
+      } else if (profile.role === "admin") {
         navigate({ to: "/admin" });
       } else if (profile.role === "superadmin") {
         navigate({ to: "/superadmin" });
@@ -60,7 +62,9 @@ export function useRequireAthlete() {
     if (!profile) return;
 
     if (profile.role !== "athlete") {
-      if (profile.role === "admin") {
+      if (profile.role === "boxos_admin") {
+        navigate({ to: "/boxos-admin" as any });
+      } else if (profile.role === "admin") {
         navigate({ to: "/admin" });
       } else if (profile.role === "superadmin") {
         navigate({ to: "/superadmin" });
@@ -85,11 +89,12 @@ export function useRedirectIfLoggedIn() {
   useEffect(() => {
     if (loading || !session || !profile) return;
     const dest: string =
-      profile.role === "admin" ? "/admin" :
-        profile.role === "superadmin" ? "/superadmin" :
-          profile.role === "coach" ? "/coach" :
-            profile.role === "external_judge" ? "/judge" :
-              "/athlete";
+      profile.role === "boxos_admin" ? "/boxos-admin" :
+        profile.role === "admin" ? "/admin" :
+          profile.role === "superadmin" ? "/superadmin" :
+            profile.role === "coach" ? "/coach" :
+              profile.role === "external_judge" ? "/judge" :
+                "/athlete";
     navigate({ to: dest as any });
   }, [session, profile, loading, navigate]);
 }

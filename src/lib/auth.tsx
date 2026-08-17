@@ -10,8 +10,6 @@ interface AuthContextValue {
   profile: Profile | null;
   role: UserRole | null;
   loading: boolean;
-  devRole: UserRole | null;
-  setDevRole: (role: UserRole | null) => void;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -19,90 +17,12 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
-export const MOCK_DEV_PROFILES: Record<UserRole, Profile> = {
-  athlete: {
-    id: "dev-athlete-id",
-    role: "athlete",
-    full_name: "Aarav Sharma (Demo Athlete)",
-    email: "athlete@boxos.in",
-    phone: null,
-    avatar_url: null,
-    is_active: true,
-    academy_id: "acad-1",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-    academy_code_verified: true,
-  },
-  coach: {
-    id: "dev-coach-id",
-    role: "coach",
-    full_name: "Coach Ravi (Demo Coach)",
-    email: "coach@boxos.in",
-    phone: null,
-    avatar_url: null,
-    is_active: true,
-    academy_id: "acad-1",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  admin: {
-    id: "dev-admin-id",
-    role: "admin",
-    full_name: "Admin Vikram (Demo Admin)",
-    email: "admin@boxos.in",
-    phone: null,
-    avatar_url: null,
-    is_active: true,
-    academy_id: "acad-1",
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  superadmin: {
-    id: "dev-superadmin-id",
-    role: "superadmin",
-    full_name: "Superadmin (Demo Superadmin)",
-    email: "superadmin@boxos.in",
-    phone: null,
-    avatar_url: null,
-    academy_id: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-  external_judge: {
-    id: "dev-judge-id",
-    role: "external_judge",
-    full_name: "Judge Arun Kumar (Demo Judge)",
-    email: "judge@boxos.in",
-    phone: null,
-    avatar_url: null,
-    academy_id: null,
-    is_active: true,
-    created_at: new Date().toISOString(),
-    updated_at: new Date().toISOString(),
-  },
-};
-
 // ── Provider ───────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [devRole, setDevRoleState] = useState<UserRole | null>(() => {
-    if (typeof window !== "undefined") {
-      return (localStorage.getItem("boxos_dev_role") as UserRole) || null;
-    }
-    return null;
-  });
-
-  const setDevRole = (r: UserRole | null) => {
-    setDevRoleState(r);
-    if (typeof window !== "undefined") {
-      if (r) localStorage.setItem("boxos_dev_role", r);
-      else localStorage.removeItem("boxos_dev_role");
-    }
-  };
 
   async function fetchProfile(userId: string): Promise<Profile | null> {
     try {
@@ -111,33 +31,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         .select("*")
         .eq("id", userId)
         .maybeSingle();
+
       if (error) {
         console.error("fetchProfile error:", error.message);
+        return null;
       }
-      if (data) return data as Profile;
-
-      // Fallback: auto-create missing profile row if logged in user has no row
-      const { data: userData } = await supabase.auth.getUser();
-      const u = userData?.user;
-      if (u) {
-        const deadline = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
-        const { data: newP } = await supabase
-          .from("profiles")
-          .upsert({
-            id: userId,
-            role: "athlete",
-            full_name: u.user_metadata?.full_name || "Athlete",
-            email: u.email || null,
-            is_active: true,
-            academy_code_verified: false,
-            academy_code_deadline: deadline,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "id" })
-          .select("*")
-          .maybeSingle();
-        return newP as Profile | null;
-      }
-      return null;
+      return data as Profile | null;
     } catch (err) {
       console.error("fetchProfile exception:", err);
       return null;
@@ -156,41 +55,52 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
       if (u) {
         const p = await fetchProfile(u.id);
-        if (!cancelled) {
-          setProfile(p);
-        }
+        if (!cancelled) setProfile(p);
       } else {
-        if (!cancelled) {
-          setProfile(null);
-        }
+        if (!cancelled) setProfile(null);
       }
-      if (!cancelled) {
-        setLoading(false);
-      }
+      if (!cancelled) setLoading(false);
     }
 
-    // Initialize session & profile on page load
-    supabase.auth.getSession().then(({ data: { session: initialSession }, error }) => {
+    // Initialize on load with resilient refresh token error catching
+    supabase.auth.getSession().then(({ data: { session: s }, error }) => {
       if (cancelled) return;
-      if (error) {
-        console.error("getSession error:", error.message);
+      if (error || (s && s.expires_at && s.expires_at * 1000 < Date.now())) {
+        try {
+          supabase.auth.signOut({ scope: "local" });
+        } catch {}
         setSession(null);
         setUser(null);
         setProfile(null);
         setLoading(false);
         return;
       }
-      loadUserAndProfile(initialSession);
+      loadUserAndProfile(s);
+    }).catch((err) => {
+      console.warn("Auth initialization error, resetting session:", err);
+      try {
+        supabase.auth.signOut({ scope: "local" });
+      } catch {}
+      if (!cancelled) {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+      }
     });
 
-    // Listen for auth state changes (login, logout, token refresh)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, newSession) => {
-        if (!cancelled) {
-          loadUserAndProfile(newSession);
-        }
+    // Auth state changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, newSession) => {
+      if (cancelled) return;
+      if (event === "SIGNED_OUT" || !newSession) {
+        setSession(null);
+        setUser(null);
+        setProfile(null);
+        setLoading(false);
+      } else {
+        loadUserAndProfile(newSession);
       }
-    );
+    });
 
     return () => {
       cancelled = true;
@@ -209,7 +119,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, fullName?: string) => {
     try {
-      // 1. Clear any existing session to ensure a clean slate for the new account
       await supabase.auth.signOut();
       setSession(null);
       setUser(null);
@@ -222,19 +131,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       });
       if (error) return { error: error as Error };
 
-      if (data.user) {
-        const deadline = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString();
-        await supabase.from("profiles").upsert({
-          id: data.user.id,
-          role: "athlete",
-          full_name: fullName || null,
-          email: email,
-          is_active: true,
-          academy_code_verified: false,
-          academy_code_deadline: deadline,
-          updated_at: new Date().toISOString(),
-        }, { onConflict: "id" });
-      }
+      // handle_new_user() trigger auto-creates profiles row on signup
+      // (defined in file.sql Migration 0001) — no manual insert needed
 
       return { error: null };
     } catch (err) {
@@ -253,7 +151,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfile(null);
       if (typeof window !== "undefined") {
         try {
-          // Clear any persisted session keys
           for (let i = localStorage.length - 1; i >= 0; i--) {
             const key = localStorage.key(i);
             if (key && (key.startsWith("sb-") || key.includes("supabase") || key.includes("auth"))) {
@@ -268,28 +165,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
-  const effectiveProfile = devRole
-    ? {
-        ...MOCK_DEV_PROFILES[devRole],
-        ...(profile ? { full_name: profile.full_name, email: profile.email } : {}),
-        role: devRole,
-      }
-    : profile;
-
-  const effectiveUser = user ?? (devRole ? ({ id: effectiveProfile?.id, email: effectiveProfile?.email } as any) : null);
-  const effectiveSession = session ?? (devRole ? ({ user: effectiveUser } as any) : null);
-  const effectiveRole = devRole ?? profile?.role ?? null;
-
   return (
     <AuthContext.Provider
       value={{
-        session: effectiveSession,
-        user: effectiveUser,
-        profile: effectiveProfile,
-        role: effectiveRole,
+        session,
+        user,
+        profile,
+        role: (profile?.role as UserRole) ?? null,
         loading,
-        devRole,
-        setDevRole,
         signIn,
         signUp,
         signOut,
@@ -309,6 +192,7 @@ export function useAuth() {
 
 export function getRedirectPath(role: UserRole | null, onboardingComplete?: boolean): string {
   if (!role) return "/login";
+  if (role === "boxos_admin") return "/boxos-admin";
   if (role === "athlete") {
     return onboardingComplete === false ? "/onboarding" : "/athlete";
   }

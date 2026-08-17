@@ -135,7 +135,7 @@ function FullAthleteDetailView({
     setLoading(true);
     try {
       const { data: ap, error: apErr } = await supabase
-        .from("athlete_profiles")
+        .from("boxer_profiles")
         .select("*")
         .eq("id", athleteId)
         .maybeSingle();
@@ -163,39 +163,39 @@ function FullAthleteDetailView({
         ap.user_id
           ? supabase.from("profiles").select("email, role, updated_at").eq("id", ap.user_id).maybeSingle()
           : Promise.resolve({ data: null }),
-        supabase.from("guardian_details").select("*").eq("athlete_profile_id", athleteId).maybeSingle(),
+        supabase.from("guardian_details").select("*").eq("boxer_profile_id", athleteId).maybeSingle(),
         supabase
           .from("fee_assignments")
           .select("*, fee_plans(*)")
-          .eq("athlete_profile_id", athleteId)
+          .eq("boxer_profile_id", athleteId)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
         supabase
           .from("invoices")
           .select("*")
-          .eq("athlete_profile_id", athleteId)
+          .eq("boxer_profile_id", athleteId)
           .order("created_at", { ascending: false }),
         supabase
           .from("payments")
           .select("*")
-          .eq("athlete_profile_id", athleteId)
-          .order("payment_date", { ascending: false }),
+          .eq("boxer_profile_id", athleteId)
+          .order("created_at", { ascending: false }),
         supabase
           .from("attendance")
           .select("*")
-          .eq("athlete_profile_id", athleteId)
+          .eq("boxer_profile_id", athleteId)
           .order("date", { ascending: false })
           .limit(100),
         supabase
           .from("leave_applications")
           .select("*")
-          .eq("athlete_profile_id", athleteId)
+          .eq("boxer_profile_id", athleteId)
           .order("created_at", { ascending: false }),
         supabase
           .from("discount_applications")
           .select("*, discount_schemes(name, value_type, value)")
-          .eq("athlete_profile_id", athleteId)
+          .eq("boxer_profile_id", athleteId)
           .order("created_at", { ascending: false }),
       ]);
 
@@ -227,7 +227,7 @@ function FullAthleteDetailView({
     loadDetails();
     const channel = supabase
       .channel(`athlete-detail-${athleteId}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "athlete_profiles", filter: `id=eq.${athleteId}` }, () => {
+      .on("postgres_changes", { event: "*", schema: "public", table: "boxer_profiles", filter: `id=eq.${athleteId}` }, () => {
         loadDetails();
       })
       .subscribe();
@@ -873,7 +873,7 @@ function SuperAdminAthletesPage() {
     const channel = supabase
       .channel("sa-athletes-watch-full")
       .on("postgres_changes", { event: "*", schema: "public", table: "fee_assignments" }, loadData)
-      .on("postgres_changes", { event: "*", schema: "public", table: "athlete_profiles" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "boxer_profiles" }, loadData)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
   }, []);
@@ -882,10 +882,10 @@ function SuperAdminAthletesPage() {
     setLoading(true);
     try {
       const [{ data: aps }, { data: plans }, { data: assigns }, { data: invs }, { data: acs }] = await Promise.all([
-        supabase.from("athlete_profiles").select("*").eq("onboarding_complete", true).order("created_at", { ascending: false }),
-        supabase.from("fee_plans").select("id,plan_name,amount,billing_cycle,custom_duration_days").eq("is_active", true),
-        supabase.from("fee_assignments").select("id,athlete_profile_id,fee_plan_id,assignment_status,payment_mode,fee_plans(plan_name,amount,billing_cycle,custom_duration_days)"),
-        supabase.from("invoices").select("id,athlete_profile_id,status,due_date,amount_due,balance_outstanding"),
+        supabase.from("boxer_profiles").select("*").eq("onboarding_complete", true).order("created_at", { ascending: false }),
+        supabase.from("fee_plans").select("id,name,amount,cycle").eq("is_active", true),
+        supabase.from("fee_assignments").select("id,boxer_profile_id,fee_plan_id,status,fee_plans(name,amount,cycle)"),
+        supabase.from("invoices").select("id,boxer_profile_id,status,due_date,amount_due,amount_paid,billing_period_start,billing_period_end"),
         supabase.from("academies").select("id,name,city,state").order("name"),
       ]);
 
@@ -893,21 +893,17 @@ function SuperAdminAthletesPage() {
       setAcademies(acs ?? []);
 
       const enriched = (aps ?? []).map(ap => {
-        const assignment = assigns?.find(a => a.athlete_profile_id === ap.id);
-        const invoice    = invs?.find(i => i.athlete_profile_id === ap.id);
+        const assignment = assigns?.find(a => a.boxer_profile_id === ap.id);
+        const invoice    = invs?.find(i => i.boxer_profile_id === ap.id);
         const academy    = acs?.find(ac => ac.id === ap.academy_id);
         let payStatus = "unassigned";
         if (assignment) {
-          const st = assignment.assignment_status;
-          if (st === "cash_approved" || st === "online_paid") payStatus = "paid";
-          else if (st === "cash_pending")      payStatus = "cash_pending";
-          else if (st === "online_pending")    payStatus = "online_pending";
-          else if (st === "rollover_pending")  payStatus = "rollover_pending";
-          else if (st === "rollover_approved") payStatus = "rollover_approved";
-          else if (invoice?.status === "paid")    payStatus = "paid";
-          else if (invoice?.status === "overdue") payStatus = "overdue";
-          else if (invoice)                       payStatus = "unpaid";
-          else                                    payStatus = "awaiting_invoice";
+          const st = assignment.status;
+          if (st === "active" && invoice?.status === "paid") payStatus = "paid";
+          else if (invoice?.status === "paid")               payStatus = "paid";
+          else if (invoice?.status === "overdue")            payStatus = "overdue";
+          else if (invoice)                                  payStatus = "unpaid";
+          else                                               payStatus = "awaiting_invoice";
         }
         return { ...ap, assignment, invoice, academy, payStatus };
       });
@@ -926,49 +922,43 @@ function SuperAdminAthletesPage() {
       const plan = feePlans.find(p => p.id === sendPlanId);
       if (!plan) throw new Error("Plan not found");
 
-      if (sendAcademyId) {
-        await supabase.from("athlete_profiles").update({ academy_id: sendAcademyId }).eq("id", selectedAthleteForModal.id);
-      }
-
       const existing = selectedAthleteForModal.assignment;
-      if (existing?.id) {
+      if (existing) {
         await supabase.from("fee_assignments").update({
-          fee_plan_id: sendPlanId, assignment_status: "sent", payment_mode: null,
-          notes: sendNotes || null, assigned_by: user?.id,
-          fee_start_date: new Date().toISOString().split("T")[0],
-          billing_cycle_start: new Date().toISOString().split("T")[0],
+          fee_plan_id: sendPlanId, status: "active",
+          academy_id: sendAcademyId || selectedAthleteForModal.academy_id,
+          updated_at: new Date().toISOString(),
         }).eq("id", existing.id);
       } else {
         await supabase.from("fee_assignments").insert({
-          athlete_profile_id: selectedAthleteForModal.id, fee_plan_id: sendPlanId,
-          assignment_status: "sent", notes: sendNotes || null, assigned_by: user?.id,
-          fee_start_date: new Date().toISOString().split("T")[0],
-          billing_cycle_start: new Date().toISOString().split("T")[0],
+          boxer_profile_id: selectedAthleteForModal.id, fee_plan_id: sendPlanId,
+          academy_id: sendAcademyId || selectedAthleteForModal.academy_id,
+          assigned_by: user?.id, status: "active",
         });
       }
 
-      const cycleDays = plan.billing_cycle === "monthly" ? 30 : plan.billing_cycle === "quarterly" ? 90 : plan.billing_cycle === "annual" ? 365 : (plan.custom_duration_days ? Number(plan.custom_duration_days) : 30);
+      const cycleDays = plan.cycle === "monthly" ? 30 : plan.cycle === "quarterly" ? 90 : plan.cycle === "yearly" ? 365 : 30;
+      const startDate = new Date();
       const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + cycleDays);
-      const cycleLabel = plan.billing_cycle === "custom" && plan.custom_duration_days
-        ? `${plan.custom_duration_days} Days`
-        : plan.billing_cycle.charAt(0).toUpperCase() + plan.billing_cycle.slice(1);
 
       const existingInv = selectedAthleteForModal.invoice;
       const academyId   = sendAcademyId || selectedAthleteForModal.academy_id;
       if (existingInv?.id) {
         await supabase.from("invoices").update({
           academy_id: academyId, amount_due: plan.amount, amount_paid: 0,
-          balance_outstanding: plan.amount, due_date: dueDate.toISOString().split("T")[0],
-          billing_period: `${cycleLabel} — ${new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`,
-          status: "unpaid", coupon_id: null, discount_applied: 0, updated_at: new Date().toISOString(),
+          due_date: dueDate.toISOString().split("T")[0],
+          billing_period_start: startDate.toISOString().split("T")[0],
+          billing_period_end: dueDate.toISOString().split("T")[0],
+          status: "unpaid", updated_at: new Date().toISOString(),
         }).eq("id", existingInv.id);
       } else {
         await supabase.from("invoices").insert({
           invoice_number: `BOX-${new Date().getFullYear()}-${String(Math.floor(Math.random() * 999999)).padStart(6, "0")}`,
-          academy_id: academyId, athlete_profile_id: selectedAthleteForModal.id,
-          amount_due: plan.amount, amount_paid: 0, balance_outstanding: plan.amount,
+          academy_id: academyId, boxer_profile_id: selectedAthleteForModal.id,
+          amount_due: plan.amount, amount_paid: 0,
           due_date: dueDate.toISOString().split("T")[0],
-          billing_period: `${cycleLabel} — ${new Date().toLocaleDateString("en-IN", { month: "short", year: "numeric" })}`,
+          billing_period_start: startDate.toISOString().split("T")[0],
+          billing_period_end: dueDate.toISOString().split("T")[0],
           status: "unpaid",
         });
       }
@@ -977,7 +967,7 @@ function SuperAdminAthletesPage() {
       await supabase.from("notifications").insert({
         recipient_id: selectedAthleteForModal.user_id, type: "fee_package_sent",
         title: existing ? "Fee package reassigned" : "Fee package assigned",
-        body: `Your fee plan has been ${existing ? "reassigned" : "assigned"} to "${plan.plan_name}" (₹${Number(plan.amount).toLocaleString("en-IN")})${academy ? ` at ${academy.name}` : ""}.`,
+        body: `Your fee plan has been ${existing ? "reassigned" : "assigned"} to "${plan.name}" (₹${Number(plan.amount).toLocaleString("en-IN")})${academy ? ` at ${academy.name}` : ""}.`,
         related_entity_type: "fee_assignment",
       });
 
@@ -991,7 +981,7 @@ function SuperAdminAthletesPage() {
     if (!reassignId || !reassignAcademy) return;
     setReassigning(true);
     try {
-      await supabase.from("athlete_profiles").update({ academy_id: reassignAcademy }).eq("id", reassignId);
+      await supabase.from("boxer_profiles").update({ academy_id: reassignAcademy }).eq("id", reassignId);
       const athlete = athletes.find(a => a.id === reassignId);
       const academy = academies.find(a => a.id === reassignAcademy);
       if (athlete?.user_id && academy) {
@@ -1015,15 +1005,15 @@ function SuperAdminAthletesPage() {
 
       await supabase.from("fee_assignments").update({
         assignment_status: approved, cash_approved_by: user?.id, cash_approved_at: new Date().toISOString(),
-      }).eq("athlete_profile_id", athleteId);
+      }).eq("boxer_profile_id", athleteId);
 
       if (invoice?.id) {
         const unpaid = Number(invoice.balance_outstanding ?? invoice.amount_due ?? 0);
         if (unpaid > 0) {
           await supabase.from("payments").insert({
-            invoice_id: invoice.id, athlete_profile_id: athleteId, amount: unpaid,
-            payment_mode: pMode, payment_date: new Date().toISOString().split("T")[0],
-            recorded_by: user?.id, transaction_reference: `${pMode.toUpperCase()}-${Date.now()}`,
+            invoice_id: invoice.id, boxer_profile_id: athleteId, amount: unpaid,
+            payment_mode: pMode,
+            recorded_by: user?.id, reference: `${pMode.toUpperCase()}-${Date.now()}`,
           });
         }
         await supabase.from("invoices").update({
@@ -1052,7 +1042,7 @@ function SuperAdminAthletesPage() {
         rollover_approved: true,
         rollover_approved_by: user?.id, 
         rollover_approved_at: new Date().toISOString(),
-      }).eq("athlete_profile_id", athleteId).eq("assignment_status", "rollover_pending");
+      }).eq("boxer_profile_id", athleteId).eq("assignment_status", "rollover_pending");
       if (athlete?.user_id) {
         await supabase.from("notifications").insert({
           recipient_id: athlete.user_id, type: "rollover_approved",
@@ -1069,7 +1059,7 @@ function SuperAdminAthletesPage() {
     setRolloverActioning(true);
     try {
       const athlete = athletes.find(a => a.id === athleteId);
-      await supabase.from("fee_assignments").update({ assignment_status: "sent", payment_mode: null }).eq("athlete_profile_id", athleteId);
+      await supabase.from("fee_assignments").update({ assignment_status: "sent", payment_mode: null }).eq("boxer_profile_id", athleteId);
       if (athlete?.user_id) {
         await supabase.from("notifications").insert({
           recipient_id: athlete.user_id, type: "rollover_rejected",

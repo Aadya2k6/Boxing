@@ -12,8 +12,8 @@ export async function loadReportData() {
     { data: feePlans },
   ] = await Promise.all([
     supabase.from("invoices").select("*").order("created_at", { ascending: true }),
-    supabase.from("payments").select("*").order("payment_date", { ascending: true }),
-    supabase.from("athlete_profiles").select("id, full_name, academy_id, onboarding_complete").eq("onboarding_complete", true),
+    supabase.from("payments").select("*").order("created_at", { ascending: true }),
+    supabase.from("boxer_profiles").select("id, full_name, academy_id, onboarding_complete").eq("onboarding_complete", true),
     supabase.from("attendance").select("*"),
     supabase.from("leave_applications").select("*"),
     supabase.from("academies").select("id, name, city"),
@@ -21,8 +21,13 @@ export async function loadReportData() {
     supabase.from("fee_plans").select("*"),
   ]);
 
+  const normalizedInvoices = (invoices ?? []).map((i: any) => ({
+    ...i,
+    balance_outstanding: Math.max(0, Number(i.amount_due ?? 0) - Number(i.amount_paid ?? 0)),
+  }));
+
   return {
-    invoices: invoices ?? [],
+    invoices: normalizedInvoices,
     payments: payments ?? [],
     athletes: athletes ?? [],
     attendance: attendance ?? [],
@@ -35,8 +40,9 @@ export async function loadReportData() {
 }
 
 export function monthKey(dateStr: string) {
+  if (!dateStr) return "Unknown";
   const d = new Date(dateStr);
-  return `${d.toLocaleString("default", { month: "short" })} ${d.getFullYear()}`;
+  return isNaN(d.getTime()) ? "Unknown" : `${d.toLocaleString("default", { month: "short" })} ${d.getFullYear()}`;
 }
 
 export function buildMonthlyData(invoices: any[]) {
@@ -46,7 +52,7 @@ export function buildMonthlyData(invoices: any[]) {
     if (!map[mk]) map[mk] = { month: mk, Invoiced: 0, Collected: 0, Outstanding: 0 };
     map[mk].Invoiced += Number(i.amount_due ?? 0);
     map[mk].Collected += Number(i.amount_paid ?? 0);
-    map[mk].Outstanding += Number(i.balance_outstanding ?? 0);
+    map[mk].Outstanding += Math.max(0, Number(i.amount_due ?? 0) - Number(i.amount_paid ?? 0));
   });
   return Object.values(map);
 }
@@ -71,13 +77,13 @@ export function buildStatusData(invoices: any[]) {
 export function buildAttendanceData(attendance: any[], leaves: any[]) {
   const map: Record<string, { month: string; Present: number; Absent: number; Leave: number }> = {};
   attendance.forEach((a) => {
-    const mk = monthKey(a.date);
+    const mk = monthKey(a.session_date ?? a.date ?? a.created_at);
     if (!map[mk]) map[mk] = { month: mk, Present: 0, Absent: 0, Leave: 0 };
     if (a.status === "present") map[mk].Present++;
     else map[mk].Absent++;
   });
   leaves.filter((l) => l.status === "approved").forEach((l) => {
-    const mk = monthKey(l.leave_date);
+    const mk = monthKey(l.start_date ?? l.leave_date ?? l.created_at);
     if (!map[mk]) map[mk] = { month: mk, Present: 0, Absent: 0, Leave: 0 };
     map[mk].Leave++;
   });
@@ -92,7 +98,7 @@ export function buildAcademyRevenue(invoices: any[], athletes: any[], academies:
 
   const rev: Record<string, { id: string; name: string; invoiced: number; collected: number; count: number }> = {};
   invoices.forEach((inv: any) => {
-    const acadId = inv.academy_id ?? athleteAcademy[inv.athlete_profile_id] ?? "unassigned";
+    const acadId = inv.academy_id ?? athleteAcademy[inv.boxer_profile_id] ?? "unassigned";
     const acadName = academyMap[acadId] ?? "Unassigned";
     if (!rev[acadId]) rev[acadId] = { id: acadId, name: acadName, invoiced: 0, collected: 0, count: 0 };
     rev[acadId].invoiced += Number(inv.amount_due ?? 0);

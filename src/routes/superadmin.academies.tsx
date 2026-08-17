@@ -60,7 +60,7 @@ function AcademiesPage() {
       const [{ data: acs }, { data: athletes }] = await Promise.all([
         supabase.from("academies").select("*").order("created_at"),
         supabase
-          .from("athlete_profiles")
+          .from("boxer_profiles")
           .select("academy_id")
           .not("academy_id", "is", null),
       ]);

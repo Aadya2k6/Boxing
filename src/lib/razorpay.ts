@@ -201,14 +201,14 @@ export async function recordPayment(
   try {
     const { error } = await supabase.from("payments").insert({
       invoice_id: opts.invoiceId,
-      athlete_profile_id: opts.athleteProfileId,
+      boxer_profile_id: opts.athleteProfileId,
       amount: opts.amount,
       payment_mode: "online",
-      payment_date: new Date().toISOString().split("T")[0],
-      razorpay_payment_id: opts.razorpayPaymentId,
-      razorpay_order_id: opts.razorpayOrderId ?? null,
-      razorpay_signature: opts.razorpaySignature ?? null,
-      transaction_reference: opts.razorpayPaymentId,
+      gateway: "razorpay",
+      gateway_payment_id: opts.razorpayPaymentId,
+      gateway_order_id: opts.razorpayOrderId ?? null,
+      reference: opts.razorpayPaymentId,
+      status: "success",
     });
     if (error) {
       // RLS blocks athletes from inserting payments directly — this is expected.

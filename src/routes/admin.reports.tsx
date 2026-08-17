@@ -41,17 +41,19 @@ function ReportsPage() {
         { data: invData },
         { data: apData },
         { data: discData },
-        { data: refData },
       ] = await Promise.all([
-        supabase.from("invoices").select("*, athlete_profiles(full_name, primary_discipline)").order("created_at", { ascending: true }),
-        supabase.from("athlete_profiles").select("id, full_name, primary_discipline").eq("onboarding_complete", true),
-        supabase.from("discount_applications").select("*, discount_schemes(name, value_type, value), athlete_profiles(full_name)").order("created_at", { ascending: false }),
-        supabase.from("refunds").select("*, athlete_profiles(full_name), profiles!refunds_requested_by_fkey(full_name)").order("created_at", { ascending: false }),
+        supabase.from("invoices").select("*, boxer_profiles(full_name, stance)").order("created_at", { ascending: true }),
+        supabase.from("boxer_profiles").select("id, full_name, stance").eq("onboarding_complete", true),
+        supabase.from("discount_applications").select("*, discount_schemes(name, discount_type, discount_value), boxer_profiles(full_name)").order("created_at", { ascending: false }),
       ]);
-      setInvoices(invData ?? []);
+      const normalizedInvoices = (invData ?? []).map((i: any) => ({
+        ...i,
+        balance_outstanding: Math.max(0, Number(i.amount_due ?? 0) - Number(i.amount_paid ?? 0)),
+      }));
+      setInvoices(normalizedInvoices);
       setAthletes(apData ?? []);
       setDiscountsApplied(discData ?? []);
-      setRefunds(refData ?? []);
+      setRefunds([]);
       if (apData?.[0]) setSelectedAthlete(apData[0].id);
     } finally {
       setLoading(false);
@@ -83,7 +85,7 @@ function ReportsPage() {
   ].filter(d => d.value > 0);
 
   // Athlete payment history
-  const athleteInvoices = invoices.filter(i => i.athlete_profile_id === selectedAthlete);
+  const athleteInvoices = invoices.filter(i => i.boxer_profile_id === selectedAthlete);
 
   // CSV export generators
   function downloadCSV(rows: string[][], filename: string) {
@@ -108,14 +110,14 @@ function ReportsPage() {
         [["Athlete", "Invoice", "Amount Due", "Outstanding", "Status", "Due Date", "Days Overdue"],
          ...dues.map(i => {
            const days = i.status === "overdue" && i.due_date ? Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86400000) : 0;
-           return [i.athlete_profiles?.full_name, i.invoice_number, i.amount_due, i.balance_outstanding, i.status, i.due_date, days];
+           return [i.boxer_profiles?.full_name, i.invoice_number, i.amount_due, i.balance_outstanding, i.status, i.due_date, days];
          })],
         `Boxos_Dues_${new Date().toISOString().split("T")[0]}.csv`
       );
     } else if (active === "refunds") {
       downloadCSV(
         [["Athlete", "Amount", "Reason", "Status", "Requested By", "Reviewed At"],
-         ...refunds.map(r => [r.athlete_profiles?.full_name, r.amount, r.reason, r.status, r.profiles?.full_name, r.reviewed_at ?? ""])],
+         ...refunds.map(r => [r.boxer_profiles?.full_name, r.amount, r.reason, r.status, r.profiles?.full_name, r.reviewed_at ?? ""])],
         `Boxos_Refunds_${new Date().toISOString().split("T")[0]}.csv`
       );
     }
@@ -262,7 +264,7 @@ function ReportsPage() {
                         const days = i.status === "overdue" && i.due_date ? Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86400000) : 0;
                         return (
                           <tr key={i.id} className="border-b border-border">
-                            <td className="py-3 font-medium">{i.athlete_profiles?.full_name ?? "—"}</td>
+                            <td className="py-3 font-medium">{i.boxer_profiles?.full_name ?? "—"}</td>
                             <td className="py-3 font-mono text-xs">{i.invoice_number}</td>
                             <td className="py-3 text-right tabular">₹ {Number(i.amount_due).toLocaleString("en-IN")}</td>
                             <td className="py-3 text-right tabular font-semibold">₹ {Number(i.balance_outstanding ?? 0).toLocaleString("en-IN")}</td>
@@ -336,7 +338,7 @@ function ReportsPage() {
                     <tbody>
                       {discountsApplied.map(d => (
                         <tr key={d.id} className="border-b border-border">
-                          <td className="py-3 font-medium">{d.athlete_profiles?.full_name}</td>
+                          <td className="py-3 font-medium">{d.boxer_profiles?.full_name}</td>
                           <td className="py-3 text-xs text-muted-foreground">{d.discount_schemes?.name}</td>
                           <td className="py-3 text-right font-semibold text-primary-dark">
                             {d.discount_schemes?.value_type === "percentage" ? `${d.discount_schemes.value}%` : `₹ ${Number(d.discount_schemes?.value).toLocaleString("en-IN")}`}
@@ -370,7 +372,7 @@ function ReportsPage() {
                     <tbody>
                       {refunds.map(r => (
                         <tr key={r.id} className="border-b border-border">
-                          <td className="py-3 font-medium">{r.athlete_profiles?.full_name}</td>
+                          <td className="py-3 font-medium">{r.boxer_profiles?.full_name}</td>
                           <td className="py-3 text-right tabular font-semibold">₹ {Number(r.amount).toLocaleString("en-IN")}</td>
                           <td className="py-3 pl-4 text-xs text-muted-foreground max-w-xs">{r.reason}</td>
                           <td className="py-3"><Badge tone={r.status === "approved" ? "success" : r.status === "rejected" ? "danger" : "warning"}>{r.status}</Badge></td>
