@@ -1,47 +1,51 @@
-/**
- * Superadmin External Judges — platform-wide view
- * §6.10: same as admin.judges.tsx but with academy-scope picker for platform-wide view.
- */
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, SectionCard, DataTable } from "@/components/dashboard/DashboardLayout";
-import { useState } from "react";
-import { Plus, X, Gavel, Trash2, AlertTriangle, ShieldOff, Building2 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Plus, X, Gavel, Trash2, Building2 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/superadmin/judges")({ component: SuperadminJudges });
 
-type InviteStatus = "pending" | "accepted" | "expired" | "revoked";
-
-interface JudgeInvite {
-  id: string;
-  email: string;
-  name: string | null;
-  status: InviteStatus;
-  invitedAt: string;
-  tournament: string;
-  academy: string;
-}
-
-const STUB_ACADEMIES = ["All Academies", "BOXOS Academy Mumbai", "Ring Masters Delhi"];
-const TOURNAMENTS = ["State Boxing Championship 2026", "District Open 2026", "National Qualifiers 2026"];
-
-const STUB_INVITES: JudgeInvite[] = [
-  { id: "j1", email: "kumar@example.com", name: "Arun Kumar", status: "accepted", invitedAt: "2026-08-12", tournament: "State Boxing Championship 2026", academy: "BOXOS Academy Mumbai" },
-  { id: "j2", email: "rao@example.com", name: "Priya Rao", status: "pending", invitedAt: "2026-08-14", tournament: "State Boxing Championship 2026", academy: "Ring Masters Delhi" },
-  { id: "j3", email: "mehta@example.com", name: null, status: "expired", invitedAt: "2026-07-30", tournament: "District Open 2026", academy: "BOXOS Academy Mumbai" },
-];
+type InviteStatus = "pending" | "active" | "expired" | "revoked";
 
 function statusBadge(s: InviteStatus) {
-  const m: Record<InviteStatus, any> = { accepted: "success", pending: "warning", expired: "neutral", revoked: "danger" };
+  const m: Record<InviteStatus, string> = { active: "success", pending: "warning", expired: "neutral", revoked: "danger" };
   return <span className={`badge badge-${m[s]}`}>{s.charAt(0).toUpperCase() + s.slice(1)}</span>;
 }
 
-function InviteModal({ onClose }: { onClose: () => void }) {
-  const [form, setForm] = useState({ email: "", name: "", tournament: TOURNAMENTS[0], academy: STUB_ACADEMIES[1] });
+function InviteModal({ onClose, academies, tournaments, onInvite }: { onClose: () => void, academies: any[], tournaments: any[], onInvite: () => void }) {
+  const { user } = useAuth();
+  const [form, setForm] = useState({ email: "", name: "", tournament: tournaments[0]?.id || "", academy: academies[0]?.id || "" });
   const [submitting, setSubmitting] = useState(false);
+  
+  async function handleSubmit() {
+    setSubmitting(true);
+    try {
+      if (!form.tournament || !form.academy) throw new Error("Please select a tournament and academy.");
+      const { error } = await supabase.from("external_judge_invites").insert({
+        email: form.email,
+        full_name: form.name || null,
+        tournament_template_id: form.tournament,
+        academy_id: form.academy,
+        invited_by: user?.id,
+        status: "pending"
+      });
+      if (error) throw error;
+      toast.success(`Invite sent to ${form.email}`);
+      onInvite();
+      onClose();
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
   return (
-    <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-surface rounded-2xl shadow-modal w-full max-w-md">
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+      <div className="bg-surface rounded-2xl shadow-modal w-full max-w-md border border-border">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="font-display font-bold">Invite External Judge</div>
           <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer"><X className="size-4" /></button>
@@ -49,7 +53,7 @@ function InviteModal({ onClose }: { onClose: () => void }) {
         <div className="p-5 space-y-4">
           <label className="block">
             <span className="block text-xs font-semibold mb-1.5">Email *</span>
-            <input type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="input-premium" placeholder="judge@example.com" />
+            <input type="email" required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="input-premium" placeholder="judge@example.com" />
           </label>
           <label className="block">
             <span className="block text-xs font-semibold mb-1.5">Name (optional)</span>
@@ -57,20 +61,20 @@ function InviteModal({ onClose }: { onClose: () => void }) {
           </label>
           <label className="block">
             <span className="block text-xs font-semibold mb-1.5">Academy</span>
-            <select value={form.academy} onChange={e => setForm(f => ({ ...f, academy: e.target.value }))} className="input-premium">
-              {STUB_ACADEMIES.slice(1).map(a => <option key={a}>{a}</option>)}
+            <select required value={form.academy} onChange={e => setForm(f => ({ ...f, academy: e.target.value }))} className="input-premium">
+              {academies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
             </select>
           </label>
           <label className="block">
             <span className="block text-xs font-semibold mb-1.5">Tournament scope</span>
-            <select value={form.tournament} onChange={e => setForm(f => ({ ...f, tournament: e.target.value }))} className="input-premium">
-              {TOURNAMENTS.map(t => <option key={t}>{t}</option>)}
+            <select required value={form.tournament} onChange={e => setForm(f => ({ ...f, tournament: e.target.value }))} className="input-premium">
+              {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </label>
         </div>
         <div className="flex justify-end gap-2 p-5 border-t border-border">
           <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-elevated cursor-pointer">Cancel</button>
-          <button onClick={async () => { setSubmitting(true); await new Promise(r => setTimeout(r, 700)); toast.success(`Invite sent to ${form.email}`); setSubmitting(false); onClose(); }} disabled={!form.email || submitting} className="px-4 py-2 text-sm bg-primary-dark text-white rounded-lg disabled:opacity-50 font-semibold cursor-pointer hover:bg-primary-dark/90">{submitting ? "Sending…" : "Send Invite"}</button>
+          <button onClick={handleSubmit} disabled={!form.email || submitting} className="px-4 py-2 text-sm bg-primary-dark text-white rounded-lg disabled:opacity-50 font-semibold cursor-pointer hover:bg-primary-dark/90">{submitting ? "Sending…" : "Send Invite"}</button>
         </div>
       </div>
     </div>
@@ -78,13 +82,59 @@ function InviteModal({ onClose }: { onClose: () => void }) {
 }
 
 function SuperadminJudges() {
+  const { user } = useAuth();
   const [showInvite, setShowInvite] = useState(false);
-  const [selectedAcademy, setSelectedAcademy] = useState(STUB_ACADEMIES[0]);
-  const [selectedTournament, setSelectedTournament] = useState("All Tournaments");
+  const [selectedAcademy, setSelectedAcademy] = useState("all");
+  const [selectedTournament, setSelectedTournament] = useState("all");
+  
+  const [invites, setInvites] = useState<any[]>([]);
+  const [academies, setAcademies] = useState<any[]>([]);
+  const [tournaments, setTournaments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  const filtered = STUB_INVITES.filter(i =>
-    (selectedAcademy === "All Academies" || i.academy === selectedAcademy) &&
-    (selectedTournament === "All Tournaments" || i.tournament === selectedTournament)
+  useEffect(() => {
+    loadData();
+  }, []);
+
+  async function loadData() {
+    setLoading(true);
+    try {
+      const [{ data: invs }, { data: acs }, { data: ts }] = await Promise.all([
+        supabase.from("external_judge_invites").select(`
+          *,
+          academy:academy_id(id, name),
+          tournament:tournament_template_id(id, name)
+        `).order("invited_at", { ascending: false }),
+        supabase.from("academies").select("id, name"),
+        supabase.from("ring_schedule_templates").select("id, name")
+      ]);
+      setInvites(invs || []);
+      setAcademies(acs || []);
+      setTournaments(ts || []);
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleRevoke(id: string, email: string) {
+    if (!confirm(`Revoke access for ${email}?`)) return;
+    try {
+      const { error } = await supabase.from("external_judge_invites")
+        .update({ status: "revoked", revoked_by: user?.id, revoked_at: new Date().toISOString() })
+        .eq("id", id);
+      if (error) throw error;
+      toast.success(`Access revoked for ${email}`);
+      loadData();
+    } catch (e: any) {
+      toast.error(e.message);
+    }
+  }
+
+  const filtered = invites.filter(i =>
+    (selectedAcademy === "all" || i.academy_id === selectedAcademy) &&
+    (selectedTournament === "all" || i.tournament_template_id === selectedTournament)
   );
 
   return (
@@ -93,28 +143,30 @@ function SuperadminJudges() {
         title="External Judges"
         subtitle="Platform-wide judge invitation management"
         actions={
-          <button onClick={() => setShowInvite(true)} className="inline-flex items-center gap-2 bg-primary-dark text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary-dark/90 transition shadow-card cursor-pointer">
+          <button onClick={() => setShowInvite(true)} className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition shadow-card cursor-pointer">
             <Plus className="size-4" /> Invite Judge
           </button>
         }
       />
 
-      {/* Filters */}
       <div className="flex gap-3 flex-wrap">
         <div className="flex items-center gap-2">
           <Building2 className="size-4 text-muted-foreground shrink-0" strokeWidth={1.75} />
           <select value={selectedAcademy} onChange={e => setSelectedAcademy(e.target.value)} className="input-premium max-w-xs">
-            {STUB_ACADEMIES.map(a => <option key={a}>{a}</option>)}
+            <option value="all">All Academies</option>
+            {academies.map(a => <option key={a.id} value={a.id}>{a.name}</option>)}
           </select>
         </div>
         <select value={selectedTournament} onChange={e => setSelectedTournament(e.target.value)} className="input-premium max-w-xs">
-          <option>All Tournaments</option>
-          {TOURNAMENTS.map(t => <option key={t}>{t}</option>)}
+          <option value="all">All Tournaments</option>
+          {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
         </select>
       </div>
 
       <SectionCard title="Judge Invitations" subtitle={`${filtered.length} record${filtered.length !== 1 ? "s" : ""}`}>
-        {filtered.length === 0 ? (
+        {loading ? (
+          <div className="text-center py-10 text-muted-foreground">Loading invitations...</div>
+        ) : filtered.length === 0 ? (
           <div className="py-10 text-center">
             <Gavel className="size-8 text-muted-foreground/40 mx-auto mb-2" strokeWidth={1.5} />
             <div className="text-sm text-muted-foreground">No invitations match current filters</div>
@@ -123,23 +175,25 @@ function SuperadminJudges() {
           <DataTable
             headers={["Judge", "Email", "Academy", "Tournament", "Status", "Invited", "Action"]}
             rows={filtered.map(invite => [
-              <span className="font-medium text-sm">{invite.name || <span className="italic text-muted-foreground">Name pending</span>}</span>,
-              <span className="text-sm font-mono text-muted-foreground">{invite.email}</span>,
-              <span className="text-xs text-muted-foreground">{invite.academy}</span>,
-              <span className="text-xs text-muted-foreground truncate max-w-[160px] block">{invite.tournament}</span>,
-              statusBadge(invite.status),
-              <span className="text-xs text-muted-foreground">{new Date(invite.invitedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>,
-              invite.status === "accepted" || invite.status === "pending" ? (
-                <button onClick={() => toast.error(`Access revoked for ${invite.email}`)} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs border border-destructive/30 text-destructive rounded-lg hover:bg-destructive hover:text-white transition cursor-pointer">
-                  <Trash2 className="size-3" />Revoke
-                </button>
-              ) : <span className="text-xs text-muted-foreground">—</span>,
+              <span key={`name-${invite.id}`} className="font-medium text-sm">{invite.full_name || <span className="italic text-muted-foreground">Name pending</span>}</span>,
+              <span key={`email-${invite.id}`} className="text-sm font-mono text-muted-foreground">{invite.email}</span>,
+              <span key={`ac-${invite.id}`} className="text-xs text-muted-foreground">{invite.academy?.name}</span>,
+              <span key={`t-${invite.id}`} className="text-xs text-muted-foreground truncate max-w-[160px] block">{invite.tournament?.name}</span>,
+              <span key={`s-${invite.id}`}>{statusBadge(invite.status)}</span>,
+              <span key={`d-${invite.id}`} className="text-xs text-muted-foreground">{new Date(invite.invited_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</span>,
+              <span key={`a-${invite.id}`}>
+                {invite.status === "active" || invite.status === "pending" ? (
+                  <button onClick={() => handleRevoke(invite.id, invite.email)} className="inline-flex items-center gap-1 px-2.5 py-1 text-xs border border-destructive/30 text-destructive rounded-lg hover:bg-destructive hover:text-white transition cursor-pointer">
+                    <Trash2 className="size-3" />Revoke
+                  </button>
+                ) : <span className="text-xs text-muted-foreground">—</span>}
+              </span>,
             ])}
           />
         )}
       </SectionCard>
 
-      {showInvite && <InviteModal onClose={() => setShowInvite(false)} />}
+      {showInvite && <InviteModal onClose={() => setShowInvite(false)} academies={academies} tournaments={tournaments} onInvite={loadData} />}
     </div>
   );
 }

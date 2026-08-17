@@ -1,4 +1,282 @@
 -- ============================================================================
+-- BOXOS — Migration 0007: fix effective_age_categories / effective_weight_categories
+--
+-- Run this in the Supabase SQL Editor after migration 0006.
+--
+-- Found while actually wiring the onboarding wizard (Phase 4) to these
+-- views — they don't do what supabase_schema.sql's own comment claims, and
+-- likely bypass RLS. Two separate bugs:
+--
+--   1. The original views compute `coalesce_academy` as literally just
+--      `academy_id` (`ac.academy_id as coalesce_academy`), then
+--      `DISTINCT ON (coalesce_academy, name)`. Since coalesce_academy
+--      always equals academy_id, this never collapses a global row and an
+--      academy's override of the same name into one — it's a no-op
+--      passthrough of the entire table (every academy's every category),
+--      not the "academy's own row overrides the global default for the
+--      same name" resolution the doc comment describes.
+--
+--   2. Plain views in Postgres default to running with the view owner's
+--      privileges (security_invoker = false), not the querying user's —
+--      meaning RLS on the underlying age_categories/weight_categories
+--      tables may not have been applied through these views at all. Any
+--      authenticated user querying effective_age_categories directly could
+--      potentially see every academy's custom categories, not just their
+--      own + the global defaults.
+--
+-- Fixed by using `public.auth_academy_id()` (already exists, reads the
+-- caller's own academy_id from their JWT — no parameter needed, which is
+-- what actually makes per-caller resolution possible from a plain view)
+-- and security_invoker so RLS-equivalent scoping is enforced regardless.
+--
+-- The dedup key also needed correcting: weight_categories.name legitimately
+-- repeats across many (age_category_id, gender) combinations — "Lightweight"
+-- exists for Elite Men, Elite Women, U19 Men, etc. `DISTINCT ON (name)`
+-- alone would collapse nearly all of them into one row. The actual unique
+-- "logical item" an academy overrides is (age_category_id, gender, name).
+-- age_categories has no such collision (Elite/U19/U17 are singular
+-- concepts), so name alone is the correct key there.
+--
+-- DROP + CREATE, not CREATE OR REPLACE: the old view's column list included
+-- an extra `coalesce_academy` column (`ac.academy_id as coalesce_academy`)
+-- that the corrected version doesn't have. Postgres's CREATE OR REPLACE
+-- VIEW can only append trailing columns to an existing view, never remove
+-- one (42P16: cannot drop columns from view) — dropping first sidesteps
+-- that restriction. Nothing else references these views, so this is safe.
+-- ============================================================================
+
+drop view if exists public.effective_age_categories;
+create view public.effective_age_categories
+with (security_invoker = true) as
+select distinct on (name) *
+from public.age_categories
+where academy_id is null or academy_id = public.auth_academy_id()
+order by name, (academy_id is not null) desc;
+
+drop view if exists public.effective_weight_categories;
+create view public.effective_weight_categories
+with (security_invoker = true) as
+select distinct on (age_category_id, gender, name) *
+from public.weight_categories
+where academy_id is null or academy_id = public.auth_academy_id()
+order by age_category_id, gender, name, (academy_id is not null) desc;
+
+-- ============================================================================
+-- END OF MIGRATION 0007
+-- ============================================================================
+-- ============================================================================
+-- BOXOS — Migration 0006: missing onboarding-wizard columns on boxer_profiles
+--
+-- Run this in the Supabase SQL Editor after migration 0005.
+--
+-- Building the real onboarding wizard (Phase 4) against screens.md §2.7
+-- surfaced fields the form asks for that boxer_profiles never had a column
+-- for — §2.7.3 (Boxing Profile step: "Years boxing", "Current coach
+-- preference") and §2.7.4 (Federation IDs step: "State association ID",
+-- "International federation ID"). Rather than silently drop them from the
+-- form or fake-store them somewhere, they get real columns.
+--
+-- Deliberately NOT added: a "preferred academy" picker for the Boxing
+-- Profile step. profiles.preferred_academy_id already exists for this, but
+-- its own doc comment says "pre-assignment" — by the time an athlete
+-- reaches onboarding they've already been assigned a fixed academy_id via
+-- the Academy Code Gate (architecture.md §1.3), so asking them to pick a
+-- preferred academy at this point is a leftover from an assignment flow
+-- that doesn't apply once code verification has already run. Skipped, not
+-- silently faked.
+-- ============================================================================
+
+alter table public.boxer_profiles
+  add column if not exists years_boxing_experience integer,
+  add column if not exists current_coach_preference text,
+  add column if not exists state_association_id text,
+  add column if not exists international_federation_id text;
+
+comment on column public.boxer_profiles.years_boxing_experience is
+  'screens.md §2.7.3 "Years boxing field (optional)".';
+comment on column public.boxer_profiles.current_coach_preference is
+  'screens.md §2.7.3 "Current coach preference field (optional)" — free text, not a coach_id FK (the boxer isn''t assigned to a specific coach at onboarding time).';
+comment on column public.boxer_profiles.state_association_id is
+  'screens.md §2.7.4 "State association ID field".';
+comment on column public.boxer_profiles.international_federation_id is
+  'screens.md §2.7.4 "International federation ID field".';
+
+-- Additive to the insert/update column grants already set in migrations
+-- 0001/0004 — these don't replace those, Postgres column grants accumulate.
+grant insert (years_boxing_experience, current_coach_preference, state_association_id, international_federation_id)
+  on public.boxer_profiles to authenticated;
+grant update (years_boxing_experience, current_coach_preference, state_association_id, international_federation_id)
+  on public.boxer_profiles to authenticated;
+
+-- ============================================================================
+-- END OF MIGRATION 0006
+-- ============================================================================
+-- ============================================================================
+-- BOXOS — Migration 0005: academy hard-delete cascade + judge activation
+--
+-- Run this in the Supabase SQL Editor after migration 0004.
+--
+-- Two additions needed by the Edge Functions in supabase/functions/:
+--   1. hard_delete_academy() — the actual cascade delete for architecture.md
+--      §10.4, called by the academy-hard-delete Edge Function AFTER it has
+--      built and returned the CSV export. Kept as one atomic SQL function
+--      rather than hand-orchestrated across ~25 tables from the Edge
+--      Function, so the whole cascade either fully succeeds or fully rolls
+--      back, and the delete order is verified in one place.
+--   2. A trigger that flips an external_judge_invites row to 'active' the
+--      moment that judge completes their forced first login (accepts
+--      terms) — architecture.md §7 step 2. Substituted for a separate
+--      "activate-external-judge" Edge Function since it's a same-row,
+--      no-secrets state transition; no Admin API call is needed for it.
+--
+-- ⚠️ hard_delete_academy is the single most destructive action in this
+-- system. It defaults to p_dry_run = true, which returns row counts
+-- WITHOUT deleting anything — always run it dry-run first and sanity-check
+-- the counts before ever passing p_dry_run := false. This has not been
+-- exercised against a live database; verify the returned counts against a
+-- test academy before relying on it in production.
+-- ============================================================================
+
+-- ----------------------------------------------------------------------------
+-- 1. hard_delete_academy
+-- ----------------------------------------------------------------------------
+
+create or replace function public.hard_delete_academy(
+  p_academy_id uuid,
+  p_actor_id uuid,
+  p_dry_run boolean default true
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_ring_instance_ids uuid[];
+  v_bout_ids uuid[];
+  v_boxer_ids uuid[];
+  v_template_ids uuid[];
+  v_profile_ids uuid[];
+  v_counts jsonb := '{}'::jsonb;
+begin
+  select array_agg(id) into v_ring_instance_ids from public.ring_instances where academy_id = p_academy_id;
+  select array_agg(id) into v_bout_ids from public.bouts where ring_instance_id = any(coalesce(v_ring_instance_ids, '{}'));
+  select array_agg(id) into v_boxer_ids from public.boxer_profiles where academy_id = p_academy_id;
+  select array_agg(id) into v_template_ids from public.ring_schedule_templates where academy_id = p_academy_id;
+  select array_agg(id) into v_profile_ids from public.profiles where academy_id = p_academy_id;
+
+  v_counts := jsonb_build_object(
+    'boxer_profiles', coalesce(array_length(v_boxer_ids, 1), 0),
+    'bouts', coalesce(array_length(v_bout_ids, 1), 0),
+    'ring_instances', coalesce(array_length(v_ring_instance_ids, 1), 0),
+    'profiles', coalesce(array_length(v_profile_ids, 1), 0),
+    'invoices', (select count(*) from public.invoices where academy_id = p_academy_id),
+    'payments', (select count(*) from public.payments where academy_id = p_academy_id),
+    'attendance', (select count(*) from public.attendance where academy_id = p_academy_id)
+  );
+
+  if p_dry_run then
+    return jsonb_build_object('dry_run', true, 'academy_id', p_academy_id, 'would_delete', v_counts);
+  end if;
+
+  delete from public.notifications where academy_id = p_academy_id;
+  delete from public.bout_judge_totals where bout_id = any(coalesce(v_bout_ids, '{}'));
+  delete from public.bout_round_scores where bout_id = any(coalesce(v_bout_ids, '{}'));
+  delete from public.bout_judge_assignments where bout_id = any(coalesce(v_bout_ids, '{}'));
+  delete from public.bout_events where bout_id = any(coalesce(v_bout_ids, '{}'));
+  delete from public.bout_rounds where bout_id = any(coalesce(v_bout_ids, '{}'));
+  delete from public.boxer_bout_history where bout_id = any(coalesce(v_bout_ids, '{}'));
+  delete from public.pregnancy_declarations
+    where ring_instance_id = any(coalesce(v_ring_instance_ids, '{}'))
+       or boxer_profile_id = any(coalesce(v_boxer_ids, '{}'));
+  delete from public.session_feedback where boxer_profile_id = any(coalesce(v_boxer_ids, '{}'));
+  delete from public.fitness_test_records where boxer_profile_id = any(coalesce(v_boxer_ids, '{}'));
+  delete from public.coach_ring_assignments where ring_instance_id = any(coalesce(v_ring_instance_ids, '{}'));
+  delete from public.external_judge_invites where academy_id = p_academy_id;
+  delete from public.bouts where ring_instance_id = any(coalesce(v_ring_instance_ids, '{}'));
+  delete from public.ring_instance_overrides where ring_instance_id = any(coalesce(v_ring_instance_ids, '{}'));
+  delete from public.ring_assignment_poll_responses
+    where poll_id in (select id from public.ring_assignment_polls where ring_instance_id = any(coalesce(v_ring_instance_ids, '{}')));
+  delete from public.ring_assignment_polls where ring_instance_id = any(coalesce(v_ring_instance_ids, '{}'));
+  delete from public.ring_instances where academy_id = p_academy_id;
+  delete from public.ring_sessions where template_id = any(coalesce(v_template_ids, '{}'));
+  delete from public.ring_schedule_templates where academy_id = p_academy_id;
+  delete from public.academy_rings where academy_id = p_academy_id;
+  delete from public.attendance_poll_responses
+    where poll_id in (select id from public.attendance_polls where academy_id = p_academy_id);
+  delete from public.attendance_polls where academy_id = p_academy_id;
+  delete from public.leave_applications where academy_id = p_academy_id;
+  delete from public.attendance where academy_id = p_academy_id;
+  delete from public.academy_codes where academy_id = p_academy_id;
+  delete from public.discount_applications where academy_id = p_academy_id;
+  delete from public.discount_schemes where academy_id = p_academy_id;
+  delete from public.coupons where academy_id = p_academy_id;
+  delete from public.payments where academy_id = p_academy_id;
+  delete from public.invoices where academy_id = p_academy_id;
+  delete from public.fee_assignments where academy_id = p_academy_id;
+  delete from public.fee_plans where academy_id = p_academy_id;
+  delete from public.guardian_details where boxer_profile_id = any(coalesce(v_boxer_ids, '{}'));
+  delete from public.boxer_profiles where academy_id = p_academy_id;
+  delete from public.age_categories where academy_id = p_academy_id;
+  delete from public.weight_categories where academy_id = p_academy_id;
+  delete from public.fitness_test_types where academy_id = p_academy_id;
+  delete from public.profiles where academy_id = p_academy_id;
+
+  -- Tombstone, not a physical delete (architecture.md §10.4 step 4): the
+  -- lifecycle log must retain proof the academy existed and was deleted.
+  update public.academies
+  set status = 'deleted', deleted_at = now(), deleted_by = p_actor_id
+  where id = p_academy_id;
+
+  insert into public.academy_lifecycle_events (academy_id, event_type, actor_id)
+  values (p_academy_id, 'hard_deleted', p_actor_id);
+
+  return jsonb_build_object('dry_run', false, 'academy_id', p_academy_id, 'deleted', v_counts, 'deleted_profile_ids', v_profile_ids);
+end;
+$$;
+
+-- Only ever called from the academy-hard-delete Edge Function under the
+-- service role — not exposed to any client role.
+revoke all on function public.hard_delete_academy(uuid, uuid, boolean) from public, anon, authenticated;
+
+-- ----------------------------------------------------------------------------
+-- 2. External judge auto-activation on first login (architecture.md §7 step 2)
+-- ----------------------------------------------------------------------------
+
+create or replace function public.activate_external_judge_on_terms_accept()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.role = 'external_judge'
+     and old.terms_accepted_at is null
+     and new.terms_accepted_at is not null then
+    update public.external_judge_invites
+    set status = 'active', activated_at = now(), profile_id = new.id
+    where profile_id = new.id and status = 'pending';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists trg_activate_external_judge_on_terms_accept on public.profiles;
+create trigger trg_activate_external_judge_on_terms_accept
+  after update of terms_accepted_at on public.profiles
+  for each row execute function public.activate_external_judge_on_terms_accept();
+
+-- ============================================================================
+-- END OF MIGRATION 0005
+-- ============================================================================
+GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL TABLES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
+GRANT ALL ON ALL ROUTINES IN SCHEMA public TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO anon, authenticated, service_role;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON ROUTINES TO anon, authenticated, service_role;
+-- ============================================================================
 -- BOXOS — Migration 0005: academy hard-delete cascade + judge activation
 --
 -- Run this in the Supabase SQL Editor after migration 0004.

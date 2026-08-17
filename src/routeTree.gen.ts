@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
-import { Route as SignupRouteImport } from './routes/signup'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as JudgeRouteImport } from './routes/judge'
@@ -72,11 +71,6 @@ import { Route as BoxosAdminAcademiesAcademyIdRouteImport } from './routes/boxos
 const SuperadminRoute = SuperadminRouteImport.update({
   id: '/superadmin',
   path: '/superadmin',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const SignupRoute = SignupRouteImport.update({
-  id: '/signup',
-  path: '/signup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
@@ -376,7 +370,6 @@ export interface FileRoutesByFullPath {
   '/judge': typeof JudgeRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/signup': typeof SignupRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
@@ -432,7 +425,6 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/signup': typeof SignupRoute
   '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/bouts': typeof AdminBoutsRoute
@@ -493,7 +485,6 @@ export interface FileRoutesById {
   '/judge': typeof JudgeRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
-  '/signup': typeof SignupRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
@@ -556,7 +547,6 @@ export interface FileRouteTypes {
     | '/judge'
     | '/login'
     | '/onboarding'
-    | '/signup'
     | '/superadmin'
     | '/admin/athletes'
     | '/admin/attendance'
@@ -612,7 +602,6 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/onboarding'
-    | '/signup'
     | '/admin/athletes'
     | '/admin/attendance'
     | '/admin/bouts'
@@ -672,7 +661,6 @@ export interface FileRouteTypes {
     | '/judge'
     | '/login'
     | '/onboarding'
-    | '/signup'
     | '/superadmin'
     | '/admin/athletes'
     | '/admin/attendance'
@@ -734,7 +722,6 @@ export interface RootRouteChildren {
   JudgeRoute: typeof JudgeRouteWithChildren
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
-  SignupRoute: typeof SignupRoute
   SuperadminRoute: typeof SuperadminRouteWithChildren
 }
 
@@ -745,13 +732,6 @@ declare module '@tanstack/react-router' {
       path: '/superadmin'
       fullPath: '/superadmin'
       preLoaderRoute: typeof SuperadminRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/signup': {
-      id: '/signup'
-      path: '/signup'
-      fullPath: '/signup'
-      preLoaderRoute: typeof SignupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding': {
@@ -1316,7 +1296,6 @@ const rootRouteChildren: RootRouteChildren = {
   JudgeRoute: JudgeRouteWithChildren,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
-  SignupRoute: SignupRoute,
   SuperadminRoute: SuperadminRouteWithChildren,
 }
 export const routeTree = rootRouteImport

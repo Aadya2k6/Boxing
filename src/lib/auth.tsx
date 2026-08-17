@@ -193,9 +193,7 @@ export function useAuth() {
 export function getRedirectPath(role: UserRole | null, onboardingComplete?: boolean): string {
   if (!role) return "/login";
   if (role === "boxos_admin") return "/boxos-admin";
-  if (role === "athlete") {
-    return onboardingComplete === false ? "/onboarding" : "/athlete";
-  }
+  if (role === "athlete") return "/athlete";
   if (role === "admin") return "/admin";
   if (role === "superadmin") return "/superadmin";
   if (role === "coach") return "/coach";

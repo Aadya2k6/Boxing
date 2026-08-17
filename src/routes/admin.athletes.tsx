@@ -573,9 +573,16 @@ function AthletesPage() {
                 <label className="block text-xs font-semibold mb-2">Select fee plan *</label>
                 <select required value={sendPlanId} onChange={e => setSendPlanId(e.target.value)} className="input-premium">
                   <option value="">Choose plan…</option>
-                  {feePlans.map(p => (
-                    <option key={p.id} value={p.id}>{p.plan_name} — ₹{Number(p.amount).toLocaleString("en-IN")} / {p.billing_cycle === "custom" && p.custom_duration_days ? `${p.custom_duration_days} days` : p.billing_cycle}</option>
-                  ))}
+                  {feePlans.map(p => {
+                    const planName = p.name ?? p.plan_name ?? "Fee Plan";
+                    const amountStr = `₹${Number(p.amount).toLocaleString("en-IN")}`;
+                    const cycleStr = p.cycle ?? p.billing_cycle ?? "monthly";
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {planName} — {amountStr} / {cycleStr}
+                      </option>
+                    );
+                  })}
                 </select>
               </div>
 

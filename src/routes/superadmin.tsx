@@ -55,7 +55,7 @@ function SuperLayout() {
             { to: "academies", label: "Academy Locations", icon: MapPin },
             { to: "config", label: "Academy Config", icon: Cog },
             { to: "fees", label: "Fee Structure", icon: Wallet },
-            { to: "discounts", label: "Discounts & Penalties", icon: Tag },
+            { to: "discounts", label: "Coupons", icon: Tag },
             { to: "class-assigning", label: "Class Assigning", icon: ClipboardList },
             { to: "bouts", label: "Bout Management", icon: Swords },
             { to: "judges", label: "External Judges", icon: Gavel },

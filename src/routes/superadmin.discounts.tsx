@@ -92,21 +92,16 @@ function CouponsPage() {
   function openEdit(c: any) {
     setEditing(c);
     setCode(c.code);
-    setValueType(c.value_type || "percentage");
-    setValue(String(c.value));
+    setValueType(c.discount_type || "percentage");
+    setValue(String(c.discount_value));
     // Load max_uses directly from coupons table column
     setMaxUses(c.max_uses ? String(c.max_uses) : "");
 
-    const planIds = c.valid_fee_plan_ids ?? [];
-    if (!planIds || planIds.length === 0) {
-      setAllPackages(true);
-      setSelectedPlanIds([]);
-    } else {
-      setAllPackages(false);
-      setSelectedPlanIds(planIds);
-    }
+    const planIds: string[] = []; // Not in schema
+    setAllPackages(true);
+    setSelectedPlanIds([]);
 
-    const acIds = c.valid_academy_ids ?? [];
+    const acIds = c.academy_id ? [c.academy_id] : [];
     if (!acIds || acIds.length === 0) {
       setAllAcademies(true);
       setSelectedAcademyIds([]);
@@ -148,11 +143,10 @@ function CouponsPage() {
 
       // Save max_uses directly in coupons table column (null = unlimited)
       const payload = {
+        academy_id: allAcademies ? user?.user_metadata?.academy_id || (academies[0] && academies[0].id) : selectedAcademyIds[0],
         code: cleanCode,
-        value_type: valueType,
-        value: numVal,
-        valid_fee_plan_ids: planIdsArray,
-        valid_academy_ids: academyIdsArray,
+        discount_type: valueType,
+        discount_value: numVal,
         is_active: isActive,
         max_uses: parsedMaxUses,
         created_by: user?.id,
@@ -229,8 +223,7 @@ function CouponsPage() {
             <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
               <th className="text-left font-medium px-5 py-3">Coupon Code</th>
               <th className="text-right font-medium py-3">Discount Value</th>
-              <th className="text-left font-medium py-3 px-4">Valid Fee Packages</th>
-              <th className="text-left font-medium py-3 px-4">Valid Academies</th>
+              <th className="text-left font-medium py-3 px-4">Valid Academy</th>
               <th className="text-left font-medium py-3 px-4">Usage & Limits</th>
               <th className="text-left font-medium py-3">Status</th>
               <th className="px-5 py-3 text-right">Actions</th>
@@ -265,25 +258,24 @@ function CouponsPage() {
                         {c.code}
                       </div>
                     </td>
-                    <td className="py-3.5 text-right tabular font-semibold text-primary-dark">
-                      {c.value_type === "percentage" ? `${c.value}% OFF` : `₹ ${Number(c.value).toLocaleString("en-IN")} OFF`}
-                    </td>
-                    <td className="py-3.5 px-4 text-xs">
-                      {planIds.length === 0 ? (
-                        <span className="text-success font-medium">All Fee Packages</span>
+                    <td className="py-4 text-right tabular font-semibold text-primary-dark">
+                      {c.discount_type === "percentage" ? (
+                        <span className="inline-flex items-center gap-1"><Percent className="size-3" />{c.discount_value}%</span>
                       ) : (
-                        <span className="text-muted-foreground">
-                          {planIds.length} package{planIds.length > 1 ? "s" : ""} selected
-                        </span>
+                        <span className="inline-flex items-center gap-1"><IndianRupee className="size-3" />{c.discount_value}</span>
                       )}
                     </td>
-                    <td className="py-3.5 px-4 text-xs">
-                      {acIds.length === 0 ? (
-                        <span className="text-success font-medium">All Academies</span>
+                    <td className="py-4 px-4">
+                      {c.academy_id ? (
+                        <div className="flex -space-x-1">
+                          {academies.filter(a => a.id === c.academy_id).map(a => (
+                            <div key={a.id} className="size-6 rounded-full bg-surface border border-border grid place-items-center" title={a.name}>
+                              <Building2 className="size-3 text-muted-foreground" />
+                            </div>
+                          ))}
+                        </div>
                       ) : (
-                        <span className="text-muted-foreground">
-                          {acIds.length} academie{acIds.length > 1 ? "s" : "y"} selected
-                        </span>
+                        <span className="text-xs text-success font-medium">All Academies</span>
                       )}
                     </td>
                     <td className="py-3.5 px-4 text-xs">
@@ -423,44 +415,9 @@ function CouponsPage() {
                 />
               </div>
 
-              {/* Fee Packages Selection */}
-              <div className="border-t border-border pt-4">
-                <label className="block text-xs font-semibold mb-2">Valid Fee Packages</label>
-                <label className="flex items-center gap-2 cursor-pointer mb-3">
-                  <input
-                    type="checkbox"
-                    checked={allPackages}
-                    onChange={(e) => setAllPackages(e.target.checked)}
-                    className="rounded border-border text-primary focus:ring-primary size-4"
-                  />
-                  <span className="text-xs font-medium">Valid for ALL fee packages</span>
-                </label>
-
-                {!allPackages && (
-                  <div className="space-y-1.5 max-h-36 overflow-y-auto border border-border rounded-xl p-2 bg-subtle/30 custom-scrollbar">
-                    {feePlans.length === 0 ? (
-                      <div className="text-xs text-muted-foreground p-2">No fee packages available</div>
-                    ) : (
-                      feePlans.map((fp) => (
-                        <label key={fp.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-elevated text-xs cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={selectedPlanIds.includes(fp.id)}
-                            onChange={() => togglePlanSelect(fp.id)}
-                            className="rounded border-border text-primary focus:ring-primary size-3.5"
-                          />
-                          <span className="font-medium text-foreground">{fp.plan_name}</span>
-                          <span className="text-muted-foreground ml-auto">₹{fp.amount}</span>
-                        </label>
-                      ))
-                    )}
-                  </div>
-                )}
-              </div>
-
               {/* Academies Selection */}
               <div className="border-t border-border pt-4">
-                <label className="block text-xs font-semibold mb-2">Valid Academies / Centers</label>
+                <label className="block text-xs font-semibold mb-2">Valid Academy</label>
                 <label className="flex items-center gap-2 cursor-pointer mb-3">
                   <input
                     type="checkbox"
@@ -479,10 +436,11 @@ function CouponsPage() {
                       academies.map((ac) => (
                         <label key={ac.id} className="flex items-center gap-2 p-1.5 rounded hover:bg-elevated text-xs cursor-pointer">
                           <input
-                            type="checkbox"
+                            type="radio"
+                            name="academy"
                             checked={selectedAcademyIds.includes(ac.id)}
-                            onChange={() => toggleAcademySelect(ac.id)}
-                            className="rounded border-border text-primary focus:ring-primary size-3.5"
+                            onChange={() => setSelectedAcademyIds([ac.id])}
+                            className="rounded-full border-border text-primary focus:ring-primary size-3.5"
                           />
                           <span className="font-medium text-foreground">{ac.name}</span>
                           <span className="text-muted-foreground ml-auto">{ac.city}</span>

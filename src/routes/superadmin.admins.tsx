@@ -10,7 +10,7 @@ export const Route = createFileRoute("/superadmin/admins")({ component: AdminsPa
 const roleColors: Record<string, any> = { superadmin: "gold", admin: "info", coach: "neutral", athlete: undefined };
 
 function AdminsPage() {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, profile } = useAuth();
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [q, setQ] = useState("");
@@ -44,11 +44,18 @@ function AdminsPage() {
     setSaving(true);
     setSaveError(null);
     try {
-      // Create auth user via admin API (superadmin only)
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // Create a temporary client that doesn't mutate the browser session
+      const { createClient } = await import("@supabase/supabase-js");
+      const tempClient = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        { auth: { persistSession: false, autoRefreshToken: false } }
+      );
+
+      const { data: authData, error: authError } = await tempClient.auth.signUp({
         email: inviteEmail,
         password: invitePass,
-        options: { data: { full_name: inviteName, role: "admin" } }
+        options: { data: { full_name: inviteName, role: "admin", academy_id: profile?.academy_id } }
       });
       if (authError) throw authError;
       if (authData.user) {

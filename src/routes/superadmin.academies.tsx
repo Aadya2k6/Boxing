@@ -30,7 +30,7 @@ const emptyForm = {
   state: "",
   latitude: "",
   longitude: "",
-  radius_meters: "200",
+  attendance_radius_meters: "200",
   // Gateway fields (stored directly in academies table columns)
   payment_gateway: "razorpay" as "razorpay" | "payu",
   razorpay_key_id: "",
@@ -92,7 +92,7 @@ function AcademiesPage() {
       state: a.state ?? "",
       latitude: String(a.latitude ?? ""),
       longitude: String(a.longitude ?? ""),
-      radius_meters: String(a.radius_meters ?? "200"),
+      attendance_radius_meters: String(a.attendance_radius_meters ?? "200"),
       payment_gateway: (a.active_gateway ?? a.payment_gateway ?? "razorpay") as "razorpay" | "payu",
       razorpay_key_id: a.razorpay_key_id ?? "",
       payu_merchant_key: a.payu_merchant_key ?? "",
@@ -125,12 +125,11 @@ function AcademiesPage() {
         state: form.state,
         latitude: form.latitude ? parseFloat(form.latitude) : null,
         longitude: form.longitude ? parseFloat(form.longitude) : null,
-        radius_meters: parseInt(form.radius_meters) || 200,
+        attendance_radius_meters: parseInt(form.attendance_radius_meters) || 200,
         razorpay_key_id: form.razorpay_key_id.trim() || null,
         payu_merchant_key: form.payu_merchant_key.trim() || null,
         encrypted_payu_salt: form.payu_merchant_salt.trim() || null,
         active_gateway: form.payment_gateway,
-        updated_by: user?.id,
       };
 
       if (editing) {
@@ -139,7 +138,7 @@ function AcademiesPage() {
       } else {
         const { error } = await supabase
           .from("academies")
-          .insert({ ...academyPayload, created_by: user?.id });
+          .insert({ ...academyPayload, onboarded_by: user?.id });
         if (error) throw error;
       }
 
@@ -227,7 +226,7 @@ function AcademiesPage() {
                   <div className="flex items-center justify-between">
                     <span className="text-muted-foreground">Geo-fence radius</span>
                     <Badge tone={a.latitude ? "success" : undefined}>
-                      {a.latitude ? `${a.radius_meters ?? 200}m` : "Not set"}
+                      {a.latitude ? `${a.attendance_radius_meters ?? 200}m` : "Not set"}
                     </Badge>
                   </div>
                   {a.latitude && (
@@ -357,8 +356,8 @@ function AcademiesPage() {
                     type="number"
                     min="50"
                     max="2000"
-                    value={form.radius_meters}
-                    onChange={(e) => setF("radius_meters", e.target.value)}
+                    value={form.attendance_radius_meters}
+                    onChange={(e) => setF("attendance_radius_meters", e.target.value)}
                     className="input-premium"
                     placeholder="200"
                   />

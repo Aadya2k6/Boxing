@@ -34,22 +34,20 @@ function LoginPage() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role, academy_code_verified")
+        .select("role")
         .eq("id", user.id)
-        .single();
+        .maybeSingle();
 
-      let onboardingComplete: boolean | undefined;
-      if (profile?.role === "athlete") {
-        const { data: bp } = await supabase
-          .from("boxer_profiles")
-          .select("onboarding_complete")
-          .eq("user_id", user.id)
-          .maybeSingle();
-        onboardingComplete = bp?.onboarding_complete ?? false;
-      }
+      const role = profile?.role;
+      let dest = "/athlete";
+      if (role === "boxos_admin") dest = "/boxos-admin";
+      else if (role === "superadmin") dest = "/superadmin";
+      else if (role === "admin") dest = "/admin";
+      else if (role === "coach") dest = "/coach";
+      else if (role === "external_judge") dest = "/judge";
+      else dest = "/athlete";
 
-      const dest = getRedirectPath(profile?.role ?? null, onboardingComplete);
-      navigate({ to: dest });
+      window.location.href = dest;
     } catch (err: any) {
       setError(err.message || "An error occurred. Please try again.");
     } finally {
@@ -132,7 +130,7 @@ function LoginPage() {
 
           <div className="mt-8 text-center text-sm text-cinematic-secondary">
             Don't have an account?{" "}
-            <Link to="/signup" className="text-cinematic-primary font-semibold hover:text-cinematic-blue transition-colors">
+            <Link to="/onboarding" className="text-cinematic-primary font-semibold hover:text-cinematic-blue transition-colors">
               Register as athlete
             </Link>
           </div>

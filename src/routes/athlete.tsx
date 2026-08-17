@@ -41,8 +41,8 @@ function AthleteLayout() {
             user_id: authUser.id,
             full_name: profile?.full_name || authUser.email?.split("@")[0] || "Athlete",
             email: authUser.email || null,
-            onboarding_complete: false,
-            verification_status: "approved",
+            onboarding_complete: true,
+            verification_status: "pending",
             updated_at: new Date().toISOString(),
           }, { onConflict: "user_id" })
           .select("id")

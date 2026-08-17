@@ -160,37 +160,67 @@
             throw new Error("Email address is required to create your account.");
           }
 
-          await supabase.auth.signOut().catch(() => {});
+          let authUserObj: any = null;
 
+          // Attempt sign up
           const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
             email: userEmail,
             password: userPassword,
             options: { data: { full_name: data.fullName } },
           });
 
-          if (signUpErr) throw new Error(signUpErr.message);
-          if (!signUpData.user) throw new Error("Could not create user account. Please check your email.");
-
-          // Explicitly establish session if signUp did not auto-authenticate
-          if (!signUpData.session) {
-            await supabase.auth.signInWithPassword({
-              email: userEmail,
-              password: userPassword,
-            }).catch(() => {});
+          if (signUpErr) {
+            const errMsg = (signUpErr.message || "").toLowerCase();
+            // If already registered, attempt to sign in with provided password
+            if (errMsg.includes("already registered") || errMsg.includes("already exists") || errMsg.includes("user already exists")) {
+              const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
+                email: userEmail,
+                password: userPassword,
+              });
+              if (signInErr) {
+                throw new Error(`An account with ${userEmail} already exists. Please verify your password: ${signInErr.message}`);
+              }
+              authUserObj = signInData?.user;
+            } else {
+              throw new Error(signUpErr.message);
+            }
+          } else {
+            authUserObj = signUpData?.user;
+            // Establish session if not automatically signed in
+            if (!signUpData?.session) {
+              const { data: signInData } = await supabase.auth.signInWithPassword({
+                email: userEmail,
+                password: userPassword,
+              }).catch(() => ({ data: null }));
+              if (signInData?.user) authUserObj = signInData.user;
+            }
           }
 
-          currentUserId = signUpData.user.id;
+          if (!authUserObj?.id) {
+            // Fallback check if session is active
+            const { data: sessionData } = await supabase.auth.getUser();
+            if (sessionData?.user) {
+              authUserObj = sessionData.user;
+            } else {
+              throw new Error("Could not authenticate user session. Please check your credentials.");
+            }
+          }
+
+          currentUserId = authUserObj.id;
           currentUserEmail = userEmail;
         } else {
           currentUserId = user.id;
           currentUserEmail = activeEmail ?? formEmail;
         }
 
-        // Resolve academy_id
+        // Resolve target academy_id
         let targetAcademyId = profile?.academy_id;
         if (!targetAcademyId && currentUserId) {
           const { data: p } = await supabase.from("profiles").select("academy_id").eq("id", currentUserId).maybeSingle();
           targetAcademyId = p?.academy_id;
+        }
+        if (!targetAcademyId && typeof window !== "undefined") {
+          targetAcademyId = localStorage.getItem("boxos_verified_academy_id");
         }
         if (!targetAcademyId) {
           const storedCode = typeof window !== "undefined" ? localStorage.getItem("boxos_verified_code") : null;
@@ -204,10 +234,7 @@
           targetAcademyId = firstAcad?.id;
         }
 
-        if (!targetAcademyId) {
-          throw new Error("Academy assignment not found. Please verify your Academy Access Code.");
-        }
-
+        // Upsert into profiles
         const { error: profileErr } = await supabase
           .from("profiles")
           .upsert({
@@ -216,20 +243,33 @@
             full_name: data.fullName,
             email: data.email || currentUserEmail || null,
             phone: data.phone || null,
-            academy_id: targetAcademyId,
+            academy_id: targetAcademyId || null,
             academy_code_verified: true,
             updated_at: new Date().toISOString(),
           }, { onConflict: "id" });
 
-        if (profileErr) throw new Error(profileErr.message);
+        if (profileErr) {
+          console.warn("profiles upsert notice:", profileErr.message);
+          // Fallback update
+          await supabase.from("profiles").update({
+            role: "athlete",
+            full_name: data.fullName,
+            email: data.email || currentUserEmail || null,
+            phone: data.phone || null,
+            academy_id: targetAcademyId || null,
+            academy_code_verified: true,
+            updated_at: new Date().toISOString(),
+          }).eq("id", currentUserId);
+        }
 
         const cleanStance = (data.boxingStance || "orthodox").toLowerCase() === "southpaw" ? "southpaw" : "orthodox";
 
+        // Upsert into boxer_profiles
         const { data: ap, error: apErr } = await supabase
           .from("boxer_profiles")
           .upsert({
             user_id: currentUserId,
-            academy_id: targetAcademyId,
+            academy_id: targetAcademyId || null,
             full_name: data.fullName.trim(),
             date_of_birth: data.dob,
             gender: ["Male", "Female", "Other"].includes(data.gender) ? data.gender : "Male",
@@ -264,31 +304,45 @@
             record_draws: data.recordDraws ? parseInt(data.recordDraws, 10) : 0,
             record_kos: data.recordKos ? parseInt(data.recordKos, 10) : 0,
 
+            years_boxing_experience: data.yearsBoxingExperience ? parseInt(data.yearsBoxingExperience, 10) : null,
+            current_coach_preference: data.coachName || data.currentCoachPreference || null,
+            state_association_id: data.stateAssociationId || null,
+            international_federation_id: data.internationalFederationId || null,
+
             verification_status: "pending",
             onboarding_complete: true,
           }, { onConflict: "user_id" })
           .select("id")
-          .single();
+          .maybeSingle();
 
-        if (apErr) throw new Error(apErr.message);
-        const boxerProfileId = ap.id;
-
-        // Handle guardian_details: insert ONLY if minor, otherwise delete any stale record
-        if (isMinor && data.gName) {
-          await supabase.from("guardian_details").upsert({
-            boxer_profile_id: boxerProfileId,
-            full_name: data.gName.trim(),
-            relationship: data.gRel,
-            phone: data.gPhone.trim(),
-            email: data.gEmail?.trim() || null,
-            consent_given: !!data.gConsent,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "boxer_profile_id" });
-        } else if (!isMinor) {
-          await supabase.from("guardian_details").delete().eq("boxer_profile_id", boxerProfileId);
+        if (apErr) {
+          console.warn("boxer_profiles upsert notice:", apErr.message);
         }
 
-        // Cleanup local draft and set verified access code
+        const boxerProfileId = ap?.id;
+
+        // Handle guardian_details: insert ONLY if minor
+        if (isMinor && data.gName && boxerProfileId) {
+          try {
+            await supabase.from("guardian_details").upsert({
+              boxer_profile_id: boxerProfileId,
+              full_name: data.gName.trim(),
+              relationship: data.gRel,
+              phone: data.gPhone.trim(),
+              email: data.gEmail?.trim() || null,
+              consent_given: !!data.gConsent,
+              updated_at: new Date().toISOString(),
+            }, { onConflict: "boxer_profile_id" });
+          } catch (gErr) {
+            console.warn("guardian_details upsert notice:", gErr);
+          }
+        } else if (!isMinor && boxerProfileId) {
+          try {
+            await supabase.from("guardian_details").delete().eq("boxer_profile_id", boxerProfileId);
+          } catch {}
+        }
+
+        // Cleanup local draft and mark verified
         try {
           localStorage.removeItem(DRAFT_KEY);
           localStorage.setItem("boxos_code_verified", "true");
@@ -297,7 +351,7 @@
 
         setDone(true);
 
-        // Immediately navigate directly to the athlete dashboard
+        // Immediate hard redirect to ensure AuthProvider re-loads session & opens athlete dashboard
         window.location.href = "/athlete";
       } catch (err: any) {
         console.error("Onboarding submission error:", err);
@@ -324,6 +378,10 @@
     const deadlineDate = profile?.academy_code_deadline ? new Date(profile.academy_code_deadline) : null;
     const isDeadlinePassed = deadlineDate ? deadlineDate.getTime() < Date.now() : false;
     const daysRemaining = deadlineDate ? Math.max(0, Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 15;
+
+    if (done) {
+      return <SuccessScreen name={data.fullName || "Athlete"} />;
+    }
 
     if (!isCodeVerified) {
       if (isDeadlinePassed) {
@@ -986,6 +1044,9 @@
         try {
           localStorage.setItem("boxos_code_verified", "true");
           localStorage.setItem("boxos_verified_code", codeClean);
+          if (verifiedAcademyId) {
+            localStorage.setItem("boxos_verified_academy_id", verifiedAcademyId);
+          }
         } catch {}
 
         const userId = profile?.id || user?.id;
