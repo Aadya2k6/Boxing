@@ -5,10 +5,10 @@ import Logo from "@/components/site/Logo";
 
 interface CinematicLayoutProps {
   children: React.ReactNode;
+  maxWidth?: string;
 }
 
-
-export function CinematicLayout({ children }: CinematicLayoutProps) {
+export function CinematicLayout({ children, maxWidth = "max-w-md" }: CinematicLayoutProps) {
   return (
     <div className="w-full min-h-screen flex flex-col lg:flex-row theme-cinematic-dark bg-cinematic-base font-sans text-cinematic-primary overflow-x-hidden">
       {/* Media Side */}
@@ -26,7 +26,7 @@ export function CinematicLayout({ children }: CinematicLayoutProps) {
         </video>
         {/* Subtle fade on edges so it blends nicely but remains a distinct panel */}
         <div className="absolute inset-0 bg-gradient-to-t lg:bg-gradient-to-r from-cinematic-base via-transparent to-transparent pointer-events-none" />
-        
+
         {/* Absolute Header Branding */}
         <header className="absolute top-0 left-0 p-6 md:p-10 z-50">
           <Link to="/">
@@ -66,8 +66,8 @@ export function CinematicLayout({ children }: CinematicLayoutProps) {
       </div>
 
       {/* Interaction Side */}
-      <div className="w-full lg:w-1/2 min-h-[calc(100vh-16rem)] lg:min-h-screen flex flex-col justify-center px-6 py-12 lg:px-24 relative overflow-y-auto">
-        <div className="w-full max-w-md mx-auto animate-fade-up">
+      <div className="w-full lg:w-1/2 min-h-[calc(100vh-16rem)] lg:min-h-screen flex flex-col justify-center px-6 py-12 lg:px-12 xl:px-16 relative overflow-y-auto">
+        <div className={`w-full ${maxWidth} mx-auto animate-fade-up`}>
           {children}
         </div>
       </div>

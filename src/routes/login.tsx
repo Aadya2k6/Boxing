@@ -59,8 +59,9 @@ function LoginPage() {
   return (
     <CinematicLayout>
       {/* Atmospheric Lighting */}
-      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1000px] h-[1000px] top-0 right-0 -translate-y-1/3 translate-x-1/3" />
-      
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1000px] h-[1000px] bottom-0 right-0 translate-y-1/4 translate-x-1/4" style={{ animationDelay: '-5s' }} />
+
       <div className="w-full flex flex-col items-center relative z-10">
         <CinematicCard>
           <div className="mb-8 text-center">

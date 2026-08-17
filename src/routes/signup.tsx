@@ -64,8 +64,11 @@ function SignupPage() {
   return (
     <CinematicLayout>
       {/* Atmospheric Lighting */}
-      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[900px] h-[900px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
-      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[600px] h-[600px] bottom-0 right-0 translate-y-1/4 translate-x-1/4" style={{ animationDelay: '-6s' }} />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-1/4 right-0 translate-x-1/3 opacity-70" style={{ animationDelay: '-3s' }} />
+      
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[1200px] h-[1200px] bottom-0 right-0 translate-y-1/4 translate-x-1/4" style={{ animationDelay: '-6s' }} />
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[700px] h-[700px] bottom-1/4 right-0 translate-x-1/3 opacity-80" style={{ animationDelay: '-9s' }} />
 
       <div className="w-full flex flex-col items-center relative z-10">
         <CinematicCard>

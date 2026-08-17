@@ -12,6 +12,7 @@ import { CinematicLayout } from "@/components/auth/CinematicLayout";
 import { CinematicCard } from "@/components/auth/CinematicCard";
 import { CinematicWizardPanel } from "@/components/auth/CinematicWizardPanel";
 import { CinematicInput } from "@/components/auth/CinematicInput";
+import { CinematicMedia } from "@/components/auth/CinematicMedia";
 
 export const Route = createFileRoute("/onboarding")({
   head: () => ({
@@ -341,16 +342,17 @@ function OnboardingPage() {
   }
 
   return (
-    <CinematicLayout>
+    <CinematicLayout maxWidth="max-w-[900px]">
       {/* Atmospheric Lighting */}
-      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1000px] h-[1000px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
-      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[600px] h-[600px] top-1/4 right-0 translate-x-1/3" style={{ animationDelay: '-4s' }} />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-1/4 right-0 translate-x-1/3 opacity-70" style={{ animationDelay: '-3s' }} />
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[1000px] h-[1000px] top-1/3 right-0 translate-x-1/4 opacity-80" style={{ animationDelay: '-6s' }} />
 
       <CinematicMedia allowVideo={false} />
       
-      <div className="w-full relative z-10 flex flex-col pt-8">
+      <div className="w-full relative z-10 flex flex-col flex-1 justify-center py-8">
         {/* Global progress bar */}
-        <div className="w-full max-w-4xl mx-auto mb-6 px-4">
+        <div className="w-full px-6 lg:px-8 mb-6">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-semibold text-cinematic-primary tracking-wider uppercase">
               Step {step + 1} of {totalSteps}
@@ -365,12 +367,14 @@ function OnboardingPage() {
           </div>
         </div>
 
-        <div className="w-full px-4 grid lg:grid-cols-12 gap-8 max-w-5xl mx-auto">
+        <div className="w-full px-6 lg:px-8 flex flex-col lg:flex-row gap-6 lg:gap-8 mx-auto">
           {/* LEFT — step sidebar */}
-          <StepSidebar steps={visibleSteps} current={step} onJump={(i) => i < step && setStep(i)} />
+          <div className="hidden lg:block w-40 xl:w-48 shrink-0">
+            <StepSidebar steps={visibleSteps} current={step} onJump={(i) => i < step && setStep(i)} />
+          </div>
 
           {/* RIGHT — form content */}
-          <main className="lg:col-span-9 w-full">
+          <main className="flex-1 w-full min-w-0">
             <FormPanel
               current={current}
               step={step}
@@ -397,8 +401,8 @@ function OnboardingPage() {
 // ── Sidebar ───────────────────────────────────────────────────────────
 function StepSidebar({ steps, current, onJump }: { steps: typeof STEPS; current: number; onJump: (i: number) => void }) {
   return (
-    <aside className="lg:col-span-3 hidden lg:block">
-      <div className="sticky top-28 space-y-1">
+    <aside className="w-full">
+      <div className="space-y-2">
         {steps.map((s, i) => {
           const state = i === current ? "active" : i < current ? "done" : "todo";
           return (
@@ -459,20 +463,20 @@ function FormPanel({
   return (
     <CinematicWizardPanel>
       {/* Section header */}
-      <div className="px-6 md:px-10 py-8 border-b border-white/5 bg-black/20">
+      <div className="px-5 md:px-8 py-6 border-b border-white/5 bg-black/20">
         <div className="flex items-center gap-4">
-          <div className="size-14 rounded-xl bg-cinematic-blue/10 border border-cinematic-blue/20 grid place-items-center">
-            <Icon className="size-6 text-cinematic-blue" strokeWidth={1.5} />
+          <div className="size-12 rounded-xl bg-cinematic-blue/10 border border-cinematic-blue/20 grid place-items-center shrink-0">
+            <Icon className="size-5 text-cinematic-blue" strokeWidth={1.5} />
           </div>
           <div>
-            <h2 className="font-display font-bold text-2xl text-cinematic-primary">{current.label}</h2>
+            <h2 className="font-display font-bold text-xl md:text-2xl text-cinematic-primary">{current.label}</h2>
             <p className="text-sm text-cinematic-secondary mt-1">{current.desc}</p>
           </div>
         </div>
       </div>
 
       {/* Form body */}
-      <div className="px-6 md:px-10 py-8">
+      <div className="px-5 md:px-8 py-6">
         {current.key === "personal"   && <PersonalStep   data={data} set={set} user={user} />}
         {current.key === "guardian"   && <GuardianStep   data={data} set={set} />}
         {current.key === "emergency"  && <EmergencyStep  data={data} set={set} />}

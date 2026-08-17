@@ -74,8 +74,14 @@ function Hero() {
   return (
     <section id="hero" className="relative w-full pt-24 lg:pt-32 pb-8 overflow-hidden min-h-[90vh] flex flex-col">
       {/* ── ATMOSPHERE FOG ── */}
+      {/* Blue Spotlight Entering from Top Left */}
       <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1200px] h-[1200px] -top-[400px] -left-[400px]" />
-      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[800px] h-[800px] -bottom-[300px] -right-[200px]" style={{ animationDelay: '-10s' }} />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-0 left-0" style={{ animationDelay: '-4s' }} />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1600px] h-[1600px] -top-[600px] -left-[600px] opacity-70" style={{ animationDelay: '-8s' }} />
+      
+      {/* Subtle Red Environmental Spill from Bottom Right */}
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[900px] h-[900px] -bottom-[400px] -right-[300px]" style={{ animationDelay: '-10s' }} />
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[600px] h-[600px] -bottom-[200px] -right-[100px] opacity-50" style={{ animationDelay: '-6s' }} />
 
       {/* ── DESKTOP PHOTOGRAPHY ── */}
       <div className="hidden lg:block absolute -top-12 -right-8 bottom-0 w-[60%] z-0 overflow-hidden">
@@ -164,8 +170,10 @@ function Features() {
   return (
     <section id="platform" className="reveal-section bg-cinematic-base relative z-10 py-24 md:py-32 scroll-mt-24 overflow-hidden">
       {/* Atmosphere Fog */}
-      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] -top-32 -left-32" />
-      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[600px] h-[600px] bottom-0 right-0" style={{ animationDelay: '-5s' }} />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1200px] h-[1200px] -top-64 -left-64" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] -top-32 -left-32 opacity-80" style={{ animationDelay: '-5s' }} />
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[1000px] h-[1000px] bottom-0 right-0 opacity-60" style={{ animationDelay: '-8s' }} />
+      <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[600px] h-[600px] -bottom-32 -right-32 opacity-80" style={{ animationDelay: '-3s' }} />
 
       <div className="max-w-7xl mx-auto px-6 relative z-10">
         <div className="max-w-2xl mb-16">
@@ -239,7 +247,9 @@ function HowItWorks() {
   return (
     <section id="how-it-works" className="reveal-section bg-cinematic-base relative z-10 py-24 border-t border-cinematic-border/50 scroll-mt-24 overflow-hidden">
       {/* Atmosphere Fog */}
-      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[1200px] h-[1200px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3" />
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[1600px] h-[1600px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/3 opacity-80" />
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[1200px] h-[1200px] top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2" style={{ animationDelay: '-4s' }} />
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[800px] h-[800px] bottom-0 left-1/2 -translate-x-1/2 translate-y-1/4 opacity-90" style={{ animationDelay: '-8s' }} />
 
       <div className="max-w-4xl mx-auto px-6 relative z-10">
         <div className="mb-20 text-center md:text-left flex flex-col md:flex-row md:items-end justify-between gap-6">
@@ -329,8 +339,11 @@ function FinalAction() {
   return (
     <section id="why-boxos" className="reveal-section bg-cinematic-base relative z-10 py-40 overflow-hidden border-t border-white/5 scroll-mt-24">
       {/* Atmosphere Fog */}
-      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-0 left-0 -translate-x-1/3 -translate-y-1/4" />
-      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[800px] h-[800px] bottom-0 right-0 translate-x-1/4 translate-y-1/4" style={{ animationDelay: '-8s' }} />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 left-0 -translate-x-1/3 -translate-y-1/4" />
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-1/4 left-0 -translate-x-1/4" style={{ animationDelay: '-5s' }} />
+      
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[1400px] h-[1400px] bottom-0 right-0 translate-x-1/4 translate-y-1/4" style={{ animationDelay: '-8s' }} />
+      <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[900px] h-[900px] bottom-1/4 right-0 translate-x-1/4" style={{ animationDelay: '-3s' }} />
 
       <div className="max-w-6xl mx-auto px-6 relative z-10 flex flex-col md:flex-row gap-16 lg:gap-24">
         
