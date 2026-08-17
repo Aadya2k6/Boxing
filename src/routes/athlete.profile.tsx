@@ -1,7 +1,7 @@
 import { AccessGuard } from "@/components/dashboard/AccessGuard";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { PageHeader, Badge } from "@/components/dashboard/DashboardLayout";
-import { Pencil, Trophy, Phone, Heart, MapPin, Mail, Hash, Loader2, Building2, Save, X } from "lucide-react";
+import { Pencil, Trophy, Phone, Heart, MapPin, Mail, Hash, Loader2, Building2, Save, X, TrendingDown, Award, Shield } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { supabase, AthleteProfile } from "@/lib/supabase";
 import { useEffect, useState, type FormEvent } from "react";
@@ -194,6 +194,49 @@ function ProfilePage() {
               ["Coach", (athleteProfile as any).coach_name || "—"],
             ]} />
           </Section>
+
+          {/* ── [NEW] Record — TODO: wire to boxer_bout_history once table exists ── */}
+          <div className="bg-surface border border-border rounded-lg p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <Award className="size-4 text-primary-dark" />
+              <h2 className="font-display font-semibold">Record</h2>
+            </div>
+            <div className="grid grid-cols-3 gap-4 text-center">
+              <div>
+                <div className="text-stat font-display text-success">{(athleteProfile as any).record_wins ?? 0}</div>
+                <div className="text-xs text-muted-foreground mt-1">Wins</div>
+              </div>
+              <div>
+                <div className="text-stat font-display text-destructive">{(athleteProfile as any).record_losses ?? 0}</div>
+                <div className="text-xs text-muted-foreground mt-1">Losses</div>
+              </div>
+              <div>
+                <div className="text-stat font-display text-warning">{(athleteProfile as any).record_kos ?? 0}</div>
+                <div className="text-xs text-muted-foreground mt-1">KOs</div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── [NEW] Federation IDs ── */}
+          <div className="bg-surface border border-border rounded-lg p-6">
+            <div className="flex items-center gap-2 mb-5">
+              <Shield className="size-4 text-primary-dark" />
+              <h2 className="font-display font-semibold">Federation IDs</h2>
+              <span className="ml-auto text-[10px] text-muted-foreground uppercase tracking-wider">Optional — update later</span>
+            </div>
+            <dl className="space-y-3">
+              {[
+                ["National Federation ID", athleteProfile.national_federation_id],
+                ["State Association ID", athleteProfile.state_association_id],
+                ["International Federation ID", athleteProfile.if_id],
+              ].map(([label, val]) => (
+                <div key={label as string} className="flex items-center justify-between py-2 border-b border-border last:border-0">
+                  <dt className="text-xs text-muted-foreground">{label as string}</dt>
+                  <dd className="text-sm font-mono font-medium">{(val as string) || "—"}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
 
           <Section title="Medical & fitness" icon={Heart}>
             <Grid items={[

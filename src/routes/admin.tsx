@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { LayoutGrid, Users, Wallet, Receipt, Bell, Settings, CalendarCheck } from "lucide-react";
+import { LayoutGrid, Users, Wallet, Receipt, Bell, Settings, CalendarCheck, Swords, Gavel } from "lucide-react";
 import { useRequireAuth } from "@/lib/guards";
 
 export const Route = createFileRoute("/admin")({ component: AdminLayout });
@@ -27,6 +27,9 @@ function AdminLayout() {
             { to: "fees", label: "Fee Management", icon: Wallet },
             { to: "invoices", label: "Invoices", icon: Receipt },
             { to: "attendance", label: "Attendance & Leaves", icon: CalendarCheck },
+            { to: "scheduling", label: "Scheduling", icon: CalendarCheck },
+            { to: "bouts", label: "Bout Management", icon: Swords },
+            { to: "judges", label: "Judges", icon: Gavel },
           ],
         },
         {

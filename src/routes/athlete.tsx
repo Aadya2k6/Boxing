@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Home, User, CreditCard, Calendar, FileText, Bell, Settings, MapPin } from "lucide-react";
+import { Home, User, CreditCard, Calendar, FileText, Bell, Settings, MapPin, Swords } from "lucide-react";
 import { useRequireAthlete } from "@/lib/guards";
 import { useState, useEffect, createContext, useContext, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -211,6 +211,7 @@ function AthleteLayout() {
               { to: "payments", label: "Fee & Payments", icon: CreditCard },
               { to: "attendance", label: "Attendance", icon: MapPin },
               { to: "schedule", label: "Training Schedule", icon: Calendar },
+              { to: "bouts", label: "My Bouts", icon: Swords },
             ],
           },
           {

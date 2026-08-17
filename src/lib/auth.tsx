@@ -4,13 +4,14 @@ import { supabase, Profile, UserRole } from "./supabase";
 
 const isBrowser = typeof window !== "undefined";
 
-// ── Auth context type ──────────────────────────────────────────────────
 interface AuthContextValue {
   session: Session | null;
   user: User | null;
   profile: Profile | null;
   role: UserRole | null;
   loading: boolean;
+  devRole: UserRole | null;
+  setDevRole: (role: UserRole | null) => void;
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>;
   signUp: (email: string, password: string, fullName?: string) => Promise<{ error: Error | null }>;
   signOut: () => Promise<void>;
@@ -18,12 +19,90 @@ interface AuthContextValue {
 
 const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
+export const MOCK_DEV_PROFILES: Record<UserRole, Profile> = {
+  athlete: {
+    id: "dev-athlete-id",
+    role: "athlete",
+    full_name: "Aarav Sharma (Demo Athlete)",
+    email: "athlete@boxos.in",
+    phone: null,
+    avatar_url: null,
+    is_active: true,
+    academy_id: "acad-1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+    academy_code_verified: true,
+  },
+  coach: {
+    id: "dev-coach-id",
+    role: "coach",
+    full_name: "Coach Ravi (Demo Coach)",
+    email: "coach@boxos.in",
+    phone: null,
+    avatar_url: null,
+    is_active: true,
+    academy_id: "acad-1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  admin: {
+    id: "dev-admin-id",
+    role: "admin",
+    full_name: "Admin Vikram (Demo Admin)",
+    email: "admin@boxos.in",
+    phone: null,
+    avatar_url: null,
+    is_active: true,
+    academy_id: "acad-1",
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  superadmin: {
+    id: "dev-superadmin-id",
+    role: "superadmin",
+    full_name: "Superadmin (Demo Superadmin)",
+    email: "superadmin@boxos.in",
+    phone: null,
+    avatar_url: null,
+    academy_id: null,
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+  external_judge: {
+    id: "dev-judge-id",
+    role: "external_judge",
+    full_name: "Judge Arun Kumar (Demo Judge)",
+    email: "judge@boxos.in",
+    phone: null,
+    avatar_url: null,
+    academy_id: null,
+    is_active: true,
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  },
+};
+
 // ── Provider ───────────────────────────────────────────────────────────
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [devRole, setDevRoleState] = useState<UserRole | null>(() => {
+    if (typeof window !== "undefined") {
+      return (localStorage.getItem("boxos_dev_role") as UserRole) || null;
+    }
+    return null;
+  });
+
+  const setDevRole = (r: UserRole | null) => {
+    setDevRoleState(r);
+    if (typeof window !== "undefined") {
+      if (r) localStorage.setItem("boxos_dev_role", r);
+      else localStorage.removeItem("boxos_dev_role");
+    }
+  };
 
   async function fetchProfile(userId: string): Promise<Profile | null> {
     try {
@@ -189,14 +268,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const effectiveProfile = devRole
+    ? {
+        ...MOCK_DEV_PROFILES[devRole],
+        ...(profile ? { full_name: profile.full_name, email: profile.email } : {}),
+        role: devRole,
+      }
+    : profile;
+
+  const effectiveUser = user ?? (devRole ? ({ id: effectiveProfile?.id, email: effectiveProfile?.email } as any) : null);
+  const effectiveSession = session ?? (devRole ? ({ user: effectiveUser } as any) : null);
+  const effectiveRole = devRole ?? profile?.role ?? null;
+
   return (
     <AuthContext.Provider
       value={{
-        session,
-        user,
-        profile,
-        role: profile?.role ?? null,
+        session: effectiveSession,
+        user: effectiveUser,
+        profile: effectiveProfile,
+        role: effectiveRole,
         loading,
+        devRole,
+        setDevRole,
         signIn,
         signUp,
         signOut,
@@ -214,7 +307,6 @@ export function useAuth() {
   return ctx;
 }
 
-// ── Route redirect helper ──────────────────────────────────────────────
 export function getRedirectPath(role: UserRole | null, onboardingComplete?: boolean): string {
   if (!role) return "/login";
   if (role === "athlete") {
@@ -222,5 +314,7 @@ export function getRedirectPath(role: UserRole | null, onboardingComplete?: bool
   }
   if (role === "admin") return "/admin";
   if (role === "superadmin") return "/superadmin";
+  if (role === "coach") return "/coach";
+  if (role === "external_judge") return "/judge";
   return "/";
 }

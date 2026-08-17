@@ -13,10 +13,14 @@ import { Route as SuperadminRouteImport } from './routes/superadmin'
 import { Route as SignupRouteImport } from './routes/signup'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as JudgeRouteImport } from './routes/judge'
+import { Route as CoachRouteImport } from './routes/coach'
 import { Route as AthleteRouteImport } from './routes/athlete'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as SuperadminIndexRouteImport } from './routes/superadmin.index'
+import { Route as JudgeIndexRouteImport } from './routes/judge.index'
+import { Route as CoachIndexRouteImport } from './routes/coach.index'
 import { Route as AthleteIndexRouteImport } from './routes/athlete.index'
 import { Route as AdminIndexRouteImport } from './routes/admin.index'
 import { Route as SuperadminUsersRouteImport } from './routes/superadmin.users'
@@ -24,25 +28,37 @@ import { Route as SuperadminSettingsRouteImport } from './routes/superadmin.sett
 import { Route as SuperadminReportsRouteImport } from './routes/superadmin.reports'
 import { Route as SuperadminRefundsRouteImport } from './routes/superadmin.refunds'
 import { Route as SuperadminNotificationsRouteImport } from './routes/superadmin.notifications'
+import { Route as SuperadminJudgesRouteImport } from './routes/superadmin.judges'
 import { Route as SuperadminFeesRouteImport } from './routes/superadmin.fees'
 import { Route as SuperadminDiscountsRouteImport } from './routes/superadmin.discounts'
 import { Route as SuperadminConfigRouteImport } from './routes/superadmin.config'
 import { Route as SuperadminClassAssigningRouteImport } from './routes/superadmin.class-assigning'
+import { Route as SuperadminCategoriesRouteImport } from './routes/superadmin.categories'
+import { Route as SuperadminBoutsRouteImport } from './routes/superadmin.bouts'
 import { Route as SuperadminAttendanceRouteImport } from './routes/superadmin.attendance'
 import { Route as SuperadminAthletesRouteImport } from './routes/superadmin.athletes'
 import { Route as SuperadminAcademiesRouteImport } from './routes/superadmin.academies'
+import { Route as JudgeExpiredRouteImport } from './routes/judge.expired'
+import { Route as CoachSettingsRouteImport } from './routes/coach.settings'
+import { Route as CoachNotificationsRouteImport } from './routes/coach.notifications'
+import { Route as CoachBoxersRouteImport } from './routes/coach.boxers'
+import { Route as CoachAttendanceRouteImport } from './routes/coach.attendance'
 import { Route as AthleteSettingsRouteImport } from './routes/athlete.settings'
 import { Route as AthleteScheduleRouteImport } from './routes/athlete.schedule'
 import { Route as AthleteProfileRouteImport } from './routes/athlete.profile'
 import { Route as AthletePaymentsRouteImport } from './routes/athlete.payments'
 import { Route as AthleteNotificationsRouteImport } from './routes/athlete.notifications'
 import { Route as AthleteDocumentsRouteImport } from './routes/athlete.documents'
+import { Route as AthleteBoutsRouteImport } from './routes/athlete.bouts'
 import { Route as AthleteAttendanceRouteImport } from './routes/athlete.attendance'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
+import { Route as AdminSchedulingRouteImport } from './routes/admin.scheduling'
 import { Route as AdminReportsRouteImport } from './routes/admin.reports'
 import { Route as AdminNotificationsRouteImport } from './routes/admin.notifications'
+import { Route as AdminJudgesRouteImport } from './routes/admin.judges'
 import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminFeesRouteImport } from './routes/admin.fees'
+import { Route as AdminBoutsRouteImport } from './routes/admin.bouts'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAthletesRouteImport } from './routes/admin.athletes'
 
@@ -66,6 +82,16 @@ const LoginRoute = LoginRouteImport.update({
   path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JudgeRoute = JudgeRouteImport.update({
+  id: '/judge',
+  path: '/judge',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CoachRoute = CoachRouteImport.update({
+  id: '/coach',
+  path: '/coach',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AthleteRoute = AthleteRouteImport.update({
   id: '/athlete',
   path: '/athlete',
@@ -85,6 +111,16 @@ const SuperadminIndexRoute = SuperadminIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => SuperadminRoute,
+} as any)
+const JudgeIndexRoute = JudgeIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => JudgeRoute,
+} as any)
+const CoachIndexRoute = CoachIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => CoachRoute,
 } as any)
 const AthleteIndexRoute = AthleteIndexRouteImport.update({
   id: '/',
@@ -121,6 +157,11 @@ const SuperadminNotificationsRoute = SuperadminNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => SuperadminRoute,
 } as any)
+const SuperadminJudgesRoute = SuperadminJudgesRouteImport.update({
+  id: '/judges',
+  path: '/judges',
+  getParentRoute: () => SuperadminRoute,
+} as any)
 const SuperadminFeesRoute = SuperadminFeesRouteImport.update({
   id: '/fees',
   path: '/fees',
@@ -142,6 +183,16 @@ const SuperadminClassAssigningRoute =
     path: '/class-assigning',
     getParentRoute: () => SuperadminRoute,
   } as any)
+const SuperadminCategoriesRoute = SuperadminCategoriesRouteImport.update({
+  id: '/categories',
+  path: '/categories',
+  getParentRoute: () => SuperadminRoute,
+} as any)
+const SuperadminBoutsRoute = SuperadminBoutsRouteImport.update({
+  id: '/bouts',
+  path: '/bouts',
+  getParentRoute: () => SuperadminRoute,
+} as any)
 const SuperadminAttendanceRoute = SuperadminAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
@@ -156,6 +207,31 @@ const SuperadminAcademiesRoute = SuperadminAcademiesRouteImport.update({
   id: '/academies',
   path: '/academies',
   getParentRoute: () => SuperadminRoute,
+} as any)
+const JudgeExpiredRoute = JudgeExpiredRouteImport.update({
+  id: '/expired',
+  path: '/expired',
+  getParentRoute: () => JudgeRoute,
+} as any)
+const CoachSettingsRoute = CoachSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => CoachRoute,
+} as any)
+const CoachNotificationsRoute = CoachNotificationsRouteImport.update({
+  id: '/notifications',
+  path: '/notifications',
+  getParentRoute: () => CoachRoute,
+} as any)
+const CoachBoxersRoute = CoachBoxersRouteImport.update({
+  id: '/boxers',
+  path: '/boxers',
+  getParentRoute: () => CoachRoute,
+} as any)
+const CoachAttendanceRoute = CoachAttendanceRouteImport.update({
+  id: '/attendance',
+  path: '/attendance',
+  getParentRoute: () => CoachRoute,
 } as any)
 const AthleteSettingsRoute = AthleteSettingsRouteImport.update({
   id: '/settings',
@@ -187,6 +263,11 @@ const AthleteDocumentsRoute = AthleteDocumentsRouteImport.update({
   path: '/documents',
   getParentRoute: () => AthleteRoute,
 } as any)
+const AthleteBoutsRoute = AthleteBoutsRouteImport.update({
+  id: '/bouts',
+  path: '/bouts',
+  getParentRoute: () => AthleteRoute,
+} as any)
 const AthleteAttendanceRoute = AthleteAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
@@ -195,6 +276,11 @@ const AthleteAttendanceRoute = AthleteAttendanceRouteImport.update({
 const AdminSettingsRoute = AdminSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminSchedulingRoute = AdminSchedulingRouteImport.update({
+  id: '/scheduling',
+  path: '/scheduling',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminReportsRoute = AdminReportsRouteImport.update({
@@ -207,6 +293,11 @@ const AdminNotificationsRoute = AdminNotificationsRouteImport.update({
   path: '/notifications',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminJudgesRoute = AdminJudgesRouteImport.update({
+  id: '/judges',
+  path: '/judges',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminInvoicesRoute = AdminInvoicesRouteImport.update({
   id: '/invoices',
   path: '/invoices',
@@ -215,6 +306,11 @@ const AdminInvoicesRoute = AdminInvoicesRouteImport.update({
 const AdminFeesRoute = AdminFeesRouteImport.update({
   id: '/fees',
   path: '/fees',
+  getParentRoute: () => AdminRoute,
+} as any)
+const AdminBoutsRoute = AdminBoutsRouteImport.update({
+  id: '/bouts',
+  path: '/bouts',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
@@ -232,31 +328,45 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/athlete': typeof AthleteRouteWithChildren
+  '/coach': typeof CoachRouteWithChildren
+  '/judge': typeof JudgeRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/bouts': typeof AdminBoutsRoute
   '/admin/fees': typeof AdminFeesRoute
   '/admin/invoices': typeof AdminInvoicesRoute
+  '/admin/judges': typeof AdminJudgesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/reports': typeof AdminReportsRoute
+  '/admin/scheduling': typeof AdminSchedulingRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/athlete/attendance': typeof AthleteAttendanceRoute
+  '/athlete/bouts': typeof AthleteBoutsRoute
   '/athlete/documents': typeof AthleteDocumentsRoute
   '/athlete/notifications': typeof AthleteNotificationsRoute
   '/athlete/payments': typeof AthletePaymentsRoute
   '/athlete/profile': typeof AthleteProfileRoute
   '/athlete/schedule': typeof AthleteScheduleRoute
   '/athlete/settings': typeof AthleteSettingsRoute
+  '/coach/attendance': typeof CoachAttendanceRoute
+  '/coach/boxers': typeof CoachBoxersRoute
+  '/coach/notifications': typeof CoachNotificationsRoute
+  '/coach/settings': typeof CoachSettingsRoute
+  '/judge/expired': typeof JudgeExpiredRoute
   '/superadmin/academies': typeof SuperadminAcademiesRoute
   '/superadmin/athletes': typeof SuperadminAthletesRoute
   '/superadmin/attendance': typeof SuperadminAttendanceRoute
+  '/superadmin/bouts': typeof SuperadminBoutsRoute
+  '/superadmin/categories': typeof SuperadminCategoriesRoute
   '/superadmin/class-assigning': typeof SuperadminClassAssigningRoute
   '/superadmin/config': typeof SuperadminConfigRoute
   '/superadmin/discounts': typeof SuperadminDiscountsRoute
   '/superadmin/fees': typeof SuperadminFeesRoute
+  '/superadmin/judges': typeof SuperadminJudgesRoute
   '/superadmin/notifications': typeof SuperadminNotificationsRoute
   '/superadmin/refunds': typeof SuperadminRefundsRoute
   '/superadmin/reports': typeof SuperadminReportsRoute
@@ -264,6 +374,8 @@ export interface FileRoutesByFullPath {
   '/superadmin/users': typeof SuperadminUsersRoute
   '/admin/': typeof AdminIndexRoute
   '/athlete/': typeof AthleteIndexRoute
+  '/coach/': typeof CoachIndexRoute
+  '/judge/': typeof JudgeIndexRoute
   '/superadmin/': typeof SuperadminIndexRoute
 }
 export interface FileRoutesByTo {
@@ -273,25 +385,37 @@ export interface FileRoutesByTo {
   '/signup': typeof SignupRoute
   '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/bouts': typeof AdminBoutsRoute
   '/admin/fees': typeof AdminFeesRoute
   '/admin/invoices': typeof AdminInvoicesRoute
+  '/admin/judges': typeof AdminJudgesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/reports': typeof AdminReportsRoute
+  '/admin/scheduling': typeof AdminSchedulingRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/athlete/attendance': typeof AthleteAttendanceRoute
+  '/athlete/bouts': typeof AthleteBoutsRoute
   '/athlete/documents': typeof AthleteDocumentsRoute
   '/athlete/notifications': typeof AthleteNotificationsRoute
   '/athlete/payments': typeof AthletePaymentsRoute
   '/athlete/profile': typeof AthleteProfileRoute
   '/athlete/schedule': typeof AthleteScheduleRoute
   '/athlete/settings': typeof AthleteSettingsRoute
+  '/coach/attendance': typeof CoachAttendanceRoute
+  '/coach/boxers': typeof CoachBoxersRoute
+  '/coach/notifications': typeof CoachNotificationsRoute
+  '/coach/settings': typeof CoachSettingsRoute
+  '/judge/expired': typeof JudgeExpiredRoute
   '/superadmin/academies': typeof SuperadminAcademiesRoute
   '/superadmin/athletes': typeof SuperadminAthletesRoute
   '/superadmin/attendance': typeof SuperadminAttendanceRoute
+  '/superadmin/bouts': typeof SuperadminBoutsRoute
+  '/superadmin/categories': typeof SuperadminCategoriesRoute
   '/superadmin/class-assigning': typeof SuperadminClassAssigningRoute
   '/superadmin/config': typeof SuperadminConfigRoute
   '/superadmin/discounts': typeof SuperadminDiscountsRoute
   '/superadmin/fees': typeof SuperadminFeesRoute
+  '/superadmin/judges': typeof SuperadminJudgesRoute
   '/superadmin/notifications': typeof SuperadminNotificationsRoute
   '/superadmin/refunds': typeof SuperadminRefundsRoute
   '/superadmin/reports': typeof SuperadminReportsRoute
@@ -299,6 +423,8 @@ export interface FileRoutesByTo {
   '/superadmin/users': typeof SuperadminUsersRoute
   '/admin': typeof AdminIndexRoute
   '/athlete': typeof AthleteIndexRoute
+  '/coach': typeof CoachIndexRoute
+  '/judge': typeof JudgeIndexRoute
   '/superadmin': typeof SuperadminIndexRoute
 }
 export interface FileRoutesById {
@@ -306,31 +432,45 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/admin': typeof AdminRouteWithChildren
   '/athlete': typeof AthleteRouteWithChildren
+  '/coach': typeof CoachRouteWithChildren
+  '/judge': typeof JudgeRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
   '/signup': typeof SignupRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
+  '/admin/bouts': typeof AdminBoutsRoute
   '/admin/fees': typeof AdminFeesRoute
   '/admin/invoices': typeof AdminInvoicesRoute
+  '/admin/judges': typeof AdminJudgesRoute
   '/admin/notifications': typeof AdminNotificationsRoute
   '/admin/reports': typeof AdminReportsRoute
+  '/admin/scheduling': typeof AdminSchedulingRoute
   '/admin/settings': typeof AdminSettingsRoute
   '/athlete/attendance': typeof AthleteAttendanceRoute
+  '/athlete/bouts': typeof AthleteBoutsRoute
   '/athlete/documents': typeof AthleteDocumentsRoute
   '/athlete/notifications': typeof AthleteNotificationsRoute
   '/athlete/payments': typeof AthletePaymentsRoute
   '/athlete/profile': typeof AthleteProfileRoute
   '/athlete/schedule': typeof AthleteScheduleRoute
   '/athlete/settings': typeof AthleteSettingsRoute
+  '/coach/attendance': typeof CoachAttendanceRoute
+  '/coach/boxers': typeof CoachBoxersRoute
+  '/coach/notifications': typeof CoachNotificationsRoute
+  '/coach/settings': typeof CoachSettingsRoute
+  '/judge/expired': typeof JudgeExpiredRoute
   '/superadmin/academies': typeof SuperadminAcademiesRoute
   '/superadmin/athletes': typeof SuperadminAthletesRoute
   '/superadmin/attendance': typeof SuperadminAttendanceRoute
+  '/superadmin/bouts': typeof SuperadminBoutsRoute
+  '/superadmin/categories': typeof SuperadminCategoriesRoute
   '/superadmin/class-assigning': typeof SuperadminClassAssigningRoute
   '/superadmin/config': typeof SuperadminConfigRoute
   '/superadmin/discounts': typeof SuperadminDiscountsRoute
   '/superadmin/fees': typeof SuperadminFeesRoute
+  '/superadmin/judges': typeof SuperadminJudgesRoute
   '/superadmin/notifications': typeof SuperadminNotificationsRoute
   '/superadmin/refunds': typeof SuperadminRefundsRoute
   '/superadmin/reports': typeof SuperadminReportsRoute
@@ -338,6 +478,8 @@ export interface FileRoutesById {
   '/superadmin/users': typeof SuperadminUsersRoute
   '/admin/': typeof AdminIndexRoute
   '/athlete/': typeof AthleteIndexRoute
+  '/coach/': typeof CoachIndexRoute
+  '/judge/': typeof JudgeIndexRoute
   '/superadmin/': typeof SuperadminIndexRoute
 }
 export interface FileRouteTypes {
@@ -346,31 +488,45 @@ export interface FileRouteTypes {
     | '/'
     | '/admin'
     | '/athlete'
+    | '/coach'
+    | '/judge'
     | '/login'
     | '/onboarding'
     | '/signup'
     | '/superadmin'
     | '/admin/athletes'
     | '/admin/attendance'
+    | '/admin/bouts'
     | '/admin/fees'
     | '/admin/invoices'
+    | '/admin/judges'
     | '/admin/notifications'
     | '/admin/reports'
+    | '/admin/scheduling'
     | '/admin/settings'
     | '/athlete/attendance'
+    | '/athlete/bouts'
     | '/athlete/documents'
     | '/athlete/notifications'
     | '/athlete/payments'
     | '/athlete/profile'
     | '/athlete/schedule'
     | '/athlete/settings'
+    | '/coach/attendance'
+    | '/coach/boxers'
+    | '/coach/notifications'
+    | '/coach/settings'
+    | '/judge/expired'
     | '/superadmin/academies'
     | '/superadmin/athletes'
     | '/superadmin/attendance'
+    | '/superadmin/bouts'
+    | '/superadmin/categories'
     | '/superadmin/class-assigning'
     | '/superadmin/config'
     | '/superadmin/discounts'
     | '/superadmin/fees'
+    | '/superadmin/judges'
     | '/superadmin/notifications'
     | '/superadmin/refunds'
     | '/superadmin/reports'
@@ -378,6 +534,8 @@ export interface FileRouteTypes {
     | '/superadmin/users'
     | '/admin/'
     | '/athlete/'
+    | '/coach/'
+    | '/judge/'
     | '/superadmin/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -387,25 +545,37 @@ export interface FileRouteTypes {
     | '/signup'
     | '/admin/athletes'
     | '/admin/attendance'
+    | '/admin/bouts'
     | '/admin/fees'
     | '/admin/invoices'
+    | '/admin/judges'
     | '/admin/notifications'
     | '/admin/reports'
+    | '/admin/scheduling'
     | '/admin/settings'
     | '/athlete/attendance'
+    | '/athlete/bouts'
     | '/athlete/documents'
     | '/athlete/notifications'
     | '/athlete/payments'
     | '/athlete/profile'
     | '/athlete/schedule'
     | '/athlete/settings'
+    | '/coach/attendance'
+    | '/coach/boxers'
+    | '/coach/notifications'
+    | '/coach/settings'
+    | '/judge/expired'
     | '/superadmin/academies'
     | '/superadmin/athletes'
     | '/superadmin/attendance'
+    | '/superadmin/bouts'
+    | '/superadmin/categories'
     | '/superadmin/class-assigning'
     | '/superadmin/config'
     | '/superadmin/discounts'
     | '/superadmin/fees'
+    | '/superadmin/judges'
     | '/superadmin/notifications'
     | '/superadmin/refunds'
     | '/superadmin/reports'
@@ -413,37 +583,53 @@ export interface FileRouteTypes {
     | '/superadmin/users'
     | '/admin'
     | '/athlete'
+    | '/coach'
+    | '/judge'
     | '/superadmin'
   id:
     | '__root__'
     | '/'
     | '/admin'
     | '/athlete'
+    | '/coach'
+    | '/judge'
     | '/login'
     | '/onboarding'
     | '/signup'
     | '/superadmin'
     | '/admin/athletes'
     | '/admin/attendance'
+    | '/admin/bouts'
     | '/admin/fees'
     | '/admin/invoices'
+    | '/admin/judges'
     | '/admin/notifications'
     | '/admin/reports'
+    | '/admin/scheduling'
     | '/admin/settings'
     | '/athlete/attendance'
+    | '/athlete/bouts'
     | '/athlete/documents'
     | '/athlete/notifications'
     | '/athlete/payments'
     | '/athlete/profile'
     | '/athlete/schedule'
     | '/athlete/settings'
+    | '/coach/attendance'
+    | '/coach/boxers'
+    | '/coach/notifications'
+    | '/coach/settings'
+    | '/judge/expired'
     | '/superadmin/academies'
     | '/superadmin/athletes'
     | '/superadmin/attendance'
+    | '/superadmin/bouts'
+    | '/superadmin/categories'
     | '/superadmin/class-assigning'
     | '/superadmin/config'
     | '/superadmin/discounts'
     | '/superadmin/fees'
+    | '/superadmin/judges'
     | '/superadmin/notifications'
     | '/superadmin/refunds'
     | '/superadmin/reports'
@@ -451,6 +637,8 @@ export interface FileRouteTypes {
     | '/superadmin/users'
     | '/admin/'
     | '/athlete/'
+    | '/coach/'
+    | '/judge/'
     | '/superadmin/'
   fileRoutesById: FileRoutesById
 }
@@ -458,6 +646,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRouteWithChildren
   AthleteRoute: typeof AthleteRouteWithChildren
+  CoachRoute: typeof CoachRouteWithChildren
+  JudgeRoute: typeof JudgeRouteWithChildren
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
   SignupRoute: typeof SignupRoute
@@ -494,6 +684,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/judge': {
+      id: '/judge'
+      path: '/judge'
+      fullPath: '/judge'
+      preLoaderRoute: typeof JudgeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/coach': {
+      id: '/coach'
+      path: '/coach'
+      fullPath: '/coach'
+      preLoaderRoute: typeof CoachRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/athlete': {
       id: '/athlete'
       path: '/athlete'
@@ -521,6 +725,20 @@ declare module '@tanstack/react-router' {
       fullPath: '/superadmin/'
       preLoaderRoute: typeof SuperadminIndexRouteImport
       parentRoute: typeof SuperadminRoute
+    }
+    '/judge/': {
+      id: '/judge/'
+      path: '/'
+      fullPath: '/judge/'
+      preLoaderRoute: typeof JudgeIndexRouteImport
+      parentRoute: typeof JudgeRoute
+    }
+    '/coach/': {
+      id: '/coach/'
+      path: '/'
+      fullPath: '/coach/'
+      preLoaderRoute: typeof CoachIndexRouteImport
+      parentRoute: typeof CoachRoute
     }
     '/athlete/': {
       id: '/athlete/'
@@ -571,6 +789,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperadminNotificationsRouteImport
       parentRoute: typeof SuperadminRoute
     }
+    '/superadmin/judges': {
+      id: '/superadmin/judges'
+      path: '/judges'
+      fullPath: '/superadmin/judges'
+      preLoaderRoute: typeof SuperadminJudgesRouteImport
+      parentRoute: typeof SuperadminRoute
+    }
     '/superadmin/fees': {
       id: '/superadmin/fees'
       path: '/fees'
@@ -599,6 +824,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SuperadminClassAssigningRouteImport
       parentRoute: typeof SuperadminRoute
     }
+    '/superadmin/categories': {
+      id: '/superadmin/categories'
+      path: '/categories'
+      fullPath: '/superadmin/categories'
+      preLoaderRoute: typeof SuperadminCategoriesRouteImport
+      parentRoute: typeof SuperadminRoute
+    }
+    '/superadmin/bouts': {
+      id: '/superadmin/bouts'
+      path: '/bouts'
+      fullPath: '/superadmin/bouts'
+      preLoaderRoute: typeof SuperadminBoutsRouteImport
+      parentRoute: typeof SuperadminRoute
+    }
     '/superadmin/attendance': {
       id: '/superadmin/attendance'
       path: '/attendance'
@@ -619,6 +858,41 @@ declare module '@tanstack/react-router' {
       fullPath: '/superadmin/academies'
       preLoaderRoute: typeof SuperadminAcademiesRouteImport
       parentRoute: typeof SuperadminRoute
+    }
+    '/judge/expired': {
+      id: '/judge/expired'
+      path: '/expired'
+      fullPath: '/judge/expired'
+      preLoaderRoute: typeof JudgeExpiredRouteImport
+      parentRoute: typeof JudgeRoute
+    }
+    '/coach/settings': {
+      id: '/coach/settings'
+      path: '/settings'
+      fullPath: '/coach/settings'
+      preLoaderRoute: typeof CoachSettingsRouteImport
+      parentRoute: typeof CoachRoute
+    }
+    '/coach/notifications': {
+      id: '/coach/notifications'
+      path: '/notifications'
+      fullPath: '/coach/notifications'
+      preLoaderRoute: typeof CoachNotificationsRouteImport
+      parentRoute: typeof CoachRoute
+    }
+    '/coach/boxers': {
+      id: '/coach/boxers'
+      path: '/boxers'
+      fullPath: '/coach/boxers'
+      preLoaderRoute: typeof CoachBoxersRouteImport
+      parentRoute: typeof CoachRoute
+    }
+    '/coach/attendance': {
+      id: '/coach/attendance'
+      path: '/attendance'
+      fullPath: '/coach/attendance'
+      preLoaderRoute: typeof CoachAttendanceRouteImport
+      parentRoute: typeof CoachRoute
     }
     '/athlete/settings': {
       id: '/athlete/settings'
@@ -662,6 +936,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AthleteDocumentsRouteImport
       parentRoute: typeof AthleteRoute
     }
+    '/athlete/bouts': {
+      id: '/athlete/bouts'
+      path: '/bouts'
+      fullPath: '/athlete/bouts'
+      preLoaderRoute: typeof AthleteBoutsRouteImport
+      parentRoute: typeof AthleteRoute
+    }
     '/athlete/attendance': {
       id: '/athlete/attendance'
       path: '/attendance'
@@ -674,6 +955,13 @@ declare module '@tanstack/react-router' {
       path: '/settings'
       fullPath: '/admin/settings'
       preLoaderRoute: typeof AdminSettingsRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/scheduling': {
+      id: '/admin/scheduling'
+      path: '/scheduling'
+      fullPath: '/admin/scheduling'
+      preLoaderRoute: typeof AdminSchedulingRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/reports': {
@@ -690,6 +978,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminNotificationsRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/judges': {
+      id: '/admin/judges'
+      path: '/judges'
+      fullPath: '/admin/judges'
+      preLoaderRoute: typeof AdminJudgesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/invoices': {
       id: '/admin/invoices'
       path: '/invoices'
@@ -702,6 +997,13 @@ declare module '@tanstack/react-router' {
       path: '/fees'
       fullPath: '/admin/fees'
       preLoaderRoute: typeof AdminFeesRouteImport
+      parentRoute: typeof AdminRoute
+    }
+    '/admin/bouts': {
+      id: '/admin/bouts'
+      path: '/bouts'
+      fullPath: '/admin/bouts'
+      preLoaderRoute: typeof AdminBoutsRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/attendance': {
@@ -724,10 +1026,13 @@ declare module '@tanstack/react-router' {
 interface AdminRouteChildren {
   AdminAthletesRoute: typeof AdminAthletesRoute
   AdminAttendanceRoute: typeof AdminAttendanceRoute
+  AdminBoutsRoute: typeof AdminBoutsRoute
   AdminFeesRoute: typeof AdminFeesRoute
   AdminInvoicesRoute: typeof AdminInvoicesRoute
+  AdminJudgesRoute: typeof AdminJudgesRoute
   AdminNotificationsRoute: typeof AdminNotificationsRoute
   AdminReportsRoute: typeof AdminReportsRoute
+  AdminSchedulingRoute: typeof AdminSchedulingRoute
   AdminSettingsRoute: typeof AdminSettingsRoute
   AdminIndexRoute: typeof AdminIndexRoute
 }
@@ -735,10 +1040,13 @@ interface AdminRouteChildren {
 const AdminRouteChildren: AdminRouteChildren = {
   AdminAthletesRoute: AdminAthletesRoute,
   AdminAttendanceRoute: AdminAttendanceRoute,
+  AdminBoutsRoute: AdminBoutsRoute,
   AdminFeesRoute: AdminFeesRoute,
   AdminInvoicesRoute: AdminInvoicesRoute,
+  AdminJudgesRoute: AdminJudgesRoute,
   AdminNotificationsRoute: AdminNotificationsRoute,
   AdminReportsRoute: AdminReportsRoute,
+  AdminSchedulingRoute: AdminSchedulingRoute,
   AdminSettingsRoute: AdminSettingsRoute,
   AdminIndexRoute: AdminIndexRoute,
 }
@@ -747,6 +1055,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 
 interface AthleteRouteChildren {
   AthleteAttendanceRoute: typeof AthleteAttendanceRoute
+  AthleteBoutsRoute: typeof AthleteBoutsRoute
   AthleteDocumentsRoute: typeof AthleteDocumentsRoute
   AthleteNotificationsRoute: typeof AthleteNotificationsRoute
   AthletePaymentsRoute: typeof AthletePaymentsRoute
@@ -758,6 +1067,7 @@ interface AthleteRouteChildren {
 
 const AthleteRouteChildren: AthleteRouteChildren = {
   AthleteAttendanceRoute: AthleteAttendanceRoute,
+  AthleteBoutsRoute: AthleteBoutsRoute,
   AthleteDocumentsRoute: AthleteDocumentsRoute,
   AthleteNotificationsRoute: AthleteNotificationsRoute,
   AthletePaymentsRoute: AthletePaymentsRoute,
@@ -770,14 +1080,47 @@ const AthleteRouteChildren: AthleteRouteChildren = {
 const AthleteRouteWithChildren =
   AthleteRoute._addFileChildren(AthleteRouteChildren)
 
+interface CoachRouteChildren {
+  CoachAttendanceRoute: typeof CoachAttendanceRoute
+  CoachBoxersRoute: typeof CoachBoxersRoute
+  CoachNotificationsRoute: typeof CoachNotificationsRoute
+  CoachSettingsRoute: typeof CoachSettingsRoute
+  CoachIndexRoute: typeof CoachIndexRoute
+}
+
+const CoachRouteChildren: CoachRouteChildren = {
+  CoachAttendanceRoute: CoachAttendanceRoute,
+  CoachBoxersRoute: CoachBoxersRoute,
+  CoachNotificationsRoute: CoachNotificationsRoute,
+  CoachSettingsRoute: CoachSettingsRoute,
+  CoachIndexRoute: CoachIndexRoute,
+}
+
+const CoachRouteWithChildren = CoachRoute._addFileChildren(CoachRouteChildren)
+
+interface JudgeRouteChildren {
+  JudgeExpiredRoute: typeof JudgeExpiredRoute
+  JudgeIndexRoute: typeof JudgeIndexRoute
+}
+
+const JudgeRouteChildren: JudgeRouteChildren = {
+  JudgeExpiredRoute: JudgeExpiredRoute,
+  JudgeIndexRoute: JudgeIndexRoute,
+}
+
+const JudgeRouteWithChildren = JudgeRoute._addFileChildren(JudgeRouteChildren)
+
 interface SuperadminRouteChildren {
   SuperadminAcademiesRoute: typeof SuperadminAcademiesRoute
   SuperadminAthletesRoute: typeof SuperadminAthletesRoute
   SuperadminAttendanceRoute: typeof SuperadminAttendanceRoute
+  SuperadminBoutsRoute: typeof SuperadminBoutsRoute
+  SuperadminCategoriesRoute: typeof SuperadminCategoriesRoute
   SuperadminClassAssigningRoute: typeof SuperadminClassAssigningRoute
   SuperadminConfigRoute: typeof SuperadminConfigRoute
   SuperadminDiscountsRoute: typeof SuperadminDiscountsRoute
   SuperadminFeesRoute: typeof SuperadminFeesRoute
+  SuperadminJudgesRoute: typeof SuperadminJudgesRoute
   SuperadminNotificationsRoute: typeof SuperadminNotificationsRoute
   SuperadminRefundsRoute: typeof SuperadminRefundsRoute
   SuperadminReportsRoute: typeof SuperadminReportsRoute
@@ -790,10 +1133,13 @@ const SuperadminRouteChildren: SuperadminRouteChildren = {
   SuperadminAcademiesRoute: SuperadminAcademiesRoute,
   SuperadminAthletesRoute: SuperadminAthletesRoute,
   SuperadminAttendanceRoute: SuperadminAttendanceRoute,
+  SuperadminBoutsRoute: SuperadminBoutsRoute,
+  SuperadminCategoriesRoute: SuperadminCategoriesRoute,
   SuperadminClassAssigningRoute: SuperadminClassAssigningRoute,
   SuperadminConfigRoute: SuperadminConfigRoute,
   SuperadminDiscountsRoute: SuperadminDiscountsRoute,
   SuperadminFeesRoute: SuperadminFeesRoute,
+  SuperadminJudgesRoute: SuperadminJudgesRoute,
   SuperadminNotificationsRoute: SuperadminNotificationsRoute,
   SuperadminRefundsRoute: SuperadminRefundsRoute,
   SuperadminReportsRoute: SuperadminReportsRoute,
@@ -810,6 +1156,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRouteWithChildren,
   AthleteRoute: AthleteRouteWithChildren,
+  CoachRoute: CoachRouteWithChildren,
+  JudgeRoute: JudgeRouteWithChildren,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
   SignupRoute: SignupRoute,

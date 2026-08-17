@@ -1,0 +1,365 @@
+# BOXOS — Architecture
+
+---
+
+## 1. System Overview & Role Hierarchy
+
+BOXOS is multi-tenant: each **academy is a tenant**. Every table that scopes to an academy uses `academy_id` for row-level isolation.
+
+### 1.1 Roles (6)
+
+| Role | Scope | Summary |
+|---|---|---|
+| **BOXOS Admin** | Platform-wide, `academy_id = null` | Creates academies, invites each academy's superadmin(s), monitors/suspends/reactivates/archives/deletes academies, sees platform-wide aggregate stats. No day-to-day boxer/fee/attendance access into any tenant. |
+| **Superadmin** | One academy | Full authority within their own academy. An academy can have several superadmins. During an academy suspension, drops to read-only on two screens only (§10.3). |
+| **Admin** | One academy | Day-to-day operations delegated by a superadmin. Cannot create other staff accounts. |
+| **Coach** | One academy, assigned rings | Runs bout timers (play/pause — always, regardless of judging role), logs round events, scores bouts when also assigned as judge, views assigned boxers. **Every tournament bout must have exactly one coach assigned**, even on bouts where that coach isn't scoring, because only a coach can mark a bout complete — see §6. |
+| **Athlete (Boxer)** | One academy | Self-registers via academy code. Pays fees, marks geotagged attendance, requests leave, submits session feedback, views schedule/fitness/bout history. |
+| **External Judge** | One tournament (temporary) | Email-invited, credential-expiring. Sees only the two boxers in an assigned bout + a live read-only timer + scoring form. |
+
+### 1.2 Role-creation channels (strict — no exceptions, no in-app alternate path)
+
+| Role being created | Who can create it | How |
+|---|---|---|
+| BOXOS Admin | — | **Direct database insert only.** No signup form, no invite flow, no UI path exists for this anywhere in the app. |
+| Superadmin | BOXOS Admin | BOXOS portal only — either at academy-creation time (§10.2) or later via "Invite Superadmin" on the Academy Detail screen. A superadmin can never invite/create another superadmin from inside their own academy. |
+| Admin / Coach | Superadmin (their own academy) | Superadmin's Users screen, email + temp password, same edge-function pattern as before. **Admins cannot create other admins or coaches.** |
+| Athlete | Self (public signup) | Signup form + mandatory academy-code verification (§1.3) ties the new account to that code's academy automatically. |
+| External Judge | Superadmin or Admin (their own academy) | Tournament-scoped invite (§7). |
+
+### 1.3 Tenancy model
+- Every academy-scoped table carries `academy_id`.
+- Global vs. academy-specific configuration (categories, fitness-test catalog, default round timing): rows with `academy_id = null` are BOXOS-maintained platform defaults; rows with `academy_id` set are that academy's own additions/overrides. Effective-config resolution always prefers the academy's own row over the global default for the same logical item.
+- Athlete signup: the academy code entered at signup (`academy_codes.code`) is what ties the new `profiles`/`boxer_profiles` row to a specific `academy_id` — there is no other way for an athlete's account to land in an academy.
+
+### 1.4 The only two hard (non-configurable) rules in the whole system
+Everything else in this app is deliberately editable per academy. These two are not, because they're not training-policy choices:
+1. **Bouts are single-gender.** `boxer_red_id` and `boxer_blue_id` must both match the bout's `weight_category_id`'s `gender` — men only fight men, women only fight women, boys only fight boys, girls only fight girls. Enforced by a DB constraint, not just a UI filter.
+2. **A bout's two boxers must both fall inside the bout's weight category's declared range at confirmed weigh-in** — see §5 for how this coexists with "the exact matching weight isn't always available in-house" flexibility (the category *range* is fixed once chosen; which two specific boxers fill it is flexible).
+
+---
+
+## 2. Tech Stack (unchanged)
+
+Expo (React Native) + expo-router, Supabase (Postgres + Auth + Realtime + Storage + Edge Functions), Razorpay + PayU dual-gateway (per-academy keys), Expo push notifications, `expo-print`/`expo-sharing` for PDF receipts, `expo-file-system` for CSV export (now also used for the academy-deletion data export, §10). Bout timers use a client-computed countdown synced via Realtime broadcast events, not per-second server writes (§6.3).
+
+---
+
+## 3. Data Model
+
+All tables: `uuid` PKs (`gen_random_uuid()`), `timestamptz` for time columns, RLS enforced. Enum-like columns are `text` + `CHECK` constraints.
+
+### 3.1 Identity & Roles
+
+**`profiles`**
+- `id`, `role text` — `'boxos_admin' | 'superadmin' | 'admin' | 'coach' | 'athlete' | 'external_judge'`
+- `academy_id uuid null` — null only for `boxos_admin`; required for every other role (CHECK + trigger)
+- `full_name`, `email`, `phone`, `avatar_url`, `preferred_academy_id` *(athlete-only, pre-assignment)*, `is_active boolean`, `push_token`, `academy_code_verified`, `academy_code_deadline`
+- External-judge-only: `judge_scope_tournament_id uuid null`, `access_expires_at timestamptz null`, `invited_by uuid null`
+- **Consent (new, applies to every role)**: `terms_accepted_at timestamptz null`, `terms_version text null` — see §12
+- `created_at`, `updated_at`
+
+**`boxer_profiles`**
+- Identity/contact: `id`, `user_id`, `academy_id`, `full_name`, `date_of_birth`, `gender`, `nationality`, `profile_photo_url`, `phone`, `email`, `city`, `state`, `country`, `blood_group`, `physical_conditions`, `current_medications`, `allergies`, `medical_fitness_declared`, `is_minor`, `onboarding_complete`, `emergency_contact_name/relation/phone`, `primary_physician_details`, `verification_status`, `created_at`, `updated_at`
+- Boxing profile: `stance` (`'orthodox'|'southpaw'`), `declared_weight_kg`, `age_category_id` FK, `weight_category_id` FK, `reach_cm`, `height_cm`, `national_federation_boxer_id`
+- Record cache: `record_wins`, `record_losses`, `record_draws`, `record_kos` (all `int default 0`)
+- Medical/injury suspension: `is_suspended boolean default false`, `suspension_start_date date null`, `suspension_end_date date null` (null = indefinite), `suspension_reason text null`, `suspended_by uuid null`, `suspended_at timestamptz null`, `reinstated_by uuid null`, `reinstated_at timestamptz null`
+
+**`guardian_details`** — unchanged (minor consent).
+
+### 3.2 BOXOS Platform Layer
+
+**`academies`**
+- `id`, `name`, `logo_url`, `address`, `city`, `state`, `latitude/longitude`, `attendance_radius_meters`
+- Payment: `razorpay_key_id`, `encrypted_razorpay_secret`, `payu_merchant_key`, `encrypted_payu_salt`, `active_gateway default 'razorpay'`
+- Tenancy lifecycle: `status text default 'active'` — `'active' | 'suspended' | 'archived' | 'deleted'`, `suspended_reason text null`, `suspended_at timestamptz null`, `suspended_by uuid null`, `archived_at timestamptz null`, **`hard_delete_eligible_at timestamptz null`** (set to `archived_at + 7 days` when archived, drives the hard-delete-button gate in §10), `deleted_at timestamptz null`, `deleted_by uuid null`
+- `onboarded_by uuid`, `onboarded_at timestamptz`
+- `created_at`, `updated_at`
+
+**`academy_lifecycle_events`**
+- `id`, `academy_id`, `event_type text` — `'created' | 'suspended' | 'reactivated' | 'archived' | 'hard_deleted' | 'settings_changed' | 'superadmin_invited'`, `reason text null`, `actor_id uuid`, `created_at`
+
+### 3.3 Fees, Payments, Coupons, Discounts, Attendance — retained, academy-scoped
+
+Unchanged in structure: `fee_plans`, `fee_assignments`, `invoices`, `payments`, `coupons`, `discount_schemes`, `discount_applications`, `academy_codes` — all academy-scoped, owned/edited by that academy's superadmin/admin.
+
+Baseline correctness requirements carried in from day one: correct `payments.payment_mode` column usage, `academies.active_gateway` present from the first migration, gateway-settings writes target real encrypted columns, all numeric coupon/discount inputs validated before insert, all single-row profile fetches use `.order(created_at desc).limit(1).maybeSingle()` never bare `.single()`, avatar-initials fallback is falsy-safe, all `Print`/`Sharing`/notification-dismissal calls wrapped in try/catch, all upsert `onConflict` targets match real unique constraints.
+
+**`attendance`** — unchanged core, geotagging mandatory on every check-in (lat/lng + computed distance always recorded).
+
+**`leave_applications`** — date-range: `id`, `boxer_profile_id`, `start_date`, `end_date` (single-day = equal), `reason`, `status default 'pending'`, `reviewed_by/at null`, `rejection_reason null`, `created_at`
+
+**`attendance_polls`** / **`attendance_poll_responses`** — unchanged.
+
+### 3.4 Age & Weight Categories — global template + academy override
+
+**`age_categories`**: `id`, `academy_id uuid null` (null = BOXOS default), `name`, `min_age`, `max_age null`, `gender_scope` (`'men'|'women'|'boys'|'girls'|'all'`), `round_count default 3`, `round_duration_seconds default 180`, `rest_duration_seconds default 60`, `max_eight_counts_per_round default 3`, `max_eight_counts_per_bout default 4`, `is_active`, `created_by`, `created_at`, `updated_at`
+
+**`weight_categories`**: `id`, `academy_id uuid null`, `age_category_id` FK, `gender` (`'men'|'women'|'boys'|'girls'`), `name`, `min_kg`, `max_kg null`, `glove_oz` (`10|12`), `sort_order`, `is_active`, `created_by`, `created_at`
+
+Resolution: an academy's effective category list = its own rows plus any global (`academy_id = null`) row not overridden by name — via `effective_age_categories`/`effective_weight_categories` views, parameterized by `academy_id`. BOXOS seeds the global rows from the World Boxing tables (round timing, weight-category ranges).
+
+### 3.5 Scheduling — Rings
+
+**`academy_rings`**: `id`, `academy_id null`, `name`, `address`, `latitude/longitude`, `geofence_meters default 200`, `is_active` — no cap on ring count per academy.
+
+**`ring_schedule_templates`**: `id`, `academy_id null`, `name`, `template_type` (`'training'|'tournament'`), `days_of_week int[]`, `valid_from/valid_to date`, `is_active`, `status default 'scheduled'` (`'scheduled'|'in_progress'|'completed'|'cancelled'`), `host_academy_id null`, `is_multi_academy default false`, `created_by`, `created_at`, `updated_at`
+
+**`ring_sessions`**: `id`, `template_id`, `ring_id null`, `name`, `from_time`, `to_time`, `custom_location/lat/lng null`, `age_category_id null`, `weight_category_id null`, `academy_filter_id null`, `assigned_boxer_ids uuid[] default '{}'`, `created_at` — a template can have any number of ring sessions; a ring session can host any number of sequential bouts.
+
+**`ring_instances`**: `id`, `template_id`, `academy_id null`, `date`, `instance_type default 'regular'`, `venue_name/lat/lng null`, `geofence_meters default 200`, `is_cancelled`, `cancel_reason null`, `created_at`
+
+**`ring_instance_overrides`**, **`ring_assignment_polls`** / **`ring_assignment_poll_responses`** — unchanged day-level override + RSVP mechanic.
+
+### 3.6 Tournaments
+
+A tournament = a `ring_schedule_template` with `template_type='tournament'`. Its `ring_instances` are the competition days; each hosts any number of `ring_sessions` (rings) and each ring session any number of sequential `bouts`.
+
+### 3.7 Bouts, Rounds, Judging
+
+**`bouts`**
+- `id`, `ring_instance_id`, `ring_session_id`, `bout_number null`
+- `boxer_red_id`, `boxer_blue_id` — **CHECK: both boxers' `boxer_profiles.gender` must match `weight_categories.gender` for the bout's `weight_category_id`** (§1.4 hard rule)
+- `age_category_id`, `weight_category_id`
+- `round_count`, `round_duration_seconds`, `rest_duration_seconds` (all default from age category, editable per bout)
+- **`judge_count int`** — any value `1`–`5` inclusive (fully generalized, not restricted to 1/3/5)
+- `bout_kind` (`'training'|'tournament'`)
+- `status default 'scheduled'` — `'scheduled'|'weigh_in_confirmed'|'declaration_pending'|'ready'|'in_progress'|'paused'|'completed'|'cancelled'|'walkover'` *(`declaration_pending` only ever applies when an adult female boxer's same-day declaration isn't yet submitted, §9.1)*
+- `current_round default 0`, `current_round_state default 'pending'` (`'pending'|'active'|'resting'|'ended'`)
+- `red_declared_weight_kg/blue_declared_weight_kg null`, `weigh_in_confirmed_by/at null`
+- **`coach_id uuid NOT NULL for bout_kind='tournament'`** (nullable only for `'training'` bouts run informally) — see §6.1
+- `winner_boxer_id null`, `decision_type null` (`'WP'|'RSC'|'RSC-I'|'ABD'|'DSQ'|'DQB'|'KO'|'WO'|'DKO'|'BDSQ'`), `decision_detail jsonb null`
+- `started_at/ended_at null`
+- `completed_by uuid null` — **must be the assigned coach**; this is what "the coach marks the match complete" refers to
+- `created_by`, `created_at`, `updated_at`
+
+**Boxer eligibility guard**: suspended boxers (§8) never appear in bout/roster pickers; enforced at both query and trigger level.
+
+**`bout_rounds`**, **`bout_events`**, **`bout_judge_assignments`**, **`bout_round_scores`**, **`bout_judge_totals`**, **`boxer_bout_history`** — unchanged in shape from before; see §6 for the generalized decision math.
+
+*(pregnancy declarations are **not** a bout-only table — see the unified `pregnancy_declarations` table in §3.12, keyed off ring assignment, covering training and tournament bouts alike)*
+
+### 3.8 External Judge Temporary Access
+
+**`external_judge_invites`**: `id`, `tournament_template_id`, `email`, `full_name null`, `profile_id null`, `status default 'pending'` (`'pending'|'active'|'expired'|'revoked'`), `invited_by`, `invited_at`, `activated_at null`, `expires_at null`, `revoked_by/at null`
+
+### 3.9 Coach Ring Assignment
+
+**`coach_ring_assignments`**: `id`, `coach_profile_id`, `ring_instance_id`, `ring_session_id`, `date`, `assigned_by`, `assigned_at` — one coach can hold several rows for the same date.
+
+### 3.10 Session Feedback
+
+**`session_feedback`**: `id`, `boxer_profile_id`, `attendance_id null`, `bout_id null` (at least one set), `rpe_score int` (0–10), `comment text null`, `submitted_at`
+
+### 3.11 Physical Fitness Profile
+
+**`fitness_test_types`**: `id`, `academy_id null` (null = BOXOS default catalog: Yo-Yo IR Test, Cooper 12-Minute Run, Beep Test, Vertical Jump, 40m Sprint, Push-up Max, Plank Hold), `name`, `unit`, `description null`, `is_active`, `created_by`, `created_at`
+
+**`fitness_test_records`**: `id`, `boxer_profile_id`, `test_type_id`, `value numeric`, `unit_snapshot text`, `recorded_date date`, `recorded_by uuid`, `notes text null`, `created_at`
+
+### 3.12 Pregnancy Declaration (firm spec — see §9 for full flow)
+
+**`pregnancy_declarations`**
+- `id`
+- `boxer_profile_id` FK — only ever created for boxers where `gender = 'Female'` **and** `is_minor = false` at the moment of assignment (§1.4-style hard rule: never created for minors, regardless of category, per your decision)
+- `ring_instance_id` FK, `ring_session_id` FK — together identify the specific ring, on the specific day, she's assigned to (covers both a training slot and a tournament bout, since a bout also belongs to a `ring_instance`/`ring_session`)
+- `bout_id uuid null` — set when this occurrence is a tournament bout (display/reference convenience only, not part of the identity key)
+- `status text default 'pending_window'` — `'pending_window' | 'open' | 'submitted' | 'missed'`
+- `window_opens_at timestamptz` — computed as `(session date + ring_session.from_time) − 24 hours` at creation time
+- `submitted_at timestamptz null`, `submitted_by uuid null` (always the boxer's own `profiles.id` — never entered on her behalf)
+- `created_at timestamptz`
+- Unique constraint on `(boxer_profile_id, ring_instance_id, ring_session_id)` — exactly one declaration row per boxer per session-day.
+
+---
+
+## 4. Auth & Root Routing Logic
+
+```
+session missing                       → /login
+session, no profile                    → wait
+role = boxos_admin                      → BOXOS console directly
+
+role = superadmin
+  → academies.status = 'active'         → full dashboard
+  → academies.status = 'suspended'      → READ-ONLY mode (§10.3): only Boxers-list and
+                                           Fees/Collections screens render, read-only;
+                                           every other screen/action is blocked
+  → academies.status IN ('archived','deleted') → forced sign-out, "Academy Suspended" screen
+
+role = admin | coach
+  → academies.status != 'active'        → forced sign-out, "Academy Suspended" screen (full lockout, no exceptions)
+  → else                                 → role's dashboard directly
+
+role = athlete
+  → academies.status != 'active'        → forced sign-out, "Academy Suspended" screen (full lockout)
+  → else                                 → code-gate → onboarding → payment-wall-gated dashboard
+  → boxer_profiles.is_suspended (medical) → does NOT block login/dashboard, only blocks
+                                             attendance check-in and bout/roster selection (§8)
+
+role = external_judge
+  → access_expires_at / is_active checked on every screen mount → forced sign-out +
+    "Access Expired" screen on failure
+```
+
+Every account-creation/first-activation moment (athlete signup, admin/coach/superadmin first login after invite, external judge first login) requires accepting Terms & Privacy before the account can proceed — see §12.
+
+---
+
+## 5. Onboarding Logic (Boxer)
+
+Unchanged wizard mechanic (Personal → Guardian [conditional] → Boxing Profile → Federation IDs → Medical & Fitness → Emergency Contact → Review & Submit). Age/weight category resolution uses the boxer's academy's effective category list (§3.4). Weight-category assignment is a **category range**, not a promise of an exact-weight opponent — the flexibility is entirely on the *matchmaking* side (§1.4 point 2): an academy is never expected to have a same-exact-kg boxer on hand, only a same-gender, same-declared-range one.
+
+Terms & Privacy checkbox is mandatory on the signup form itself, before account creation — see §12.
+
+---
+
+## 6. Bout & Timer Engine
+
+### 6.1 Mandatory coach assignment
+Every **tournament** bout must have `coach_id` set before it can leave `'scheduled'` — a bout with no assigned coach cannot be started, because only the assigned coach can drive the timer or mark the bout `completed`. Training bouts may run informally without a coach assignment (`coach_id` nullable there) since they're lower-stakes practice, not part of a tournament's completion-tracking chain.
+
+### 6.2 State machine
+```
+scheduled → weigh_in_confirmed → ready → in_progress ⇄ paused → completed
+                    ↓ (adult-female boxer(s) on this bout, §9)      ↘ cancelled / walkover
+              declaration_pending → ready
+```
+A bout only ever visits `declaration_pending` if it has an adult female boxer whose pregnancy declaration for that day is still `pending_window`/`open`/`missed` when the bout would otherwise be ready to start; it advances straight from `weigh_in_confirmed` to `ready` for every other bout. See §9.1 step 7.
+
+### 6.3 Timer control (coach only, always)
+The assigned coach starts/pauses/resumes/ends rounds regardless of whether they're also a scoring judge for that bout — timer control and scoring are independent capabilities that happen to often sit on the same person. Mechanic unchanged: RPC writes a timestamp, broadcasts a Realtime event (`round_started`/`paused`/`resumed`/`ended`), every subscribed client (coach, any assigned external judges) computes its own local countdown — no per-second server writes.
+
+### 6.4 Event logging
+Coach logs `bout_events` (knockdown, warning, foul, low blow, injury timeout) in real time, visible read-only to assigned judges; a `warning` auto-applies a `-1` deduction at final tally.
+
+### 6.5 Judge-panel decision computation — generalized for `judge_count` 1–5
+1. **`judge_count = 1`** (informal/coach-only scoring): that single judge's round-by-round tally directly determines the bout's `winner_boxer_id`. `decision_detail = {"type": "single_judge"}` — no unanimous/split language applies.
+2. **`judge_count` 2–5**: for each judge, sum round scores (minus warning deductions) → per-judge winner (or a manual tie-break prompt if that judge's own total ties, same as before). Then count how many judges favour each boxer:
+   - All `judge_count` judges agree → **unanimous**, `decision_type='WP'`, `decision_detail={"type":"unanimous"}`
+   - A strict majority (more than half) agree → **split**, `decision_type='WP'`, `decision_detail={"type":"split","votes":"X-Y"}`
+   - **Exactly even (only possible when `judge_count` is 2 or 4)** → no majority exists; the app surfaces a mandatory **bout-level tie-break prompt** to the assigned coach/admin, who must nominate the winner (mirrors the per-judge tie-break requirement) — `decision_detail={"type":"panel_tie_broken","by":"<profile_id>"}`. The system never silently invents a winner.
+3. Early-stoppage decisions (RSC/RSC-I/ABD/DSQ/DQB/KO/WO/DKO/BDSQ) skip judge tallying entirely — coach/admin records the decision directly, any completed-round scores are archived for reference only.
+4. Bout completion always writes: `bouts.status='completed'`, `completed_by` = the assigned coach's `profile.id` (enforced — an admin can record a decision, but the terminal completion write is credited to the coach of record), `winner_boxer_id`, `decision_type`, `ended_at`; one `boxer_bout_history` row per boxer; atomic `boxer_profiles.record_*` update.
+
+---
+
+## 7. External Judge Access Lifecycle
+
+1. Admin/superadmin invites a judge by email, scoped to one tournament.
+2. First login forces a Terms acceptance (§12) + password change → invite `status='active'`.
+3. Admin assigns the judge to specific bouts (`bout_judge_assignments`).
+4. Judge submits one immutable scorecard per round per assigned bout; sees the same read-only synced timer as the coach's live one.
+5. **Tournament auto-completion** (replaces a purely manual "End Tournament" button as the primary path): a trigger watches every `bouts` row under a tournament template. When **all** bouts under that template have reached a terminal state (`completed`/`cancelled`/`walkover`) — i.e. every match's scheduled time has passed, every score is stored, and each bout's assigned coach has marked it complete — the template automatically transitions `status='completed'`, which cascades:
+   - Every `external_judge_invites` row scoped to it → `status='expired'`, `expires_at=now()`
+   - Every linked judge `profiles` row → `is_active=false`, `access_expires_at=now()`
+   - Hard revocation of the judge's Supabase auth session tokens via the Admin API (immediate lockout, not lockout-on-next-check)
+6. Admin/superadmin retains a **manual override** ("End Tournament Now") for edge cases (e.g. an abandoned bout that will never reach a terminal state) — same cascade, with a confirm dialog warning about any still-open bouts, which get force-cancelled.
+7. Admin/superadmin can also manually revoke a single judge's access mid-event at any time.
+
+---
+
+## 8. Medical / Injury Suspension Logic
+
+- Admin or superadmin (their own academy only) suspends a boxer: sets `is_suspended=true`, `suspension_start_date`, `suspension_end_date` (optional — null = indefinite, reinstated manually later), `suspension_reason`, `suspended_by/at`.
+- **Effective everywhere a boxer can be selected for physical activity**: bout creation/edit pickers (`boxer_red_id`/`boxer_blue_id`), ring-session roster assignment (`assigned_boxer_ids`, category-filter auto-roster) — suspended boxers are excluded from the selectable list, and a DB trigger rejects any write that would assign one anyway (defence in depth against a stale client picker).
+- **Attendance check-in** is blocked with an explicit "You are currently suspended until {date/indefinite} — contact your coach or admin" message during the suspension window.
+- **Not affected by suspension**: fee payment/invoice access, viewing schedule/notifications, viewing own profile/fitness data, submitting leave requests, messaging/notifications.
+- **Cascade on suspend**: a trigger scans for any *future* bout/ring-session assignment for that boxer falling inside the new suspension window and removes the boxer from it, firing a `boxer_suspended_reassign_needed` notification to the academy's admins so the vacated slot can be filled.
+- **Visibility**: suspension status + reason + date range shown to coach, admin, superadmin (not hidden), and the boxer themself also sees their own suspension status on their own profile.
+- **Reinstatement**: explicit admin/superadmin action (even if `suspension_end_date` has passed, the record stays until manually reinstated — an admin always makes the final "cleared to train" call, the system never auto-clears it) — sets `is_suspended=false`, `reinstated_by/at`.
+
+---
+
+## 9. Pregnancy Declaration — firm spec
+
+**Applies to**: adult female boxers only (`boxer_profiles.gender = 'Female' AND is_minor = false`) — never triggered for minors, per your decision, regardless of which weight/age category they're placed in. **Applies to every ring assignment**, not just tournament bouts — a training session and a tournament bout are treated identically by this mechanic, since both are "the athlete is assigned to a ring."
+
+**Frequency**: one fresh declaration per assigned session-day (§3.12 unique key) — no rolling-validity window, per your decision. A boxer who trains five days a week fills this out up to five times a week.
+
+### 9.1 Lifecycle
+```
+pending_window  →  open  →  submitted
+                        ↘  missed  (session start passes with nothing submitted)
+```
+
+1. **Row created at assignment time**, not lazily. The moment a non-minor female boxer is placed on a ring/session roster — via bulk template generation, an explicit `assigned_boxer_ids` edit, a day-level override, or being set as `boxer_red_id`/`boxer_blue_id` on a bout — a `pregnancy_declarations` row is created immediately with `status='pending_window'` and `window_opens_at` computed from that session's date/time. This can happen weeks in advance if the template's `valid_from`/`valid_to` range bulk-generates that far out.
+2. **Notification at creation** (`type='pregnancy_declaration_upcoming'`): "You've been assigned to {ring/session name} on {date}. A pre-session declaration will open 24 hours before." — informational only, no action possible yet.
+3. **Window opens 24 hours before** the session's `from_time`: a scheduled job flips `status='pending_window' → 'open'` and fires a second notification (`type='pregnancy_declaration_open'`): "Your pre-session declaration is now open — please complete it before {time}." From this point the boxer can submit at any time up until the session actually starts (submission is **not** cut off exactly at the 1-hour mark below — that mark is when staff get alerted, not when her own window closes).
+4. **Submission**: boxer alone, self-serve, one checkbox — "I declare that I am not currently pregnant" — no further detail requested or stored. Writes `status='submitted'`, `submitted_at=now()`, `submitted_by=her own profile id`. Immutable once written.
+5. **T-minus 1 hour before session start**: a scheduled job compiles, per ring/session, the list of assigned non-minor female boxers whose declaration is still not `'submitted'`, and:
+   - Notifies (`type='pregnancy_declaration_pending_alert'`) the coach(es) assigned to that ring/session for that day (`coach_ring_assignments`).
+   - Surfaces the same list as a **persistent card** on the coach's live Rings dashboard for that session (not just a push notification that can be dismissed and lost) — see `screens.md` §4.1.
+6. **Coach action within that final hour** (and afterward, since the window doesn't hard-close for the athlete herself): the coach can call the athlete, or use a scoped **same-day roster-edit action** — surfaced directly from the pending-declarations card — to remove/swap that boxer out of that specific day's ring/bout via the existing day-level override mechanic (§ scheduling). This is a narrow, purpose-built exception: it does not grant the coach general scheduling authority, only a same-day swap/removal reachable from this specific alert.
+7. **If session start passes with still no submission and no coach swap**: `status='missed'`. The boxer is blocked from checking in to that training session (same blocking pattern as a medical suspension, §7 of this doc), or — for a bout — the bout cannot leave `'weigh_in_confirmed'`/advance toward `'ready'` (`bouts.status` gains the intermediate value `'declaration_pending'` when this occurs on a bout, distinct from a routine `'weigh_in_confirmed'` state, so admin/coach dashboards can see exactly why a bout is stuck). A late in-person submission (she shows up and declares right there) still resolves it — `missed` isn't a dead end, just a visibility flag; resubmission re-opens the same row (`status` back to `'submitted'`) since the unique key is per session-day, not per lifecycle-attempt.
+
+### 9.2 Privacy
+Admin/coach/superadmin dashboards only ever show the **completion status** (`submitted` / `pending` / `missed`) per boxer per session — never the underlying medical fact beyond the binary of "declared or not." The declaration content itself (the fact that she ticked "not pregnant") is visible only to the boxer herself and, implicitly, to whoever has RLS read access to `pregnancy_declarations.status` for operational purposes.
+
+---
+
+## 10. BOXOS Platform Operations
+
+### 10.1 Academy monitoring
+BOXOS Admin sees every academy's status, boxer/staff counts, and aggregate revenue for tenancy-health monitoring — never drills into individual boxer PII, fee line-items, or bout data (that stays inside each academy's own RLS boundary).
+
+### 10.2 Academy creation
+BOXOS Admin fills a creation form (academy details + one or more initial superadmin emails) → edge function creates the `academies` row (`status='active'`) and, for each superadmin email, creates the `profiles` row (`role='superadmin'`, that `academy_id`) + sends temp-password credentials via the same pattern as any other invited-staff account.
+
+### 10.3 Suspension (full lockout, superadmin read-only exception)
+BOXOS Admin suspends an academy with a required reason. Cascades:
+- `admin`, `coach`, `athlete` roles in that academy: **fully locked out** — forced sign-out on next check, no exceptions, no read access at all.
+- `superadmin` role: **not locked out**, but drops into read-only mode limited to exactly two views — the Boxers list and the Fees/Collections view (§ auth routing, §4) — every write action and every other screen is inaccessible while suspended.
+- Reactivation (`status='active'`) restores full access for everyone immediately.
+
+### 10.4 Archive → 7-day cool-off → hard delete with auto-export
+1. BOXOS Admin archives an academy (`status='archived'`, `archived_at=now()`, `hard_delete_eligible_at=archived_at+7 days`). Archived behaves like suspended for lockout purposes (full lockout for non-superadmin roles, read-only two-screen access for superadmin) — data is retained, nothing is deleted yet.
+2. For 7 days, the academy sits in `archived` — BOXOS Admin can still reactivate it back to `active` within this window, undoing the archive.
+3. Once `now() >= hard_delete_eligible_at`, a **"Delete Permanently"** action becomes available to BOXOS Admin (not before — the button doesn't exist until the 7 days have elapsed).
+4. Triggering it: the edge function first assembles the academy's full data export — boxer profiles, fee/invoice/payment history, attendance records, bout history, fitness records — as a bundle of CSV files, which **auto-downloads to the BOXOS Admin's device before deletion proceeds**. Only after the export completes does the function hard-delete the academy's rows (`status='deleted'`, `deleted_at/by` recorded on a tombstone row before cascade-deleting the rest, so the lifecycle log retains a record that the academy existed and was deleted, even though its operational data is gone).
+5. Logged to `academy_lifecycle_events` (`event_type='hard_deleted'`).
+
+---
+
+## 11. Session Feedback & Fitness Profile Logic — unchanged from prior spec
+
+RPE (0–10) + optional comment after check-in/bout completion, immutable once submitted. Fitness test records via the academy's effective test catalog (global BOXOS defaults + the academy's own additions), chronological history per test type on the boxer's profile.
+
+---
+
+## 12. Terms & Privacy Consent (new)
+
+Every self-serve or invite-activated account-creation flow requires an explicit, forced tick-box agreement before the account can be used — not a soft "by continuing you agree" footnote:
+- **Athlete signup** (§2.2 in screens.md): checkbox required, unchecked = "Create account" button stays disabled. Writes `profiles.terms_accepted_at`, `terms_version`.
+- **Any invited-staff first login** (admin, coach, superadmin, external judge) — the forced first-login flow (already required for password setup) also requires ticking the same agreement before proceeding to the dashboard.
+- BOXOS Admin accounts are DB-created directly and are exempt from any in-app consent screen (there is no in-app path for them at all).
+- `terms_version` lets a future re-consent flow be added (not built now, just not blocked by the schema) if the terms change and existing users need to re-accept.
+
+---
+
+## 13. Security / RLS Model
+
+| Domain | BOXOS Admin | Superadmin (own academy) | Admin (own academy) | Coach | Athlete | External Judge |
+|---|---|---|---|---|---|---|
+| `academies` (own) | R/W all, create/suspend/archive/delete | R (own); read-only-two-screens only while suspended | R (own) | — | — | — |
+| Other academies | — | — | — | — | — | — |
+| Boxer profiles | — | R/W (own academy); read-only while suspended | R/W (own academy) | R (assigned-ring roster) | R/W own | R (name/category/corner, assigned bout only) |
+| Boxer medical suspension | — | R/W (own academy) | R/W (own academy) | R (assigned boxers) | R own | — |
+| Fees/invoices/payments/coupons | — | R/W (own academy); read-only while suspended | R/W (own academy) | — | R/W own | — |
+| Attendance / leave | — | R/W (own academy) | R/W (own academy) | R (assigned roster), mark-assist | R/W own | — |
+| Categories / fitness catalog | R/W global rows | R/W own-academy rows | R (own academy effective set) | R | R | — |
+| Bouts/rounds/scores | — | R/W (own academy) | R/W (own academy) | R/W assigned rings | R own (post-completion) | W own judge-assignment rows only, insert-only |
+| Pregnancy declarations (§3.12, §9) | — | R (completion status only, own academy) | R (completion status only) | R (completion status only, assigned rings) + same-day swap action on non-compliant rows | R/W own (the boxer herself, self-serve only — never entered by staff) | — |
+| Session feedback / fitness records | — | R (own academy) | R (own academy) | R/W assigned boxers | R/W own | — |
+| `external_judge_invites` | — | R/W (own academy) | R/W (own academy) | — | — | — |
+| Create Superadmin | ✓ (only path) | — | — | — | — | — |
+| Create Admin/Coach | — | ✓ (only path) | — | — | — | — |
+| Platform aggregate stats | R | — | — | — | — | — |
+
+---
+
+## 14. Non-Functional Notes
+
+- Attendance offline-queueing retained; bout scoring is not offline-queued (judge must be online).
+- All Edge Functions touching payment secrets or privileged Admin-API actions (academy lifecycle, external-judge account creation/revocation, staff invites) run service-role server-side, always re-verifying the caller's role/academy scope — never trusted from client-supplied claims.
+- Academy suspension/archive/delete are BOXOS-only actions, logged to `academy_lifecycle_events`.
+- The bout-completion path is the single trigger for tournament-wide judge-credential expiry — this makes "one coach per bout, coach ends the match" a load-bearing requirement, not a nicety (§6.1, §7 step 5).

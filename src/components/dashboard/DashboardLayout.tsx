@@ -21,7 +21,7 @@ export interface NavSection {
 interface DashboardLayoutProps {
   navSections: NavSection[];
   basePath: string;
-  role: "Athlete" | "Admin" | "Superadmin";
+  role: "Athlete" | "Admin" | "Superadmin" | "Coach" | "Judge";
   userName: string;
   userMeta: string;
   accentClass?: string;
@@ -199,7 +199,9 @@ export function DashboardLayout({
                             ? "var(--color-admin)"
                             : accentClass.includes("superadmin")
                               ? "var(--color-superadmin)"
-                              : "var(--color-primary)",
+                              : accentClass.includes("coach")
+                                ? "var(--color-coach)"
+                                : "var(--color-primary)",
                         }}
                       />
                     )}

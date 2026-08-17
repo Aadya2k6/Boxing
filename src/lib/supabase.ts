@@ -74,7 +74,7 @@ export const supabase: SupabaseClient = isBrowser
 export { getOrCreateClient as getSupabaseClient };
 
 // ── TypeScript types ───────────────────────────────────────────────────
-export type UserRole = "athlete" | "admin" | "superadmin";
+export type UserRole = "athlete" | "admin" | "superadmin" | "coach" | "external_judge";
 export type VerificationStatus = "pending" | "approved" | "flagged" | "manual_review";
 export type InvoiceStatus = "unpaid" | "partially_paid" | "paid" | "overdue";
 export type AccessStatus =

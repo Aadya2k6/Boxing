@@ -3,7 +3,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Badge } from "@/components/dashboard/DashboardLayout";
 import {
   MapPin, CalendarCheck, Send, Loader2, Check, X,
-  AlertCircle, Navigation, CalendarX, ClipboardList
+  AlertCircle, Navigation, CalendarX, ClipboardList,
+  Ban, Star, MessageSquare
 } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useAuth } from "@/lib/auth";
@@ -619,6 +620,32 @@ function AttendancePage() {
             )}
           </div>
 
+          {/* ── [NEW] Suspension notice ── TODO: wire to medical_suspensions table */}
+          {(athleteProfile as any)?.is_suspended && (
+            <div className="flex items-start gap-3 bg-destructive/8 border border-destructive/25 rounded-xl px-4 py-4">
+              <Ban className="size-5 text-destructive shrink-0 mt-0.5" strokeWidth={2} />
+              <div>
+                <div className="font-semibold text-destructive">Training paused — Medical Suspension</div>
+                <div className="text-sm text-muted-foreground mt-1">
+                  Check-in is disabled while your suspension is active.{" "}
+                  {(athleteProfile as any).suspension_reason && `Reason: ${(athleteProfile as any).suspension_reason}`}
+                </div>
+                {(athleteProfile as any).suspension_end_date ? (
+                  <div className="text-xs text-muted-foreground mt-1">
+                    Until: {new Date((athleteProfile as any).suspension_end_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                  </div>
+                ) : (
+                  <div className="text-xs text-muted-foreground mt-1">Duration: Indefinite</div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── [NEW] Session feedback prompt ── shown after check-in ── TODO: wire to session_feedback */}
+          {alreadyMarked && (
+            <SessionFeedbackCard />
+          )}
+
           {/* Attendance log */}
           <div className="bg-surface border border-border rounded-xl overflow-hidden">
             <div className="px-5 py-4 border-b border-border">
@@ -740,5 +767,82 @@ function AttendancePage() {
         </div>
       )}
     </AccessGuard>
+  );
+}
+
+// ── [NEW] SessionFeedbackCard ── §3.3 of screens.md ──────────────────────────
+// TODO: wire to session_feedback table once it exists
+function SessionFeedbackCard() {
+  const [rpe, setRpe] = useState<number | null>(null);
+  const [comment, setComment] = useState("");
+  const [submitted, setSubmitted] = useState(false);
+  const [skipped, setSkipped] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  if (submitted) {
+    return (
+      <div className="bento-card p-5 flex items-center gap-3">
+        <Check className="size-5 text-success shrink-0" />
+        <div>
+          <div className="font-semibold text-sm">Feedback recorded</div>
+          <div className="text-xs text-muted-foreground mt-0.5">Thanks for rating today's session!</div>
+        </div>
+      </div>
+    );
+  }
+  if (skipped) return null;
+
+  return (
+    <div className="bento-card p-5">
+      <div className="flex items-center gap-2 mb-4">
+        <MessageSquare className="size-4 text-primary-dark" strokeWidth={1.75} />
+        <div className="font-semibold text-sm">How did today's session feel?</div>
+      </div>
+      <div className="mb-4">
+        <div className="text-xs text-muted-foreground mb-2">RPE (0 = rest, 10 = max effort)</div>
+        <div className="flex gap-1 flex-wrap">
+          {Array.from({ length: 11 }, (_, i) => (
+            <button
+              key={i}
+              onClick={() => setRpe(i)}
+              className={`w-9 h-9 rounded-lg text-sm font-semibold border transition-all cursor-pointer ${
+                rpe === i
+                  ? "bg-primary text-primary-foreground border-primary"
+                  : "bg-surface border-border text-muted-foreground hover:border-border-strong hover:text-foreground"
+              }`}
+            >
+              {i}
+            </button>
+          ))}
+        </div>
+      </div>
+      <textarea
+        value={comment}
+        onChange={(e) => setComment(e.target.value)}
+        placeholder="Optional notes about today's session…"
+        rows={2}
+        className="input-premium resize-none mb-4"
+      />
+      <div className="flex items-center gap-2">
+        <button
+          onClick={async () => {
+            if (rpe === null) return;
+            setSubmitting(true);
+            // TODO: supabase.from("session_feedback").insert({ rpe, comment })
+            await new Promise(r => setTimeout(r, 600));
+            setSubmitted(true);
+            setSubmitting(false);
+          }}
+          disabled={rpe === null || submitting}
+          className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 hover:bg-primary-dark transition cursor-pointer"
+        >
+          {submitting ? <Loader2 className="size-3.5 animate-spin" /> : <Send className="size-3.5" />}
+          Submit Feedback
+        </button>
+        <button onClick={() => setSkipped(true)} className="px-3 py-2 text-sm text-muted-foreground hover:text-foreground transition cursor-pointer">
+          Skip
+        </button>
+      </div>
+    </div>
   );
 }

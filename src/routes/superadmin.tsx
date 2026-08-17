@@ -2,7 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
 import {
   Building2, Cog, Wallet, Tag, Undo2, BarChart3,
-  ShieldCheck, Settings, MapPin, Users2, ClipboardList, Bell, CalendarCheck
+  ShieldCheck, Settings, MapPin, Users2, ClipboardList, Bell, CalendarCheck,
+  Swords, Gavel, Layers
 } from "lucide-react";
 import { useRequireAuth } from "@/lib/guards";
 
@@ -36,6 +37,9 @@ function SuperLayout() {
             { to: "fees", label: "Fee Structure", icon: Wallet },
             { to: "discounts", label: "Discounts & Penalties", icon: Tag },
             { to: "class-assigning", label: "Class Assigning", icon: ClipboardList },
+            { to: "bouts", label: "Bout Management", icon: Swords },
+            { to: "judges", label: "External Judges", icon: Gavel },
+            { to: "categories", label: "Age & Weight Categories", icon: Layers },
           ],
         },
         {

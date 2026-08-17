@@ -7,7 +7,7 @@ import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/superadmin/users")({ component: UsersPage });
 
-const roleColors: Record<string, any> = { superadmin: "gold", admin: "info", athlete: undefined };
+const roleColors: Record<string, any> = { superadmin: "gold", admin: "info", coach: "neutral", athlete: undefined };
 
 function UsersPage() {
   const { user: currentUser } = useAuth();
@@ -16,7 +16,7 @@ function UsersPage() {
   const [q, setQ] = useState("");
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState<"admin" | "superadmin">("admin");
+  const [inviteRole, setInviteRole] = useState<"admin" | "coach">("admin");
   const [inviteName, setInviteName] = useState("");
   const [invitePass, setInvitePass] = useState("");
   const [showPass, setShowPass] = useState(false);
@@ -193,7 +193,7 @@ function UsersPage() {
                   <td className="py-3.5 text-muted-foreground text-sm">{u.email}</td>
                   <td className="py-3.5">
                     <Badge tone={roleColors[u.role] ?? "default"}>
-                      {u.role === "superadmin" ? <><Shield className="size-2.5 inline mr-1" />Superadmin</> : u.role === "admin" ? "Admin" : "Athlete"}
+                      {u.role === "superadmin" ? <><Shield className="size-2.5 inline mr-1" />Superadmin</> : u.role === "admin" ? "Admin" : u.role === "coach" ? "Coach" : "Athlete"}
                     </Badge>
                   </td>
                   <td className="py-3.5">
@@ -258,8 +258,10 @@ function UsersPage() {
                 <label className="block text-xs font-semibold mb-1.5">Role *</label>
                 <select value={inviteRole} onChange={e => setInviteRole(e.target.value as any)} className="input-premium appearance-none">
                   <option value="admin">Admin</option>
-                  <option value="superadmin">Superadmin</option>
+                  <option value="coach">Coach</option>
+                  {/* Superadmin is intentionally absent — see architecture.md §1.2 */}
                 </select>
+                <p className="text-[11px] text-muted-foreground mt-1.5">Need another Superadmin? Contact BOXOS support — superadmin accounts can only be created from the BOXOS platform console.</p>
               </div>
               {saveError && <p className="text-xs text-destructive">{saveError}</p>}
               <div className="flex gap-3 pt-1">

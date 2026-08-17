@@ -8,6 +8,7 @@ import {
   Scripts,
 } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth";
+import { DevRoleSwitcher } from "@/components/dev/DevRoleSwitcher";
 
 import appCss from "../styles.css?url";
 
@@ -134,6 +135,7 @@ function RootComponent() {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <Outlet />
+        <DevRoleSwitcher />
       </AuthProvider>
     </QueryClientProvider>
   );

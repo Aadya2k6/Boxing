@@ -33,6 +33,7 @@ function AthletesPage() {
   const [reassignId, setReassignId] = useState<string | null>(null); // athlete id to reassign academy
   const [reassignAcademy, setReassignAcademy] = useState("");
   const [reassigning, setReassigning] = useState(false);
+  const [suspendActionId, setSuspendActionId] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
@@ -207,6 +208,30 @@ function AthletesPage() {
       loadData();
     } finally {
       setReassigning(false);
+    }
+  }
+
+  async function handleToggleSuspension(athleteId: string, currentlySuspended: boolean) {
+    setSuspendActionId(athleteId);
+    try {
+      await supabase.from("athlete_profiles")
+        .update({ is_suspended: !currentlySuspended })
+        .eq("id", athleteId);
+      
+      const athlete = athletes.find(a => a.id === athleteId);
+      if (athlete?.user_id) {
+        await supabase.from("notifications").insert({
+          recipient_id: athlete.user_id,
+          type: "status_changed",
+          title: !currentlySuspended ? "Account Suspended" : "Account Reinstated",
+          body: !currentlySuspended 
+            ? "Your account has been suspended by the academy admin. Please contact the administration."
+            : "Your account has been reinstated. You can now access your dashboard.",
+        });
+      }
+      loadData();
+    } finally {
+      setSuspendActionId(null);
     }
   }
 
@@ -450,6 +475,7 @@ function AthletesPage() {
                       <div>
                         <div className="font-medium text-sm">{a.full_name}</div>
                         <div className="text-[11px] text-muted-foreground">{a.training_year ?? "—"}</div>
+                        {a.is_suspended && <span className="badge badge-danger text-[9px] mt-1">Suspended</span>}
                       </div>
                     </div>
                   </td>
@@ -488,6 +514,16 @@ function AthletesPage() {
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     <div className="flex items-center gap-1 justify-end">
+                      {/* Suspend/Reinstate */}
+                      <button
+                        onClick={() => handleToggleSuspension(a.id, a.is_suspended)}
+                        title={a.is_suspended ? "Reinstate Athlete" : "Suspend Athlete"}
+                        disabled={suspendActionId === a.id}
+                        className={`text-[11px] font-semibold px-2.5 py-1 rounded-md transition disabled:opacity-50 ${a.is_suspended ? "bg-success/10 text-success hover:bg-success/20" : "bg-destructive/10 text-destructive hover:bg-destructive/20"}`}
+                      >
+                        {suspendActionId === a.id ? <Loader2 className="size-3 animate-spin" /> : a.is_suspended ? "Reinstate" : "Suspend"}
+                      </button>
+
                       {/* Reassign academy — always visible */}
                       <button
                         onClick={() => { setReassignId(a.id); setReassignAcademy(a.academy_id ?? ""); }}

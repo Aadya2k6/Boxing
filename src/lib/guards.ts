@@ -29,6 +29,10 @@ export function useRequireAuth(requiredRole?: UserRole) {
         navigate({ to: "/superadmin" });
       } else if (profile.role === "athlete") {
         navigate({ to: "/athlete" });
+      } else if (profile.role === "coach") {
+        navigate({ to: "/coach" as any });
+      } else if (profile.role === "external_judge") {
+        navigate({ to: "/judge" as any });
       } else {
         navigate({ to: "/login" });
       }
@@ -60,6 +64,10 @@ export function useRequireAthlete() {
         navigate({ to: "/admin" });
       } else if (profile.role === "superadmin") {
         navigate({ to: "/superadmin" });
+      } else if (profile.role === "coach") {
+        navigate({ to: "/coach" as any });
+      } else if (profile.role === "external_judge") {
+        navigate({ to: "/judge" as any });
       } else {
         navigate({ to: "/login" });
       }
@@ -76,10 +84,12 @@ export function useRedirectIfLoggedIn() {
 
   useEffect(() => {
     if (loading || !session || !profile) return;
-    const dest =
+    const dest: string =
       profile.role === "admin" ? "/admin" :
         profile.role === "superadmin" ? "/superadmin" :
-          "/athlete";
-    navigate({ to: dest });
+          profile.role === "coach" ? "/coach" :
+            profile.role === "external_judge" ? "/judge" :
+              "/athlete";
+    navigate({ to: dest as any });
   }, [session, profile, loading, navigate]);
 }

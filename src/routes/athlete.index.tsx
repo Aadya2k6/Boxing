@@ -16,6 +16,8 @@ import {
   Loader2,
   Tag,
   RotateCcw,
+  Baby,
+  AlertCircle,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -245,6 +247,69 @@ function AthleteOverview() {
             ) : undefined
           }
         />
+
+        {/* ── [NEW] Pregnancy Declaration Banners — conditional, adult female only ———————— */}
+        {/* TODO: replace stub with real data from pregnancy_declarations table once it exists */}
+        {(() => {
+          const gender = (athleteProfile as any)?.gender?.toLowerCase();
+          const dob = athleteProfile?.date_of_birth;
+          const isAdultFemale = gender === "female" && dob && (
+            (new Date().getFullYear() - new Date(dob).getFullYear()) >= 18
+          );
+          if (!isAdultFemale || !isUnlocked) return null;
+
+          // Stub declarations — TODO: wire to pregnancy_declarations table
+          const openDeclarations: { sessionName: string; date: string; time: string }[] = [];
+          const missedDeclarations: { sessionName: string; date: string }[] = [];
+          const upcomingDeclarations: { sessionName: string; date: string }[] = [
+            // Example: { sessionName: "Morning Training — Ring A", date: "2026-08-20" }
+          ];
+
+          if (openDeclarations.length === 0 && missedDeclarations.length === 0 && upcomingDeclarations.length === 0) return null;
+
+          return (
+            <div className="space-y-2">
+              {/* Missed declarations — warning tone */}
+              {missedDeclarations.map((d, i) => (
+                <div key={i} className="flex items-start gap-3 bg-warning/8 border border-warning/25 rounded-xl px-4 py-3">
+                  <AlertCircle className="size-4 text-warning shrink-0 mt-0.5" strokeWidth={2} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold text-warning">Declaration window closed</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{d.sessionName} · {new Date(d.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} — contact your coach</div>
+                  </div>
+                </div>
+              ))}
+
+              {/* Open declarations — action required */}
+              {openDeclarations.map((d, i) => (
+                <div key={i} className="flex items-center gap-3 bg-destructive/8 border border-destructive/25 rounded-xl px-4 py-3">
+                  <Baby className="size-4 text-destructive shrink-0" strokeWidth={2} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-semibold">Pre-session declaration required</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">{d.sessionName} · {d.time}</div>
+                  </div>
+                  <button
+                    onClick={() => {/* TODO: open declaration dialog */}}
+                    className="text-xs font-semibold text-destructive hover:underline shrink-0 cursor-pointer"
+                  >
+                    Declare Now →
+                  </button>
+                </div>
+              ))}
+
+              {/* Upcoming declarations — info only */}
+              {upcomingDeclarations.map((d, i) => (
+                <div key={i} className="flex items-start gap-3 bg-info/8 border border-info/20 rounded-xl px-4 py-3">
+                  <Info className="size-4 text-info shrink-0 mt-0.5" strokeWidth={1.75} />
+                  <div className="text-sm text-muted-foreground">
+                    Declaration will open 24 h before <span className="font-medium text-foreground">{d.sessionName}</span>, {new Date(d.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          );
+        })()}
+
 
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mt-6">
           <StatCard
