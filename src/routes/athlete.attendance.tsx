@@ -620,7 +620,7 @@ function AttendancePage() {
             )}
           </div>
 
-          {/* ── [NEW] Suspension notice ── TODO: wire to medical_suspensions table */}
+          {/* ── Suspension notice ── */}
           {(athleteProfile as any)?.is_suspended && (
             <div className="flex items-start gap-3 bg-destructive/8 border border-destructive/25 rounded-xl px-4 py-4">
               <Ban className="size-5 text-destructive shrink-0 mt-0.5" strokeWidth={2} />
@@ -641,9 +641,12 @@ function AttendancePage() {
             </div>
           )}
 
-          {/* ── [NEW] Session feedback prompt ── shown after check-in ── TODO: wire to session_feedback */}
+          {/* ── Session feedback prompt ── shown after check-in */}
           {alreadyMarked && (
-            <SessionFeedbackCard />
+            <SessionFeedbackCard 
+              boxerProfileId={athleteProfile.id} 
+              attendanceId={attendanceLog.find(a => a.date === todayStr && a.status === "present")?.id}
+            />
           )}
 
           {/* Attendance log */}
@@ -770,9 +773,8 @@ function AttendancePage() {
   );
 }
 
-// ── [NEW] SessionFeedbackCard ── §3.3 of screens.md ──────────────────────────
-// TODO: wire to session_feedback table once it exists
-function SessionFeedbackCard() {
+// ── SessionFeedbackCard ── §3.3 of screens.md ──────────────────────────
+function SessionFeedbackCard({ boxerProfileId, attendanceId }: { boxerProfileId: string; attendanceId?: string }) {
   const [rpe, setRpe] = useState<number | null>(null);
   const [comment, setComment] = useState("");
   const [submitted, setSubmitted] = useState(false);
@@ -828,7 +830,14 @@ function SessionFeedbackCard() {
           onClick={async () => {
             if (rpe === null) return;
             setSubmitting(true);
-            // TODO: supabase.from("session_feedback").insert({ rpe, comment })
+            if (boxerProfileId) {
+              await supabase.from("session_feedback").insert({ 
+                boxer_profile_id: boxerProfileId,
+                attendance_id: attendanceId || null,
+                rpe_score: rpe,
+                comment: comment.trim() || null
+              });
+            }
             await new Promise(r => setTimeout(r, 600));
             setSubmitted(true);
             setSubmitting(false);

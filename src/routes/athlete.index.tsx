@@ -40,6 +40,7 @@ function AthleteOverview() {
   const [feeAssignment, setFeeAssignment] = useState<any>(null);
   const [latestInvoice, setLatestInvoice] = useState<any>(null);
   const [hasUsedRollover, setHasUsedRollover] = useState(false);
+  const [pregnancyDeclarations, setPregnancyDeclarations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -205,6 +206,17 @@ function AthleteOverview() {
       
       setHasUsedRollover(!!(unclearedRollover && unclearedRollover.length > 0));
 
+      // Fetch pregnancy declarations
+      const { data: pregDecls } = await supabase
+        .from("pregnancy_declarations")
+        .select(`
+          id, status, window_opens_at, ring_sessions(name)
+        `)
+        .eq("boxer_profile_id", ap.id)
+        .order("window_opens_at", { ascending: false })
+        .limit(10);
+      setPregnancyDeclarations(pregDecls || []);
+
     } finally {
       setLoading(false);
     }
@@ -258,8 +270,7 @@ function AthleteOverview() {
           }
         />
 
-        {/* ── [NEW] Pregnancy Declaration Banners — conditional, adult female only ———————— */}
-        {/* TODO: replace stub with real data from pregnancy_declarations table once it exists */}
+        {/* ── Pregnancy Declaration Banners — conditional, adult female only ———————— */}
         {(() => {
           const gender = (athleteProfile as any)?.gender?.toLowerCase();
           const dob = athleteProfile?.date_of_birth;
@@ -268,12 +279,24 @@ function AthleteOverview() {
           );
           if (!isAdultFemale || !isUnlocked) return null;
 
-          // Stub declarations — TODO: wire to pregnancy_declarations table
-          const openDeclarations: { sessionName: string; date: string; time: string }[] = [];
-          const missedDeclarations: { sessionName: string; date: string }[] = [];
-          const upcomingDeclarations: { sessionName: string; date: string }[] = [
-            // Example: { sessionName: "Morning Training — Ring A", date: "2026-08-20" }
-          ];
+          const openDeclarations: { sessionName: string; date: string; time: string; id: string }[] = [];
+          const missedDeclarations: { sessionName: string; date: string; id: string }[] = [];
+          const upcomingDeclarations: { sessionName: string; date: string; id: string }[] = [];
+
+          pregnancyDeclarations.forEach(pd => {
+            const dateObj = new Date(pd.window_opens_at);
+            const dateStr = dateObj.toLocaleDateString("en-US", { year: 'numeric', month: 'short', day: 'numeric' });
+            const timeStr = dateObj.toLocaleTimeString("en-US", { hour: '2-digit', minute: '2-digit' });
+            const sName = (pd.ring_sessions as any)?.name || "Session";
+
+            if (pd.status === "open") {
+              openDeclarations.push({ sessionName: sName, date: dateStr, time: timeStr, id: pd.id });
+            } else if (pd.status === "missed") {
+              missedDeclarations.push({ sessionName: sName, date: dateStr, id: pd.id });
+            } else if (pd.status === "pending_window") {
+              upcomingDeclarations.push({ sessionName: sName, date: dateStr, id: pd.id });
+            }
+          });
 
           if (openDeclarations.length === 0 && missedDeclarations.length === 0 && upcomingDeclarations.length === 0) return null;
 
@@ -299,7 +322,10 @@ function AthleteOverview() {
                     <div className="text-xs text-muted-foreground mt-0.5">{d.sessionName} · {d.time}</div>
                   </div>
                   <button
-                    onClick={() => {/* TODO: open declaration dialog */}}
+                    onClick={async () => {
+                      await supabase.from("pregnancy_declarations").update({ status: "submitted", submitted_at: new Date().toISOString() }).eq("id", d.id);
+                      loadDashboard();
+                    }}
                     className="text-xs font-semibold text-destructive hover:underline shrink-0 cursor-pointer"
                   >
                     Declare Now →
@@ -615,14 +641,25 @@ function PaymentWall({
         })
         .eq("id", assignment.id);
 
-      // 2. Notify all superadmins
-      const { data: superadmins } = await supabase
-        .from("profiles")
-        .select("id")
-        .eq("role", "superadmin");
+      // 2. Notify ALL admins who can approve: superadmins + academy's own admins
+      const academyId = athleteAcademyId;
+      
+      const [{ data: superadmins }, { data: academyAdmins }] = await Promise.all([
+        supabase.from("profiles").select("id").eq("role", "superadmin"),
+        academyId
+          ? supabase.from("profiles").select("id").eq("role", "admin").eq("academy_id", academyId)
+          : Promise.resolve({ data: [] }),
+      ]);
 
-      if (superadmins && superadmins.length > 0) {
-        const notifications = superadmins.map((sa: any) => ({
+      const allAdmins = [
+        ...(superadmins ?? []),
+        ...(academyAdmins ?? []),
+      ];
+      // Deduplicate by id
+      const uniqueAdmins = Array.from(new Map(allAdmins.map((a: any) => [a.id, a])).values());
+
+      if (uniqueAdmins.length > 0) {
+        const notifications = uniqueAdmins.map((sa: any) => ({
           recipient_id: sa.id,
           type: "rollover_requested",
           title: "Rollover payment request",
@@ -744,10 +781,35 @@ function PaymentWall({
             .eq("id", payableInvoice.id);
         } catch (_) {}
       }
+
+      // Mark the assignment as cash_pending so admin/superadmin sees it
       await supabase
         .from("fee_assignments")
         .update({ assignment_status: "cash_pending", payment_mode: "cash" })
         .eq("id", assignment.id);
+
+      // Notify the athlete's academy admins (both admin + superadmin roles)
+      const academyId = athleteAcademyId;
+      if (academyId) {
+        const { data: adminUsers } = await supabase
+          .from("profiles")
+          .select("id")
+          .eq("academy_id", academyId)
+          .in("role", ["admin", "superadmin"]);
+
+        if (adminUsers && adminUsers.length > 0) {
+          await supabase.from("notifications").insert(
+            adminUsers.map((a: any) => ({
+              recipient_id: a.id,
+              type: "cash_pending",
+              title: "Cash payment pending approval",
+              body: `${profile?.full_name ?? "An athlete"} has notified you of a cash payment for "${assignment?.fee_plans?.plan_name ?? "Fee Plan"}". Please confirm receipt to unlock their dashboard.`,
+              related_entity_id: assignment.id,
+              related_entity_type: "fee_assignment",
+            }))
+          );
+        }
+      }
 
       onRefresh();
       refreshAccess();

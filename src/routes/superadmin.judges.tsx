@@ -17,27 +17,70 @@ function statusBadge(s: InviteStatus) {
 
 function InviteModal({ onClose, academies, tournaments, onInvite }: { onClose: () => void, academies: any[], tournaments: any[], onInvite: () => void }) {
   const { user } = useAuth();
-  const [form, setForm] = useState({ email: "", name: "", tournament: tournaments[0]?.id || "", academy: academies[0]?.id || "" });
+  const [form, setForm] = useState({ email: "", name: "", password: "", tournament: tournaments[0]?.id || "", academy: academies[0]?.id || "" });
   const [submitting, setSubmitting] = useState(false);
   
-  async function handleSubmit() {
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.email || !form.password) {
+      toast.error("Please provide both email and password.");
+      return;
+    }
     setSubmitting(true);
     try {
       if (!form.tournament || !form.academy) throw new Error("Please select a tournament and academy.");
-      const { error } = await supabase.from("external_judge_invites").insert({
+
+      // 1. Create auth user with temporary client (does not overwrite superadmin session)
+      const { createClient } = await import("@supabase/supabase-js");
+      const tempClient = createClient(
+        import.meta.env.VITE_SUPABASE_URL,
+        import.meta.env.VITE_SUPABASE_ANON_KEY,
+        { auth: { persistSession: false, autoRefreshToken: false } }
+      );
+
+      const { data: authData, error: authError } = await tempClient.auth.signUp({
+        email: form.email,
+        password: form.password,
+        options: {
+          data: {
+            full_name: form.name || "Judge",
+            role: "external_judge",
+            academy_id: form.academy,
+          },
+        },
+      });
+
+      if (authError && !authError.message.toLowerCase().includes("already registered")) {
+        throw authError;
+      }
+
+      if (authData?.user) {
+        await supabase.from("profiles").upsert({
+          id: authData.user.id,
+          email: form.email,
+          full_name: form.name || "Judge",
+          role: "external_judge",
+          academy_id: form.academy,
+        });
+      }
+
+      // 2. Insert into external_judge_invites
+      const { error: inviteErr } = await supabase.from("external_judge_invites").insert({
         email: form.email,
         full_name: form.name || null,
         tournament_template_id: form.tournament,
         academy_id: form.academy,
         invited_by: user?.id,
-        status: "pending"
+        status: "accepted",
       });
-      if (error) throw error;
-      toast.success(`Invite sent to ${form.email}`);
+
+      if (inviteErr) throw inviteErr;
+
+      toast.success(`Judge account & invite created for ${form.email}! They can now log in to /judge.`);
       onInvite();
       onClose();
     } catch (e: any) {
-      toast.error(e.message);
+      toast.error(e.message || "Failed to invite judge");
     } finally {
       setSubmitting(false);
     }
@@ -50,13 +93,18 @@ function InviteModal({ onClose, academies, tournaments, onInvite }: { onClose: (
           <div className="font-display font-bold">Invite External Judge</div>
           <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer"><X className="size-4" /></button>
         </div>
-        <div className="p-5 space-y-4">
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
           <label className="block">
-            <span className="block text-xs font-semibold mb-1.5">Email *</span>
+            <span className="block text-xs font-semibold mb-1.5">Email Address *</span>
             <input type="email" required value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} className="input-premium" placeholder="judge@example.com" />
           </label>
           <label className="block">
-            <span className="block text-xs font-semibold mb-1.5">Name (optional)</span>
+            <span className="block text-xs font-semibold mb-1.5">Portal Password *</span>
+            <input type="password" required minLength={6} value={form.password} onChange={e => setForm(f => ({ ...f, password: e.target.value }))} className="input-premium" placeholder="Min 6 characters" />
+            <span className="text-[11px] text-muted-foreground mt-1 block">Used by the external judge to log in to the Judge Portal.</span>
+          </label>
+          <label className="block">
+            <span className="block text-xs font-semibold mb-1.5">Judge Name (optional)</span>
             <input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="input-premium" placeholder="Full name" />
           </label>
           <label className="block">
@@ -66,16 +114,18 @@ function InviteModal({ onClose, academies, tournaments, onInvite }: { onClose: (
             </select>
           </label>
           <label className="block">
-            <span className="block text-xs font-semibold mb-1.5">Tournament scope</span>
+            <span className="block text-xs font-semibold mb-1.5">Tournament Scope</span>
             <select required value={form.tournament} onChange={e => setForm(f => ({ ...f, tournament: e.target.value }))} className="input-premium">
               {tournaments.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
           </label>
-        </div>
-        <div className="flex justify-end gap-2 p-5 border-t border-border">
-          <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-elevated cursor-pointer">Cancel</button>
-          <button onClick={handleSubmit} disabled={!form.email || submitting} className="px-4 py-2 text-sm bg-primary-dark text-white rounded-lg disabled:opacity-50 font-semibold cursor-pointer hover:bg-primary-dark/90">{submitting ? "Sending…" : "Send Invite"}</button>
-        </div>
+          <div className="flex justify-end gap-2 pt-2 border-t border-border">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-lg hover:bg-elevated cursor-pointer">Cancel</button>
+            <button type="submit" disabled={!form.email || !form.password || submitting} className="px-4 py-2 text-sm bg-primary text-primary-foreground rounded-lg disabled:opacity-50 font-semibold cursor-pointer hover:bg-primary/90 transition shadow-sm">
+              {submitting ? "Creating Account…" : "Create & Send Invite"}
+            </button>
+          </div>
+        </form>
       </div>
     </div>
   );

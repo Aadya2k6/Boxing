@@ -193,14 +193,12 @@ function SchedulePage() {
 
         const myPitches = combinedPitches.filter((p: any) => {
           if (p.template_id !== tmpl.id) return false;
-          const isAllAcademy = (!p.batsmen || p.batsmen.length === 0) && (!p.bowlers || p.bowlers.length === 0) && (!p.extras || p.extras.length === 0);
-          const inBatsmen = Array.isArray(p.batsmen) && p.batsmen.includes(athleteProfileId);
-          const inBowlers = Array.isArray(p.bowlers) && p.bowlers.includes(athleteProfileId);
-          const inExtras  = Array.isArray(p.extras)  && p.extras.includes(athleteProfileId);
-          return isAllAcademy || inBatsmen || inBowlers || inExtras;
+          const isAllAcademy = (!p.assigned_boxer_ids || p.assigned_boxer_ids.length === 0);
+          const inAssigned = Array.isArray(p.assigned_boxer_ids) && p.assigned_boxer_ids.includes(athleteProfileId);
+          return isAllAcademy || inAssigned;
         });
 
-        if (myPitches.length === 0) return; // athlete not assigned in any pitch of this template
+        if (myPitches.length === 0) return; // athlete not assigned in any session of this template
 
         const tStart = new Date(String(rawFrom).split("T")[0] + "T00:00:00");
         const tEnd   = new Date(String(rawTo).split("T")[0]   + "T23:59:59");
@@ -221,13 +219,13 @@ function SchedulePage() {
 
             myPitches.forEach((p: any) => {
               let role = "";
-              if (Array.isArray(p.batsmen) && p.batsmen.includes(athleteProfileId)) role = "Batsman";
-              else if (Array.isArray(p.bowlers) && p.bowlers.includes(athleteProfileId)) role = "Bowler";
-              else if (Array.isArray(p.extras)  && p.extras.includes(athleteProfileId))  role = "Extra";
+              if (Array.isArray(p.assigned_boxer_ids) && p.assigned_boxer_ids.includes(athleteProfileId)) {
+                role = "Boxer";
+              }
 
               const startTime = String(p.from_time ?? "").slice(0, 5);
               const endTime   = String(p.to_time   ?? "").slice(0, 5);
-              const locName   = p.custom_location ?? "Academy Pitch";
+              const locName   = p.custom_location ?? "Academy Ring";
 
               generatedSessions.push({
                 id: `${tmpl.id}-${p.id}-${dateStr}`,

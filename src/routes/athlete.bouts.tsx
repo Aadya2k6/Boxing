@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, SectionCard, Badge, DataTable, AvatarInitials } from "@/components/dashboard/DashboardLayout";
-import { useState } from "react";
-import { Swords, Trophy, TrendingDown, Minus, ChevronRight, X, Calendar, MapPin, Tag, Award } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Swords, Trophy, TrendingDown, Minus, ChevronRight, X, Calendar, MapPin, Tag, Award, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/athlete/bouts")({ component: AthleteBouts });
 
-// ── Stub data — TODO: wire to bouts + bout_judge_totals + boxer_bout_history
 type BoutFilter = "all" | "upcoming" | "completed";
 
 interface Bout {
@@ -16,7 +17,7 @@ interface Bout {
   ringName: string;
   ageCategory: string;
   weightCategory: string;
-  result: "win" | "loss" | "draw" | "upcoming";
+  result: "win" | "loss" | "draw" | "upcoming" | "no_contest";
   decision: string;
   myCorner: "red" | "blue";
   rounds?: RoundScore[];
@@ -38,65 +39,11 @@ interface BoutEvent {
   note: string;
 }
 
-const STUB_BOUTS: Bout[] = [
-  {
-    id: "b1",
-    opponent: "Priya Sharma",
-    date: "2026-08-10",
-    tournamentName: "State Boxing Championship 2026",
-    ringName: "Ring A",
-    ageCategory: "Youth (17–18)",
-    weightCategory: "60 kg",
-    result: "win",
-    decision: "WP",
-    myCorner: "red",
-    rounds: [
-      { round: 1, judge: "Judge 1", red: 10, blue: 9 },
-      { round: 2, judge: "Judge 1", red: 10, blue: 8 },
-      { round: 3, judge: "Judge 1", red: 9, blue: 9 },
-    ],
-    events: [
-      { round: 2, time: "1:34", type: "Knockdown", boxer: "Blue (Priya Sharma)", note: "Left hook" },
-      { round: 3, time: "0:45", type: "Warning", boxer: "Red", note: "Holding" },
-    ],
-  },
-  {
-    id: "b2",
-    opponent: "Ananya Reddy",
-    date: "2026-07-22",
-    tournamentName: "District Open 2026",
-    ringName: "Ring B",
-    ageCategory: "Youth (17–18)",
-    weightCategory: "60 kg",
-    result: "loss",
-    decision: "WP",
-    myCorner: "blue",
-    rounds: [
-      { round: 1, judge: "Judge 2", red: 10, blue: 9 },
-      { round: 2, judge: "Judge 2", red: 9, blue: 10 },
-      { round: 3, judge: "Judge 2", red: 10, blue: 9 },
-    ],
-  },
-  {
-    id: "b3",
-    opponent: "Meera Nair",
-    date: "2026-09-05",
-    tournamentName: "National Qualifiers 2026",
-    ringName: "Ring C",
-    ageCategory: "Youth (17–18)",
-    weightCategory: "60 kg",
-    result: "upcoming",
-    decision: "—",
-    myCorner: "red",
-  },
-];
-
-const RECORD = { wins: 12, losses: 3, kos: 4 };
-
 function resultBadge(r: Bout["result"]) {
   if (r === "win") return <span className="badge badge-success">Win</span>;
   if (r === "loss") return <span className="badge badge-danger">Loss</span>;
   if (r === "draw") return <span className="badge badge-neutral">Draw</span>;
+  if (r === "no_contest") return <span className="badge badge-neutral">No Contest</span>;
   return <span className="badge badge-info">Upcoming</span>;
 }
 
@@ -119,7 +66,7 @@ function BoutScorecardModal({ bout, onClose }: { bout: Bout; onClose: () => void
           <div>
             <div className="font-display font-bold text-lg">Bout Scorecard</div>
             <div className="text-sm text-muted-foreground mt-0.5">
-              {bout.tournamentName} · {bout.ringName} · {new Date(bout.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+              {bout.tournamentName} · {bout.ringName} · {bout.date ? new Date(bout.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "-"}
             </div>
           </div>
           <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center text-muted-foreground cursor-pointer">
@@ -136,7 +83,7 @@ function BoutScorecardModal({ bout, onClose }: { bout: Bout; onClose: () => void
                 {bout.myCorner === "red" ? "🔴 Red Corner" : "🔵 Blue Corner"}
               </div>
               <div className="font-semibold text-sm">You</div>
-              <div className="text-stat font-display mt-1">{myScore}</div>
+              <div className="text-stat font-display mt-1">{myScore > 0 ? myScore : "-"}</div>
             </div>
 
             {/* Result */}
@@ -151,7 +98,7 @@ function BoutScorecardModal({ bout, onClose }: { bout: Bout; onClose: () => void
                 {bout.myCorner === "red" ? "🔵 Blue Corner" : "🔴 Red Corner"}
               </div>
               <div className="font-semibold text-sm">{bout.opponent}</div>
-              <div className="text-stat font-display mt-1">{oppScore}</div>
+              <div className="text-stat font-display mt-1">{oppScore > 0 ? oppScore : "-"}</div>
             </div>
           </div>
         </div>
@@ -162,11 +109,11 @@ function BoutScorecardModal({ bout, onClose }: { bout: Bout; onClose: () => void
             <div className="font-semibold text-sm mb-3">Round Scores</div>
             <DataTable
               headers={["Round", "Judge", "Red", "Blue"]}
-              rows={bout.rounds.map((r) => [
-                <span className="font-semibold">R{r.round}</span>,
-                <span className="text-muted-foreground text-xs">{r.judge}</span>,
-                <span className={`font-semibold ${bout.myCorner === "red" ? "text-foreground" : "text-muted-foreground"}`}>{r.red}</span>,
-                <span className={`font-semibold ${bout.myCorner === "blue" ? "text-foreground" : "text-muted-foreground"}`}>{r.blue}</span>,
+              rows={bout.rounds.map((r, idx) => [
+                <span key={`r-${idx}`} className="font-semibold">R{r.round}</span>,
+                <span key={`j-${idx}`} className="text-muted-foreground text-xs">{r.judge}</span>,
+                <span key={`rd-${idx}`} className={`font-semibold ${bout.myCorner === "red" ? "text-foreground" : "text-muted-foreground"}`}>{r.red}</span>,
+                <span key={`bl-${idx}`} className={`font-semibold ${bout.myCorner === "blue" ? "text-foreground" : "text-muted-foreground"}`}>{r.blue}</span>,
               ])}
             />
             <div className="flex justify-between mt-3 pt-3 border-t border-border text-sm font-bold">
@@ -197,6 +144,12 @@ function BoutScorecardModal({ bout, onClose }: { bout: Bout; onClose: () => void
             </div>
           </div>
         )}
+        
+        {(!bout.rounds || bout.rounds.length === 0) && (!bout.events || bout.events.length === 0) && (
+          <div className="p-10 text-center text-muted-foreground text-sm">
+            Detailed scorecard data is not available for this bout.
+          </div>
+        )}
       </div>
     </div>
   );
@@ -220,7 +173,7 @@ function BoutCard({ bout, onClick }: { bout: Bout; onClick: () => void }) {
         <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground flex-wrap">
           <span className="flex items-center gap-1">
             <Calendar className="size-3" />
-            {new Date(bout.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+            {bout.date ? new Date(bout.date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "-"}
           </span>
           <span className="flex items-center gap-1">
             <MapPin className="size-3" />
@@ -239,10 +192,160 @@ function BoutCard({ bout, onClick }: { bout: Bout; onClick: () => void }) {
 }
 
 function AthleteBouts() {
+  const { user } = useAuth();
   const [filter, setFilter] = useState<BoutFilter>("all");
   const [selectedBout, setSelectedBout] = useState<Bout | null>(null);
+  
+  const [loading, setLoading] = useState(true);
+  const [bouts, setBouts] = useState<Bout[]>([]);
+  const [record, setRecord] = useState({ wins: 0, losses: 0, kos: 0 });
+  const [modalLoading, setModalLoading] = useState(false);
 
-  const filtered = STUB_BOUTS.filter((b) => {
+  useEffect(() => {
+    if (!user) return;
+
+    async function loadData() {
+      try {
+        setLoading(true);
+        // 1. Get boxer profile and record
+        const { data: bp } = await supabase
+          .from("boxer_profiles")
+          .select("id, record_wins, record_losses, record_kos")
+          .eq("user_id", user!.id)
+          .maybeSingle();
+
+        if (!bp) return;
+
+        setRecord({
+          wins: bp.record_wins || 0,
+          losses: bp.record_losses || 0,
+          kos: bp.record_kos || 0,
+        });
+
+        // 2. Fetch Completed Bouts from boxer_bout_history
+        const { data: history } = await supabase
+          .from("boxer_bout_history")
+          .select(`
+            id, result, decision_type, bout_id,
+            bouts (
+              id, ring_instance_id, ring_session_id, boxer_red_id, boxer_blue_id, bout_kind,
+              ring_instances(name, date),
+              age_categories(name),
+              weight_categories(name)
+            ),
+            opponent:boxer_profiles!opponent_id (full_name)
+          `)
+          .eq("boxer_profile_id", bp.id)
+          .order("created_at", { ascending: false });
+
+        // 3. Fetch Upcoming Bouts from bouts
+        const { data: upcoming } = await supabase
+          .from("bouts")
+          .select(`
+            id, status, boxer_red_id, boxer_blue_id, bout_kind,
+            ring_instances(name, date),
+            age_categories(name),
+            weight_categories(name),
+            red_boxer:boxer_profiles!boxer_red_id(full_name),
+            blue_boxer:boxer_profiles!boxer_blue_id(full_name)
+          `)
+          .in("status", ["scheduled", "weigh_in_confirmed", "declaration_pending", "ready"])
+          .or(`boxer_red_id.eq.${bp.id},boxer_blue_id.eq.${bp.id}`);
+
+        // Map them together
+        const mappedBouts: Bout[] = [];
+
+        if (history) {
+          history.forEach((h: any) => {
+            const boutNode = h.bouts;
+            if (!boutNode) return;
+            const myCorner = boutNode.boxer_red_id === bp.id ? "red" : "blue";
+            mappedBouts.push({
+              id: boutNode.id,
+              opponent: (h.opponent as any)?.full_name || "Unknown",
+              date: (boutNode.ring_instances as any)?.date || "",
+              tournamentName: boutNode.bout_kind === "tournament" ? "Tournament Bout" : "Training Bout",
+              ringName: (boutNode.ring_instances as any)?.name || "Main Ring",
+              ageCategory: (boutNode.age_categories as any)?.name || "-",
+              weightCategory: (boutNode.weight_categories as any)?.name || "-",
+              result: h.result as any,
+              decision: h.decision_type || "—",
+              myCorner,
+            });
+          });
+        }
+
+        if (upcoming) {
+          upcoming.forEach((u: any) => {
+            const myCorner = u.boxer_red_id === bp.id ? "red" : "blue";
+            const opponentName = myCorner === "red" ? (u.blue_boxer as any)?.full_name : (u.red_boxer as any)?.full_name;
+            mappedBouts.push({
+              id: u.id,
+              opponent: opponentName || "TBD",
+              date: (u.ring_instances as any)?.date || "",
+              tournamentName: u.bout_kind === "tournament" ? "Tournament Bout" : "Training Bout",
+              ringName: (u.ring_instances as any)?.name || "Main Ring",
+              ageCategory: (u.age_categories as any)?.name || "-",
+              weightCategory: (u.weight_categories as any)?.name || "-",
+              result: "upcoming",
+              decision: "—",
+              myCorner,
+            });
+          });
+        }
+
+        // Sort by date desc
+        mappedBouts.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setBouts(mappedBouts);
+
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [user]);
+
+  const loadModalData = async (bout: Bout) => {
+    setModalLoading(true);
+    try {
+      const [{ data: scores }, { data: events }] = await Promise.all([
+        supabase
+          .from("bout_round_scores")
+          .select("round_number, red_score, blue_score, profiles(full_name)")
+          .eq("bout_id", bout.id),
+        supabase
+          .from("bout_events")
+          .select("round_number, event_type, description, target_boxer_id, boxer_profiles!target_boxer_id(full_name)")
+          .eq("bout_id", bout.id),
+      ]);
+
+      const parsedRounds: RoundScore[] = (scores || []).map((s: any) => ({
+        round: s.round_number,
+        judge: s.profiles?.full_name || "Unknown Judge",
+        red: s.red_score,
+        blue: s.blue_score,
+      }));
+
+      const parsedEvents: BoutEvent[] = (events || []).map((e: any) => ({
+        round: e.round_number || 1,
+        time: "--:--", // Time parsing left out for simplicity if not in DB natively
+        type: e.event_type,
+        boxer: e.boxer_profiles?.full_name || "Unknown Boxer",
+        note: e.description || "",
+      }));
+
+      setSelectedBout({ ...bout, rounds: parsedRounds, events: parsedEvents });
+    } catch (err) {
+      console.error("Failed to load modal data", err);
+      setSelectedBout(bout);
+    } finally {
+      setModalLoading(false);
+    }
+  };
+
+  const filtered = bouts.filter((b) => {
     if (filter === "upcoming") return b.result === "upcoming";
     if (filter === "completed") return b.result !== "upcoming";
     return true;
@@ -254,11 +357,20 @@ function AthleteBouts() {
     { key: "completed", label: "Completed" },
   ];
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center p-12">
+        <Loader2 className="size-8 animate-spin text-primary mb-4" />
+        <p className="text-muted-foreground font-medium">Loading bout history...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-up space-y-6">
       <PageHeader
         title="My Bouts"
-        subtitle={`${RECORD.wins}W · ${RECORD.losses}L · ${RECORD.kos} KOs`}
+        subtitle={`${record.wins}W · ${record.losses}L · ${record.kos} KOs`}
       />
 
       {/* Record stats */}
@@ -268,21 +380,21 @@ function AthleteBouts() {
             <Trophy className="size-4 text-success" strokeWidth={1.75} />
             <span className="label-micro">Wins</span>
           </div>
-          <div className="text-stat font-display text-success">{RECORD.wins}</div>
+          <div className="text-stat font-display text-success">{record.wins}</div>
         </div>
         <div className="bento-card p-4 text-center">
           <div className="flex items-center justify-center gap-1.5 mb-2">
             <TrendingDown className="size-4 text-destructive" strokeWidth={1.75} />
             <span className="label-micro">Losses</span>
           </div>
-          <div className="text-stat font-display text-destructive">{RECORD.losses}</div>
+          <div className="text-stat font-display text-destructive">{record.losses}</div>
         </div>
         <div className="bento-card p-4 text-center">
           <div className="flex items-center justify-center gap-1.5 mb-2">
             <Award className="size-4 text-warning" strokeWidth={1.75} />
             <span className="label-micro">KOs</span>
           </div>
-          <div className="text-stat font-display text-warning">{RECORD.kos}</div>
+          <div className="text-stat font-display text-warning">{record.kos}</div>
         </div>
       </div>
 
@@ -313,7 +425,14 @@ function AthleteBouts() {
       ) : (
         <div className="space-y-3">
           {filtered.map((bout) => (
-            <BoutCard key={bout.id} bout={bout} onClick={() => setSelectedBout(bout)} />
+            <BoutCard 
+              key={bout.id} 
+              bout={bout} 
+              onClick={() => {
+                if (modalLoading) return;
+                loadModalData(bout);
+              }} 
+            />
           ))}
         </div>
       )}
@@ -321,6 +440,15 @@ function AthleteBouts() {
       {/* Scorecard modal */}
       {selectedBout && (
         <BoutScorecardModal bout={selectedBout} onClose={() => setSelectedBout(null)} />
+      )}
+      
+      {modalLoading && (
+        <div className="fixed inset-0 z-[60] bg-foreground/10 flex items-center justify-center">
+          <div className="bg-surface p-4 rounded-xl shadow-lg flex items-center gap-3">
+            <Loader2 className="size-5 animate-spin text-primary" />
+            <span className="text-sm font-semibold">Loading scorecard...</span>
+          </div>
+        </div>
       )}
     </div>
   );

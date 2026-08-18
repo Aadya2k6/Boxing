@@ -36,6 +36,9 @@ function ProfilePage() {
     primary_goal: "",
     previous_club: "",
     coach_name: "",
+    health_insurance_provider: "",
+    fight_record_text: "",
+    preferred_class_schedule: "",
   });
 
   useEffect(() => {
@@ -79,7 +82,10 @@ function ProfilePage() {
         experience_level: (data as any).experience_level ?? "",
         primary_goal: (data as any).primary_goal ?? "",
         previous_club: (data as any).previous_club ?? "",
-        coach_name: (data as any).coach_name ?? "",
+        coach_name: (data as any).coach_name ?? (data as any).current_coach_preference ?? "",
+        health_insurance_provider: (data as any).health_insurance_provider ?? "",
+        fight_record_text: (data as any).fight_record_text ?? "",
+        preferred_class_schedule: (data as any).preferred_class_schedule ?? "",
       });
       setLoading(false);
     }
@@ -121,6 +127,9 @@ function ProfilePage() {
       primary_goal: (form as any).primary_goal?.trim() || null,
       previous_club: (form as any).previous_club?.trim() || null,
       coach_name: (form as any).coach_name?.trim() || null,
+      health_insurance_provider: (form as any).health_insurance_provider?.trim() || null,
+      fight_record_text: (form as any).fight_record_text?.trim() || null,
+      preferred_class_schedule: (form as any).preferred_class_schedule?.trim() || null,
     }).eq("id", athleteProfile.id);
 
     if (athleteError) {
@@ -195,7 +204,7 @@ function ProfilePage() {
             ]} />
           </Section>
 
-          {/* ── [NEW] Record — TODO: wire to boxer_bout_history once table exists ── */}
+          {/* ── Record ── */}
           <div className="bg-surface border border-border rounded-lg p-6">
             <div className="flex items-center gap-2 mb-5">
               <Award className="size-4 text-primary-dark" />
@@ -240,10 +249,12 @@ function ProfilePage() {
 
           <Section title="Medical & fitness" icon={Heart}>
             <Grid items={[
-              ["Conditions", (athleteProfile as any).medical_history_details || "None disclosed"],
+              ["Conditions", (athleteProfile as any).physical_conditions || (athleteProfile as any).medical_history_details || "None disclosed"],
               ["Medications", (athleteProfile as any).current_medications || "—"],
               ["Allergies", (athleteProfile as any).allergies || "—"],
               ["Insurance", (athleteProfile as any).health_insurance_provider || "—"],
+              ["Fight Record", (athleteProfile as any).fight_record_text || "—"],
+              ["Pref. Schedule", (athleteProfile as any).preferred_class_schedule || "—"],
             ]} />
           </Section>
 
@@ -317,6 +328,9 @@ function ProfilePage() {
                   ["primary_goal", "Primary goal"],
                   ["previous_club", "Previous club"],
                   ["coach_name", "Coach name"],
+                  ["health_insurance_provider", "Health insurance"],
+                  ["fight_record_text", "Fight record (text)"],
+                  ["preferred_class_schedule", "Preferred schedule"],
                 ].map(([key, label]) => (
                   <label key={key} className="block">
                     <span className="block text-xs font-semibold mb-1.5">{label}</span>

@@ -13,7 +13,7 @@ export const Route = createFileRoute("/admin/attendance")({ component: AdminAtte
 type Tab = "overview" | "daily" | "leaves" | "poll";
 
 function AdminAttendancePage() {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const [tab, setTab] = useState<Tab>("overview");
   const [summaries, setSummaries] = useState<any[]>([]);
   const [dailyRecords, setDailyRecords] = useState<any[]>([]);
@@ -36,27 +36,59 @@ function AdminAttendancePage() {
     const ch = supabase.channel("admin-attendance-watch")
       .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, loadAll)
       .on("postgres_changes", { event: "*", schema: "public", table: "leave_applications" }, loadAll)
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance_polls" }, loadAll)
       .subscribe();
     return () => { supabase.removeChannel(ch); };
-  }, []);
+  }, [profile?.academy_id]);
+
+  useEffect(() => {
+    if (tab === "daily") {
+      loadDailyRecords(dateFilter);
+    }
+  }, [dateFilter, tab]);
 
   async function loadAll() {
     setLoading(true);
     try {
-      const [{ data: aps }, { data: att }, { data: leaves }, { data: todayPoll }] = await Promise.all([
-        supabase.from("boxer_profiles").select("id, full_name, user_id, academy_id").eq("onboarding_complete", true).order("full_name"),
-        supabase.from("attendance").select("boxer_profile_id, status, date, marked_at, distance_meters"),
-        supabase.from("leave_applications")
-          .select("*, boxer_profiles!leave_applications_boxer_profile_id_fkey(full_name)")
-          .order("leave_date", { ascending: false }),
-        supabase.from("attendance_polls").select("id").eq("poll_date", todayStr).maybeSingle(),
+      const academyId = profile?.academy_id;
+
+      let bpQuery = supabase.from("boxer_profiles").select("id, full_name, user_id, academy_id").order("full_name");
+      let attQuery = supabase.from("attendance").select("boxer_profile_id, status, session_date, checked_in_at, distance_meters, academy_id");
+      let leavesQuery = supabase.from("leave_applications").select("*, boxer_profiles(full_name)").order("start_date", { ascending: false });
+      let pollQuery = supabase.from("attendance_polls").select("id, sent_at, academy_id").order("sent_at", { ascending: false }).limit(1);
+
+      if (academyId) {
+        bpQuery = bpQuery.eq("academy_id", academyId);
+        attQuery = attQuery.eq("academy_id", academyId);
+        leavesQuery = leavesQuery.eq("academy_id", academyId);
+        pollQuery = pollQuery.eq("academy_id", academyId);
+      }
+
+      const [
+        { data: aps, error: apErr },
+        { data: att, error: attErr },
+        { data: leaves, error: lErr },
+        { data: todayPolls, error: pErr }
+      ] = await Promise.all([
+        bpQuery,
+        attQuery,
+        leavesQuery,
+        pollQuery,
       ]);
+
+      if (apErr) console.error("Error fetching boxers for attendance:", apErr);
+      if (attErr) console.error("Error fetching attendance records:", attErr);
+      if (lErr) console.error("Error fetching leaves:", lErr);
+      if (pErr) console.error("Error fetching polls:", pErr);
+
+      const latestPoll = todayPolls?.[0];
+      const isTodayPoll = latestPoll && latestPoll.sent_at && new Date(latestPoll.sent_at).toISOString().split("T")[0] === todayStr;
 
       const sums = (aps ?? []).map(ap => {
         const records = (att ?? []).filter(a => a.boxer_profile_id === ap.id);
         const pending = (leaves ?? []).filter(l => l.boxer_profile_id === ap.id && l.status === "pending").length;
         const approved = (leaves ?? []).filter(l => l.boxer_profile_id === ap.id && l.status === "approved").length;
-        const lastRecord = records.sort((a, b) => b.date.localeCompare(a.date))[0];
+        const lastRecord = records.sort((a, b) => (b.session_date || "").localeCompare(a.session_date || ""))[0];
         return {
           boxer_profile_id: ap.id,
           user_id: ap.user_id,
@@ -65,17 +97,17 @@ function AdminAttendancePage() {
           total_absent: records.filter(r => r.status === "absent").length,
           total_approved_leave: approved,
           pending_leave_requests: pending,
-          last_marked_date: lastRecord?.date ?? null,
+          last_marked_date: lastRecord?.session_date ?? null,
         };
       });
 
       setSummaries(sums);
       setLeaveRequests(leaves ?? []);
-      setTodayPollSent(!!todayPoll);
-      setTodayPollId(todayPoll?.id ?? null);
+      setTodayPollSent(!!isTodayPoll);
+      setTodayPollId(isTodayPoll ? latestPoll.id : null);
 
-      if (todayPoll?.id) {
-        await loadPollResponses(todayPoll.id);
+      if (isTodayPoll && latestPoll?.id) {
+        await loadPollResponses(latestPoll.id);
       }
     } finally {
       setLoading(false);
@@ -85,7 +117,7 @@ function AdminAttendancePage() {
   async function loadPollResponses(pollId: string) {
     const { data } = await supabase
       .from("attendance_poll_responses")
-      .select("*, boxer_profiles!attendance_poll_responses_boxer_profile_id_fkey(full_name)")
+      .select("*, boxer_profiles(full_name)")
       .eq("poll_id", pollId)
       .order("responded_at", { ascending: false });
     setPollResponses(data ?? []);
@@ -96,27 +128,26 @@ function AdminAttendancePage() {
       alert("An attendance poll has already been sent today. You can only send one poll per day.");
       return;
     }
-    if (!confirm(`Send an attendance poll to all ${summaries.length} athletes? They will be asked to confirm attendance or provide a reason for absence.\n\nNote: You can only send this ONCE per day.`)) return;
+    if (!confirm(`Send an attendance poll to all ${summaries.length} athletes? They will be asked to confirm attendance or provide a reason for absence.`)) return;
 
     setSendingPoll(true);
     try {
+      const academyId = profile?.academy_id;
+      if (!academyId) {
+        throw new Error("Admin is not assigned to an academy location.");
+      }
+
       const { data: poll, error: pollErr } = await supabase
         .from("attendance_polls")
         .insert({
+          academy_id: academyId,
           sent_by: user?.id,
-          poll_date: todayStr,
-          title: "Today's Attendance Check",
-          message: "Please confirm your attendance for today's training session.",
+          sent_at: new Date().toISOString(),
         })
         .select("id")
         .single();
 
       if (pollErr) {
-        if (pollErr.code === "23505") {
-          alert("An attendance poll was already sent today.");
-          setTodayPollSent(true);
-          return;
-        }
         throw pollErr;
       }
 
@@ -124,11 +155,11 @@ function AdminAttendancePage() {
         .filter(s => s.user_id)
         .map(s => ({
           recipient_id: s.user_id,
+          academy_id: academyId,
           type: "attendance_poll",
           title: "📋 Attendance check for today",
           body: "Please mark your attendance for today's training session, or provide a reason if you cannot attend.",
-          related_entity_id: poll.id,
-          related_entity_type: "attendance_poll",
+          data: { poll_id: poll.id },
         }));
 
       if (notifInserts.length > 0) {
@@ -138,6 +169,7 @@ function AdminAttendancePage() {
       setTodayPollSent(true);
       setTodayPollId(poll.id);
       alert(`✓ Attendance poll sent to ${notifInserts.length} athletes.`);
+      loadAll();
     } catch (e: any) {
       alert(e.message || "Failed to send attendance poll.");
     } finally {
@@ -146,11 +178,16 @@ function AdminAttendancePage() {
   }
 
   async function loadDailyRecords(date: string) {
-    const { data } = await supabase
+    const academyId = profile?.academy_id;
+    let q = supabase
       .from("attendance")
-      .select("*, boxer_profiles!attendance_boxer_profile_id_fkey(full_name)")
-      .eq("date", date)
-      .order("marked_at", { ascending: false });
+      .select("*, boxer_profiles(full_name)")
+      .eq("session_date", date)
+      .order("checked_in_at", { ascending: false });
+
+    if (academyId) q = q.eq("academy_id", academyId);
+
+    const { data } = await q;
     setDailyRecords(data ?? []);
   }
 
@@ -161,7 +198,7 @@ function AdminAttendancePage() {
       .from("attendance")
       .select("*")
       .eq("boxer_profile_id", athleteId)
-      .order("date", { ascending: false })
+      .order("session_date", { ascending: false })
       .limit(30);
     setAthleteHistory(data ?? []);
   }
@@ -183,13 +220,15 @@ function AdminAttendancePage() {
         const { data: ap } = await supabase
           .from("boxer_profiles").select("user_id").eq("id", leave.boxer_profile_id).maybeSingle();
         if (ap?.user_id) {
+          const dateStr = leave.start_date ? new Date(leave.start_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "the requested date";
           await supabase.from("notifications").insert({
             recipient_id: ap.user_id,
+            academy_id: profile?.academy_id,
             type: `leave_${action}`,
             title: action === "approved" ? "Leave approved ✓" : "Leave request rejected",
             body: action === "approved"
-              ? `Your leave for ${new Date(leave.leave_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} has been approved. This day will not count as absent.`
-              : `Your leave request for ${new Date(leave.leave_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })} was not approved.${reason ? ` Reason: ${reason}` : ""}`,
+              ? `Your leave for ${dateStr} has been approved. This day will not count as absent.`
+              : `Your leave request for ${dateStr} was not approved.${reason ? ` Reason: ${reason}` : ""}`,
           });
         }
       }
@@ -333,7 +372,7 @@ function AdminAttendancePage() {
                                 : athleteHistory.map(a => (
                                   <span key={a.id} title={`${a.status}${a.distance_meters ? ` · ${a.distance_meters}m` : ""}`}
                                     className={`px-2 py-1 rounded-md text-[11px] font-medium border ${a.status === "present" ? "bg-success/10 border-success/20 text-success" : "bg-destructive/10 border-destructive/20 text-destructive"}`}>
-                                    {new Date(a.date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                                    {new Date(a.session_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
                                   </span>
                                 ))}
                             </div>
@@ -373,7 +412,7 @@ function AdminAttendancePage() {
                         <td className="px-5 py-3.5 font-medium">{r.boxer_profiles?.full_name ?? "—"}</td>
                         <td className="px-4 py-3.5"><Badge tone={r.status === "present" ? "success" : "danger"}>{r.status}</Badge></td>
                         <td className="px-4 py-3.5 text-xs text-muted-foreground">
-                          {r.marked_at ? new Date(r.marked_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
+                          {r.checked_in_at ? new Date(r.checked_in_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" }) : "—"}
                         </td>
                         <td className="px-5 py-3.5 text-right text-xs text-muted-foreground">
                           {r.distance_meters != null ? `${r.distance_meters}m` : "—"}
@@ -417,7 +456,7 @@ function AdminAttendancePage() {
                       </Badge>
                     </div>
                     <div className="text-xs text-muted-foreground mt-1">
-                      Leave for: <strong>{new Date(l.leave_date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" })}</strong>
+                      Leave for: <strong>{l.start_date ? new Date(l.start_date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "long", year: "numeric" }) : "—"}{l.end_date && l.end_date !== l.start_date ? ` to ${new Date(l.end_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}</strong>
                     </div>
                     <div className="text-xs text-muted-foreground mt-0.5">Reason: {l.reason ?? "—"}</div>
                     {l.rejection_reason && (

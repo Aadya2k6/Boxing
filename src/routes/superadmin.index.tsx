@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHeader, StatCard, Badge, SectionCard, DataTable, AvatarInitials } from "@/components/dashboard/DashboardLayout";
-import { ArrowUpRight, TrendingUp, AlertCircle, CheckCircle2, Clock, ChevronRight, Building2, MapPin, Radio, Users, Wallet, ClipboardList, Shield } from "lucide-react";
-import { useState, useEffect } from "react";
+import { PageHeader, StatCard, Badge, SectionCard, DataTable } from "@/components/dashboard/DashboardLayout";
+import { TrendingUp, CheckCircle2, Clock, Building2, MapPin, Radio, Users, Wallet, Shield } from "lucide-react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase, Academy } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 
@@ -18,114 +18,170 @@ function SAOverview() {
     totalAdmins: 0,
     pendingAthletes: 0,
     monthlyRevenue: 0,
-    pendingRefundsCount: 0,
-    pendingRefundsAmount: 0,
+    totalRevenue: 0,
   });
   const [academiesList, setAcademiesList] = useState<any[]>([]);
-  const [pendingRefunds, setPendingRefunds] = useState<any[]>([]);
 
-  // Access route search query
+  // Search query
   const search: { q?: string } = Route.useSearch();
   const q = search.q || "";
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const now = new Date();
-        const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+  const loadData = useCallback(async () => {
+    try {
+      const now = new Date();
+      const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
 
-        // 1. Fetch current academy if assigned
-        if (profile?.academy_id) {
-          const { data: ac } = await supabase
-            .from("academies")
-            .select("*")
-            .eq("id", profile.academy_id)
-            .maybeSingle();
-          if (ac) setCurrentAcademy(ac as Academy);
-        }
-
-        // 2. Fetch data (filtered to academy if superadmin is assigned to a specific academy)
-        let academiesQuery = supabase.from("academies").select("*");
-        let boxersQuery = supabase.from("boxer_profiles").select("academy_id, verification_status");
-        let profilesQuery = supabase.from("profiles").select("academy_id, role");
-        let paymentsQuery = supabase.from("payments").select("amount, academy_id").gte("created_at", startOfMonth);
-        let invoicesQuery = supabase.from("invoices").select("academy_id, amount_due, amount_paid");
-
-        if (profile?.academy_id) {
-          boxersQuery = boxersQuery.eq("academy_id", profile.academy_id);
-          profilesQuery = profilesQuery.eq("academy_id", profile.academy_id);
-          paymentsQuery = paymentsQuery.eq("academy_id", profile.academy_id);
-          invoicesQuery = invoicesQuery.eq("academy_id", profile.academy_id);
-        }
-
-        const [
-          { data: academies },
-          { data: athletesList },
-          { data: profilesList },
-          { data: paymentsThisMonth },
-          { data: invoicesList }
-        ] = await Promise.all([
-          academiesQuery,
-          boxersQuery,
-          profilesQuery,
-          paymentsQuery,
-          invoicesQuery
-        ]);
-
-        const rev = paymentsThisMonth?.reduce((sum, p) => sum + p.amount, 0) || 0;
-        
-        const activeAthletes = athletesList?.filter(a => a.verification_status === "approved")?.length || 0;
-        const pendingAthletes = athletesList?.filter(a => a.verification_status === "pending")?.length || 0;
-        const totalCoaches = profilesList?.filter(p => p.role === "coach")?.length || 0;
-        const totalAdmins = profilesList?.filter(p => p.role === "admin")?.length || 0;
-
-        setStats({
-          totalAcademies: academies?.length || (profile?.academy_id ? 1 : 0),
-          totalAthletes: activeAthletes,
-          totalCoaches,
-          totalAdmins,
-          pendingAthletes,
-          monthlyRevenue: rev,
-          pendingRefundsCount: 0,
-          pendingRefundsAmount: 0,
-        });
-
-        // Aggregate academy data dynamically
-        const visibleAcademies = profile?.academy_id
-          ? (academies?.filter(a => a.id === profile.academy_id) ?? [])
-          : (academies ?? []);
-
-        const aggregatedAcademies = visibleAcademies.map((a) => {
-          const athletesForAcademy = (athletesList ?? []).filter(ath => ath.academy_id === a.id).length || 0;
-          const academyInvoices = (invoicesList ?? []).filter(inv => inv.academy_id === a.id);
-          const totalDue = academyInvoices.reduce((sum, inv) => sum + Number(inv.amount_due), 0);
-          const totalPaid = academyInvoices.reduce((sum, inv) => sum + Number(inv.amount_paid), 0);
-          
-          const collectionRate = totalDue > 0 ? Math.round((totalPaid / totalDue) * 100) : 100;
-          
-          return {
-            id: a.id,
-            n: a.name,
-            city: a.city,
-            state: a.state,
-            status: a.status,
-            athletes: athletesForAcademy,
-            rev: `₹ ${totalPaid.toLocaleString("en-IN")}`,
-            pct: collectionRate,
-            st: collectionRate >= 85 ? "Healthy" : collectionRate >= 60 ? "Warning" : "Critical",
-            tone: collectionRate >= 85 ? "success" : collectionRate >= 60 ? "warning" : "destructive"
-          };
-        });
-
-        setAcademiesList(aggregatedAcademies);
-      } catch (err) {
-        console.error("Error loading superadmin dashboard data:", err);
-      } finally {
-        setLoading(false);
+      // 1. Fetch current academy if assigned
+      if (profile?.academy_id) {
+        const { data: ac } = await supabase
+          .from("academies")
+          .select("*")
+          .eq("id", profile.academy_id)
+          .maybeSingle();
+        if (ac) setCurrentAcademy(ac as Academy);
+      } else {
+        setCurrentAcademy(null);
       }
+
+      // 2. Fetch all raw datasets
+      const [
+        { data: academies, error: acErr },
+        { data: boxerProfiles, error: bpErr },
+        { data: userProfiles, error: upErr },
+        { data: payments, error: payErr },
+        { data: invoices, error: invErr }
+      ] = await Promise.all([
+        supabase.from("academies").select("*").order("name"),
+        supabase.from("boxer_profiles").select("id, user_id, academy_id, verification_status, onboarding_complete"),
+        supabase.from("profiles").select("id, academy_id, role, full_name, email"),
+        supabase.from("payments").select("id, amount, academy_id, status, created_at"),
+        supabase.from("invoices").select("id, academy_id, amount_due, amount_paid, status")
+      ]);
+
+      if (acErr) console.error("Error fetching academies:", acErr);
+      if (bpErr) console.error("Error fetching boxer_profiles:", bpErr);
+      if (upErr) console.error("Error fetching profiles:", upErr);
+      if (payErr) console.error("Error fetching payments:", payErr);
+      if (invErr) console.error("Error fetching invoices:", invErr);
+
+      const allAcademies = academies ?? [];
+      const allBoxers = boxerProfiles ?? [];
+      const allProfiles = userProfiles ?? [];
+      const allPayments = payments ?? [];
+      const allInvoices = invoices ?? [];
+
+      // Filter by academy if superadmin is scoped to one academy
+      const targetAcademyId = profile?.academy_id;
+
+      const filteredBoxers = targetAcademyId
+        ? allBoxers.filter(b => b.academy_id === targetAcademyId)
+        : allBoxers;
+
+      const filteredProfiles = targetAcademyId
+        ? allProfiles.filter(p => p.academy_id === targetAcademyId)
+        : allProfiles;
+
+      const filteredPayments = targetAcademyId
+        ? allPayments.filter(p => p.academy_id === targetAcademyId)
+        : allPayments;
+
+      const filteredInvoices = targetAcademyId
+        ? allInvoices.filter(i => i.academy_id === targetAcademyId)
+        : allInvoices;
+
+      // Unique athlete IDs (combine boxer_profiles and athlete user profiles)
+      const athleteUserIds = new Set<string>();
+      filteredProfiles.filter(p => p.role === "athlete").forEach(p => athleteUserIds.add(p.id));
+      filteredBoxers.forEach(b => {
+        if (b.user_id) athleteUserIds.add(b.user_id);
+        else athleteUserIds.add(b.id);
+      });
+      const totalAthletesCount = athleteUserIds.size;
+
+      // Verification stats
+      const verifiedAthletes = filteredBoxers.filter(b => b.verification_status === "verified" || b.onboarding_complete === true).length;
+      const pendingAthletes = Math.max(0, totalAthletesCount - verifiedAthletes);
+
+      // Staff counts
+      const totalCoaches = filteredProfiles.filter(p => p.role === "coach").length;
+      const totalAdmins = filteredProfiles.filter(p => p.role === "admin").length;
+
+      // Revenue
+      const monthlyPayments = filteredPayments.filter(p => p.status === "success" && p.created_at >= startOfMonth);
+      const monthlyRevenue = monthlyPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+      const allSuccessfulPayments = filteredPayments.filter(p => p.status === "success");
+      const totalRevenue = allSuccessfulPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+      setStats({
+        totalAcademies: targetAcademyId ? 1 : allAcademies.length,
+        totalAthletes: totalAthletesCount,
+        totalCoaches,
+        totalAdmins,
+        pendingAthletes,
+        monthlyRevenue,
+        totalRevenue: totalRevenue > 0 ? totalRevenue : monthlyRevenue,
+      });
+
+      // Aggregate academy performance list
+      const visibleAcademies = targetAcademyId
+        ? allAcademies.filter(a => a.id === targetAcademyId)
+        : allAcademies;
+
+      const aggregatedAcademies = visibleAcademies.map((a) => {
+        // Count athletes assigned to this academy
+        const athleteCount = allBoxers.filter(b => b.academy_id === a.id).length
+          + allProfiles.filter(p => p.role === "athlete" && p.academy_id === a.id && !allBoxers.some(b => b.user_id === p.id)).length;
+
+        const academyInvoices = allInvoices.filter(inv => inv.academy_id === a.id);
+        const academyPayments = allPayments.filter(p => p.academy_id === a.id && p.status === "success");
+
+        const totalDue = academyInvoices.reduce((sum, inv) => sum + Number(inv.amount_due || 0), 0);
+        const totalPaid = academyPayments.length > 0
+          ? academyPayments.reduce((sum, p) => sum + Number(p.amount || 0), 0)
+          : academyInvoices.reduce((sum, inv) => sum + Number(inv.amount_paid || 0), 0);
+
+        const collectionRate = totalDue > 0 ? Math.min(100, Math.round((totalPaid / totalDue) * 100)) : 100;
+
+        return {
+          id: a.id,
+          n: a.name,
+          city: a.city,
+          state: a.state,
+          status: a.status ?? "active",
+          athletes: athleteCount,
+          rev: `₹ ${Number(totalPaid).toLocaleString("en-IN")}`,
+          pct: collectionRate,
+          st: collectionRate >= 85 ? "Healthy" : collectionRate >= 60 ? "Warning" : "Critical",
+          tone: collectionRate >= 85 ? "success" : collectionRate >= 60 ? "warning" : "danger"
+        };
+      });
+
+      setAcademiesList(aggregatedAcademies);
+    } catch (err) {
+      console.error("Error loading superadmin dashboard data:", err);
+    } finally {
+      setLoading(false);
     }
-    loadData();
   }, [profile?.academy_id]);
+
+  useEffect(() => {
+    loadData();
+
+    // Live subscriptions
+    const channel = supabase
+      .channel("superadmin-dashboard-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "payments" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "boxer_profiles" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "academies" }, loadData)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadData]);
 
   if (loading) {
     return (
@@ -135,15 +191,9 @@ function SAOverview() {
     );
   }
 
-  const formatCurrency = (amt: number) => `₹ ${(amt / 100000).toFixed(1)}L`; // approx Lakh format for display
-
   const filteredAcademies = academiesList.filter((a) =>
-    a.n.toLowerCase().includes(q.toLowerCase())
-  );
-
-  const filteredRefunds = pendingRefunds.filter((r) =>
-    (r.boxer_profiles?.full_name || "").toLowerCase().includes(q.toLowerCase()) ||
-    (r.reason || "").toLowerCase().includes(q.toLowerCase())
+    a.n.toLowerCase().includes(q.toLowerCase()) ||
+    (a.city && a.city.toLowerCase().includes(q.toLowerCase()))
   );
 
   return (
@@ -179,7 +229,7 @@ function SAOverview() {
                       </span>
                     )}
                     <span className="flex items-center gap-1">
-                      <Radio className="size-3" /> Geofence: {currentAcademy.attendance_radius_meters}m
+                      <Radio className="size-3" /> Geofence: {currentAcademy.attendance_radius_meters ?? 200}m
                     </span>
                   </div>
                 </div>
@@ -213,7 +263,7 @@ function SAOverview() {
       {/* KPI row */}
       <div className="grid sm:grid-cols-3 gap-4">
         <StatCard label="Academy status" value={currentAcademy ? currentAcademy.status.toUpperCase() : stats.totalAcademies.toString()} hint={currentAcademy ? "Live in Boxos" : "Total Academies"} />
-        <StatCard label="Total athletes" value={stats.totalAthletes.toString()} hint="Active enrollments" />
+        <StatCard label="Total athletes" value={stats.totalAthletes.toString()} hint="Enrolled athletes" />
         <StatCard label="Monthly revenue" value={`₹ ${stats.monthlyRevenue.toLocaleString("en-IN")}`} hint="This month" />
       </div>
 
@@ -231,7 +281,7 @@ function SAOverview() {
               </div>
               <span className="font-semibold text-sm">{a.n}</span>
             </div>,
-            <span key="ath" className="tabular">{a.athletes}</span>,
+            <span key="ath" className="tabular font-medium">{a.athletes}</span>,
             <span key="rev" className="font-semibold tabular">{a.rev}</span>,
             <div key="pct" className="flex items-center gap-3 min-w-[120px]">
               <div className="flex-1 h-1.5 rounded-full bg-subtle overflow-hidden">
@@ -257,11 +307,11 @@ function SAOverview() {
           <SectionCard title="Platform stats">
             <div className="space-y-4">
               {[
-                { label: "Total revenue (YTD)", value: `₹ ${stats.monthlyRevenue.toLocaleString("en-IN")}`, icon: TrendingUp, tone: "text-success" },
-                { label: "Verified athletes", value: `${stats.totalAthletes}`, icon: CheckCircle2, tone: "text-success" },
+                { label: "Total revenue (YTD)", value: `₹ ${stats.totalRevenue.toLocaleString("en-IN")}`, icon: TrendingUp, tone: "text-success" },
+                { label: "Total athletes", value: `${stats.totalAthletes}`, icon: Users, tone: "text-success" },
                 { label: "Active coaches", value: `${stats.totalCoaches}`, icon: Users, tone: "text-info" },
                 { label: "Active admins", value: `${stats.totalAdmins}`, icon: Shield, tone: "text-primary-dark" },
-                { label: "Pending verification", value: `${stats.pendingAthletes}`, icon: Clock, tone: "text-warning" },
+                { label: "Pending onboarding", value: `${stats.pendingAthletes}`, icon: Clock, tone: "text-warning" },
               ].map(({ label, value, icon: Icon, tone }) => (
                 <div key={label} className="flex items-center gap-3">
                   <div className={`size-8 rounded-lg bg-subtle grid place-items-center ${tone}`}>
@@ -285,7 +335,7 @@ function SAOverview() {
               <div className="text-[10px] tracking-widest uppercase font-semibold text-primary mb-3">System status</div>
               <div className="font-display font-bold text-base">All systems nominal</div>
               <div className="text-xs text-background/60 mt-1.5 leading-relaxed">
-                Supabase real-time triggers are active. Invoices and payments are fully synchronized across {stats.totalAcademies} academies.
+                Supabase real-time triggers are active. Invoices and payments are fully synchronized across {stats.totalAcademies} {stats.totalAcademies === 1 ? "academy" : "academies"}.
               </div>
             </div>
           </div>
@@ -294,3 +344,4 @@ function SAOverview() {
     </div>
   );
 }
+

@@ -908,7 +908,7 @@ function SuperAdminAthletesPage() {
         supabase.from("profiles").select("*").eq("role", "athlete").order("created_at", { ascending: false }),
         supabase.from("boxer_profiles").select("*").order("created_at", { ascending: false }),
         supabase.from("fee_plans").select("id,name,amount,cycle").eq("is_active", true),
-        supabase.from("fee_assignments").select("id,boxer_profile_id,fee_plan_id,status,fee_plans(name,amount,cycle)"),
+        supabase.from("fee_assignments").select("id,boxer_profile_id,fee_plan_id,status,assignment_status,payment_mode,rollover_requested,fee_plans(name,amount,cycle)"),
         supabase.from("invoices").select("id,boxer_profile_id,status,due_date,amount_due,amount_paid,billing_period_start,billing_period_end"),
         supabase.from("academies").select("id,name,city,state").order("name"),
       ]);
@@ -947,12 +947,16 @@ function SuperAdminAthletesPage() {
 
         let payStatus = "unassigned";
         if (assignment) {
-          const st = assignment.status;
-          if (st === "active" && invoice?.status === "paid") payStatus = "paid";
-          else if (invoice?.status === "paid")               payStatus = "paid";
-          else if (invoice?.status === "overdue")            payStatus = "overdue";
-          else if (invoice)                                  payStatus = "unpaid";
-          else                                               payStatus = "awaiting_invoice";
+          const ast = assignment.assignment_status;
+          if (ast === "cash_pending")           payStatus = "cash_pending";
+          else if (ast === "online_pending")    payStatus = "online_pending";
+          else if (ast === "rollover_pending")  payStatus = "rollover_pending";
+          else if (ast === "rollover_approved") payStatus = "rollover_approved";
+          else if (ast === "cash_approved" || ast === "online_paid") payStatus = "paid";
+          else if (invoice?.status === "paid")    payStatus = "paid";
+          else if (invoice?.status === "overdue")  payStatus = "overdue";
+          else if (invoice)                        payStatus = "unpaid";
+          else                                     payStatus = "awaiting_invoice";
         }
 
         seenIds.add(bp.id);
@@ -980,12 +984,16 @@ function SuperAdminAthletesPage() {
 
           let payStatus = "unassigned";
           if (assignment) {
-            const st = assignment.status;
-            if (st === "active" && invoice?.status === "paid") payStatus = "paid";
-            else if (invoice?.status === "paid")               payStatus = "paid";
-            else if (invoice?.status === "overdue")            payStatus = "overdue";
-            else if (invoice)                                  payStatus = "unpaid";
-            else                                               payStatus = "awaiting_invoice";
+            const ast = assignment.assignment_status;
+            if (ast === "cash_pending")           payStatus = "cash_pending";
+            else if (ast === "online_pending")    payStatus = "online_pending";
+            else if (ast === "rollover_pending")  payStatus = "rollover_pending";
+            else if (ast === "rollover_approved") payStatus = "rollover_approved";
+            else if (ast === "cash_approved" || ast === "online_paid") payStatus = "paid";
+            else if (invoice?.status === "paid")    payStatus = "paid";
+            else if (invoice?.status === "overdue")  payStatus = "overdue";
+            else if (invoice)                        payStatus = "unpaid";
+            else                                     payStatus = "awaiting_invoice";
           }
 
           combinedAthletes.push({
@@ -1191,8 +1199,18 @@ function SuperAdminAthletesPage() {
       const pMode    = athlete?.assignment?.payment_mode || "cash";
       const approved = pMode === "cash" ? "cash_approved" : "online_paid";
 
-      // Update only existing valid columns, if necessary. For cash approval, updating invoice is sufficient.
-      // await supabase.from("fee_assignments").update({ status: "active" }).eq("boxer_profile_id", athleteId);
+      // 1. Update fee assignment status
+      if (athlete?.assignment?.id) {
+        await supabase.from("fee_assignments").update({
+          assignment_status: approved,
+          status: "active",
+        }).eq("id", athlete.assignment.id);
+      } else {
+        await supabase.from("fee_assignments").update({
+          assignment_status: approved,
+          status: "active",
+        }).eq("boxer_profile_id", athleteId).in("assignment_status", ["cash_pending", "online_pending"]);
+      }
 
       if (invoice?.id) {
         const unpaid = Number(invoice.balance_outstanding ?? invoice.amount_due ?? 0);
@@ -1212,7 +1230,7 @@ function SuperAdminAthletesPage() {
       if (athlete?.user_id) {
         await supabase.from("notifications").insert({
           recipient_id: athlete.user_id, type: "cash_approved", title: "Payment confirmed ✓",
-          body: `Your ${pMode === "cash" ? "cash" : "online"} payment has been confirmed.`,
+          body: `Your ${pMode === "cash" ? "cash" : "online"} payment has been confirmed. Your dashboard is now unlocked!`,
         });
       }
       setCashApproveId(null); loadData();
@@ -1224,15 +1242,25 @@ function SuperAdminAthletesPage() {
     setRolloverActioning(true);
     try {
       const athlete = athletes.find(a => a.id === athleteId);
-      await supabase.from("fee_assignments").update({
-        status: "active", 
-      }).eq("boxer_profile_id", athleteId);
-      // Invoice rollover should ideally be recorded in invoices/payments, but we update status for now.
+      
+      // Update fee assignment status
+      if (athlete?.assignment?.id) {
+        await supabase.from("fee_assignments").update({
+          assignment_status: "rollover_approved",
+          status: "active",
+        }).eq("id", athlete.assignment.id);
+      } else {
+        await supabase.from("fee_assignments").update({
+          assignment_status: "rollover_approved",
+          status: "active",
+        }).eq("boxer_profile_id", athleteId).in("assignment_status", ["rollover_pending"]);
+      }
+
       if (athlete?.user_id) {
         await supabase.from("notifications").insert({
           recipient_id: athlete.user_id, type: "rollover_approved",
           title: "Payment rollover approved ✓",
-          body: "Your payment rollover has been approved.",
+          body: "Your payment rollover has been approved. Your dashboard is now unlocked!",
         });
       }
       setRolloverApproveId(null); loadData();
@@ -1244,13 +1272,27 @@ function SuperAdminAthletesPage() {
     setRolloverActioning(true);
     try {
       const athlete = athletes.find(a => a.id === athleteId);
-      // No-op for fee_assignments since it doesn't have assignment_status or payment_mode
-      // await supabase.from("fee_assignments").update({ status: "cancelled" }).eq("boxer_profile_id", athleteId);
+      
+      // Revert fee assignment status so athlete can pay again
+      if (athlete?.assignment?.id) {
+        await supabase.from("fee_assignments").update({
+          assignment_status: null,
+          payment_mode: null,
+          rollover_requested: false,
+        }).eq("id", athlete.assignment.id);
+      } else {
+        await supabase.from("fee_assignments").update({
+          assignment_status: null,
+          payment_mode: null,
+          rollover_requested: false,
+        }).eq("boxer_profile_id", athleteId).in("assignment_status", ["rollover_pending"]);
+      }
+
       if (athlete?.user_id) {
         await supabase.from("notifications").insert({
           recipient_id: athlete.user_id, type: "rollover_rejected",
           title: "Payment rollover rejected",
-          body: "Your rollover request was declined.",
+          body: "Your payment rollover request was declined. Please complete your payment to unlock your dashboard.",
         });
       }
       setRolloverRejectId(null); loadData();

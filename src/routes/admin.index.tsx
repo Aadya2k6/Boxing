@@ -1,15 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { PageHeader, StatCard, Badge, SectionCard, DataTable, AvatarInitials } from "@/components/dashboard/DashboardLayout";
+import { PageHeader, StatCard, SectionCard, DataTable, AvatarInitials } from "@/components/dashboard/DashboardLayout";
 import {
-  UserPlus, AlertTriangle, ChevronRight, Loader2,
+  ChevronRight, Loader2,
   CalendarCheck, Clock, CheckCircle2, Users
 } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/admin/")({ component: Overview });
 
 function Overview() {
+  const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalAthletes: 0,
@@ -22,74 +24,112 @@ function Overview() {
   const [recentAthletes, setRecentAthletes] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
 
-  useEffect(() => {
-    async function loadData() {
-      try {
-        const today = new Date().toISOString().split("T")[0];
+  const loadData = useCallback(async () => {
+    try {
+      const today = new Date().toISOString().split("T")[0];
+      const academyId = profile?.academy_id;
 
-        const [
-          { count: athletesCount },
-          { count: pendingCount },
-          { data: attendanceToday },
-          { data: leaves },
-          { data: recentAths },
-          { data: invs },
-        ] = await Promise.all([
-          supabase.from("boxer_profiles").select("*", { count: "exact", head: true }).eq("onboarding_complete", true),
-          supabase.from("boxer_profiles").select("*", { count: "exact", head: true }).eq("onboarding_complete", false),
-          supabase.from("attendance").select("status").eq("session_date", today).eq("status", "present"),
-          supabase.from("leave_applications")
-            .select("id, start_date, end_date, reason, boxer_profiles!leave_applications_boxer_profile_id_fkey(full_name)")
-            .eq("status", "pending")
-            .order("start_date", { ascending: true })
-            .limit(5),
-          supabase.from("boxer_profiles")
-            .select("id, full_name, city, stance, created_at")
-            .eq("onboarding_complete", true)
-            .order("created_at", { ascending: false })
-            .limit(6),
-          supabase.from("invoices").select("amount_due, amount_paid, status"),
-        ]);
+      let boxersQuery = supabase.from("boxer_profiles").select("id, user_id, full_name, city, stance, onboarding_complete, verification_status, created_at, academy_id");
+      let profilesQuery = supabase.from("profiles").select("id, full_name, email, role, academy_id");
+      let attendanceQuery = supabase.from("attendance").select("id, status, session_date, academy_id").eq("session_date", today).eq("status", "present");
+      let leavesQuery = supabase.from("leave_applications").select("id, start_date, end_date, reason, status, academy_id, boxer_profiles(full_name)").eq("status", "pending").order("start_date", { ascending: true }).limit(5);
+      let invoicesQuery = supabase.from("invoices").select("amount_due, amount_paid, status, academy_id");
 
-        const totalInvoiced = (invs ?? []).reduce((a: number, i: any) => a + Number(i.amount_due ?? 0), 0);
-        const totalCollected = (invs ?? []).reduce((a: number, i: any) => a + Number(i.amount_paid ?? 0), 0);
-        const totalOutstanding = (invs ?? []).filter((i: any) => i.status !== "paid").reduce((a: number, i: any) => a + Math.max(0, Number(i.amount_due ?? 0) - Number(i.amount_paid ?? 0)), 0);
-        const rate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
-
-        setStats({
-          totalAthletes: athletesCount || 0,
-          pendingOnboarding: pendingCount || 0,
-          presentToday: attendanceToday?.length || 0,
-          pendingLeaves: leaves?.length || 0,
-          collectionRate: rate,
-          outstanding: totalOutstanding,
-        });
-        setRecentAthletes(recentAths || []);
-        setPendingLeaves(leaves || []);
-      } catch (err) {
-        console.error("Error loading dashboard data:", err);
-      } finally {
-        setLoading(false);
+      if (academyId) {
+        boxersQuery = boxersQuery.eq("academy_id", academyId);
+        profilesQuery = profilesQuery.eq("academy_id", academyId);
+        attendanceQuery = attendanceQuery.eq("academy_id", academyId);
+        leavesQuery = leavesQuery.eq("academy_id", academyId);
+        invoicesQuery = invoicesQuery.eq("academy_id", academyId);
       }
+
+      const [
+        { data: boxers },
+        { data: userProfiles },
+        { data: attendanceToday },
+        { data: leaves },
+        { data: invs },
+      ] = await Promise.all([
+        boxersQuery,
+        profilesQuery,
+        attendanceQuery,
+        leavesQuery,
+        invoicesQuery,
+      ]);
+
+      const allBoxers = boxers ?? [];
+      const athleteProfiles = (userProfiles ?? []).filter(p => p.role === "athlete");
+
+      // Unique athlete count
+      const athleteUserIds = new Set<string>();
+      athleteProfiles.forEach(p => athleteUserIds.add(p.id));
+      allBoxers.forEach(b => {
+        if (b.user_id) athleteUserIds.add(b.user_id);
+        else athleteUserIds.add(b.id);
+      });
+      const totalAthletes = athleteUserIds.size;
+
+      // Pending onboarding
+      const verifiedAthletes = allBoxers.filter(b => b.verification_status === "verified" || b.onboarding_complete === true).length;
+      const pendingOnboarding = Math.max(0, totalAthletes - verifiedAthletes);
+
+      // Financials
+      const totalInvoiced = (invs ?? []).reduce((a: number, i: any) => a + Number(i.amount_due ?? 0), 0);
+      const totalCollected = (invs ?? []).reduce((a: number, i: any) => a + Number(i.amount_paid ?? 0), 0);
+      const totalOutstanding = (invs ?? []).filter((i: any) => i.status !== "paid").reduce((a: number, i: any) => a + Math.max(0, Number(i.amount_due ?? 0) - Number(i.amount_paid ?? 0)), 0);
+      const rate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 100;
+
+      setStats({
+        totalAthletes,
+        pendingOnboarding,
+        presentToday: attendanceToday?.length || 0,
+        pendingLeaves: leaves?.length || 0,
+        collectionRate: rate,
+        outstanding: totalOutstanding,
+      });
+
+      // Recent athletes
+      const sortedBoxers = [...allBoxers].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).slice(0, 6);
+      setRecentAthletes(sortedBoxers);
+      setPendingLeaves(leaves ?? []);
+    } catch (err) {
+      console.error("Error loading admin dashboard data:", err);
+    } finally {
+      setLoading(false);
     }
+  }, [profile?.academy_id]);
+
+  useEffect(() => {
     loadData();
-  }, []);
+
+    const channel = supabase.channel("admin-dashboard-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "boxer_profiles" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "attendance" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "leave_applications" }, loadData)
+      .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, loadData)
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [loadData]);
 
   return (
     <div className="animate-fade-up space-y-6">
       <PageHeader
-        title="Academy overview"
+        title="Academy Overview"
         subtitle={`${new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${stats.totalAthletes} active athletes`}
         actions={
           <Link to="/admin/athletes">
-            <button className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-card">
-              <Users className="size-3.5" /> Manage athletes
+            <button className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-card cursor-pointer">
+              <Users className="size-3.5" /> Manage Athletes
             </button>
           </Link>
         }
       />
 
-      {/* KPIs — athlete management focus, NO financial stats */}
+      {/* KPIs */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
         <StatCard label="Total athletes" value={loading ? "—" : stats.totalAthletes.toString()} />
         <StatCard label="Present today" value={loading ? "—" : stats.presentToday.toString()} deltaTone={undefined} hint="Marked via geo-fence" />
@@ -111,18 +151,20 @@ function Overview() {
           >
             {loading ? (
               <div className="flex justify-center py-8"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>
+            ) : recentAthletes.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">No recent athletes found</div>
             ) : (
               <DataTable
-                headers={["Athlete", "City", "Batting style", "Joined"]}
+                headers={["Athlete", "City", "Stance", "Joined"]}
                 rows={recentAthletes.map((a) => [
                   <div key="name" className="flex items-center gap-2.5">
                     <AvatarInitials name={a.full_name || "?"} />
                     <span className="font-medium text-sm">{a.full_name || "—"}</span>
                   </div>,
                   <span key="city" className="text-xs text-muted-foreground">{a.city || "—"}</span>,
-                  <span key="bow" className="text-xs">{a.bow_type || "—"}</span>,
+                  <span key="stance" className="text-xs capitalize">{a.stance || "—"}</span>,
                   <span key="date" className="text-xs text-muted-foreground">
-                    {new Date(a.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+                    {a.created_at ? new Date(a.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}
                   </span>,
                 ])}
               />
@@ -155,7 +197,8 @@ function Overview() {
                     <div className="min-w-0">
                       <p className="text-sm font-medium truncate">{l.boxer_profiles?.full_name ?? "Unknown"}</p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(l.leave_date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" })}
+                        {l.start_date ? new Date(l.start_date + "T00:00:00").toLocaleDateString("en-IN", { weekday: "short", day: "numeric", month: "short" }) : "—"}
+                        {l.end_date && l.end_date !== l.start_date ? ` to ${new Date(l.end_date + "T00:00:00").toLocaleDateString("en-IN", { day: "numeric", month: "short" })}` : ""}
                       </p>
                     </div>
                   </div>
@@ -179,3 +222,4 @@ function Overview() {
     </div>
   );
 }
+

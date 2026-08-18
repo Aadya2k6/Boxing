@@ -31,7 +31,7 @@ export function AccessGuard({ children }: { children: ReactNode }) {
     async function directCheck() {
       try {
         const { data: ap } = await supabase
-          .from("athlete_profiles")
+          .from("boxer_profiles")
           .select("id")
           .eq("user_id", user!.id)
           .maybeSingle();
@@ -41,7 +41,7 @@ export function AccessGuard({ children }: { children: ReactNode }) {
         const { data: fa } = await supabase
           .from("fee_assignments")
           .select("assignment_status")
-          .eq("athlete_profile_id", ap.id)
+          .eq("boxer_profile_id", ap.id)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle();

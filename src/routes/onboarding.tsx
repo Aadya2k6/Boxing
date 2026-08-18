@@ -309,6 +309,12 @@
             state_association_id: data.stateAssociationId || null,
             international_federation_id: data.internationalFederationId || null,
 
+            experience_level: data.experienceLevel || null,
+            health_insurance_provider: data.healthInsuranceProvider || null,
+            fight_record_text: data.fightRecord || null,
+            previous_club: data.previousClub || null,
+            preferred_class_schedule: data.preferredClassSchedule || null,
+
             verification_status: "pending",
             onboarding_complete: true,
           }, { onConflict: "user_id" })
