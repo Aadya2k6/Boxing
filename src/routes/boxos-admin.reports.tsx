@@ -48,23 +48,26 @@ function PlatformReportsPage() {
       const academies = acRes.data;
 
       const totalAcademies = academies.length;
-      const activeAcademies = academies.filter(a => a.status === "active").length;
-      const suspendedAcademies = academies.filter(a => a.status === "suspended").length;
-      const archivedAcademies = academies.filter(a => a.status === "archived").length;
+      const activeAcademies = academies.filter((a: any) => a.status === "active").length;
+      const suspendedAcademies = academies.filter((a: any) => a.status === "suspended").length;
+      const archivedAcademies = academies.filter((a: any) => a.status === "archived").length;
 
-      // 2. Fetch boxers
-      const { data: boxers } = await supabase.from("boxer_profiles").select("id, academy_id");
-      const totalBoxers = boxers?.length ?? 0;
+      // 2. Fetch boxers and staff using profiles table (which boxos_admin has access to)
+      const { data: profiles } = await supabase.from("profiles").select("id, academy_id, role");
+      const boxers = (profiles || []).filter(p => p.role === "athlete");
+      const totalBoxers = boxers.length;
 
       // 3. Fetch payments
-      const { data: payments } = await supabase
+      const { data: paymentsRes } = await supabase
         .from("payments")
         .select("amount, status, academy_id, created_at")
         .eq("status", "success");
+        
+      const payments = paymentsRes || [];
 
       // Filter payments by date range if applicable
       const now = Date.now();
-      const filteredPayments = (payments ?? []).filter(p => {
+      const filteredPayments = payments.filter((p: any) => {
         if (dateRange === "all") return true;
         const time = new Date(p.created_at).getTime();
         if (dateRange === "month") return now - time <= 30 * 24 * 60 * 60 * 1000;
@@ -73,7 +76,7 @@ function PlatformReportsPage() {
         return true;
       });
 
-      const totalRevenue = filteredPayments.reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+      const totalRevenue = filteredPayments.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
 
       // 4. Fetch tournaments
       const { data: tournaments } = await supabase
@@ -94,10 +97,10 @@ function PlatformReportsPage() {
         activeTournaments,
       });
 
-      // 5. Aggregate Top Academies list
+      // Aggregate Top Academies list
       const academyMap: Record<string, { id: string; name: string; city: string | null; boxers: number; revenue: number; status: string }> = {};
 
-      academies.forEach(a => {
+      academies.forEach((a: any) => {
         academyMap[a.id] = {
           id: a.id,
           name: a.name,
@@ -108,13 +111,13 @@ function PlatformReportsPage() {
         };
       });
 
-      (boxers ?? []).forEach(b => {
+      boxers.forEach((b: any) => {
         if (b.academy_id && academyMap[b.academy_id]) {
           academyMap[b.academy_id].boxers++;
         }
       });
 
-      filteredPayments.forEach(p => {
+      filteredPayments.forEach((p: any) => {
         if (p.academy_id && academyMap[p.academy_id]) {
           academyMap[p.academy_id].revenue += parseFloat(p.amount) || 0;
         }

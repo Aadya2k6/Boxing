@@ -4,16 +4,130 @@ import { LogOut, Clock, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useRequireAuth } from "@/lib/guards";
 import Logo from "@/components/site/Logo";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/judge")({ component: JudgeLayout });
 
-// Mock access status — TODO: wire to external_judge_invites table
+// ── Real access state — wired to external_judge_invites + profiles ───────────
 type AccessState = "active" | "expiring" | "expired";
-const MOCK_ACCESS: { tournamentName: string; state: AccessState; expiresAt: string } = {
-  tournamentName: "State Boxing Championship 2026",
-  state: "active",
-  expiresAt: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-};
+
+interface JudgeAccessInfo {
+  tournamentName: string;
+  state: AccessState;
+  expiresAt: string | null;
+}
+
+function useJudgeAccess(userId: string | null | undefined): {
+  access: JudgeAccessInfo | null;
+  loading: boolean;
+} {
+  const [access, setAccess] = useState<JudgeAccessInfo | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    async function fetchAccess() {
+      try {
+        // 1. Check profile is_active + access_expires_at first (fastest revocation path)
+        const { data: profile } = await supabase
+          .from("profiles")
+          .select("is_active, access_expires_at, judge_scope_tournament_id")
+          .eq("id", userId!)
+          .maybeSingle();
+
+        const now = new Date();
+
+        // Hard-revoked or expired via profile flags → expired immediately
+        if (
+          !profile ||
+          profile.is_active === false ||
+          (profile.access_expires_at && new Date(profile.access_expires_at) <= now)
+        ) {
+          setAccess({ tournamentName: "", state: "expired", expiresAt: null });
+          setLoading(false);
+          return;
+        }
+
+        // 2. Check external_judge_invites for the active invite
+        const { data: invite } = await supabase
+          .from("external_judge_invites")
+          .select("status, expires_at, tournament_template_id")
+          .eq("profile_id", userId!)
+          .order("invited_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (!invite || invite.status === "revoked" || invite.status === "expired") {
+          setAccess({ tournamentName: "", state: "expired", expiresAt: null });
+          setLoading(false);
+          return;
+        }
+
+        // 3. Fetch tournament name
+        let tournamentName = "Tournament";
+        const tournamentId =
+          invite.tournament_template_id ?? profile.judge_scope_tournament_id;
+
+        if (tournamentId) {
+          const { data: template } = await supabase
+            .from("ring_schedule_templates")
+            .select("name, status")
+            .eq("id", tournamentId)
+            .maybeSingle();
+
+          if (template) {
+            tournamentName = template.name;
+            // Tournament itself is completed/cancelled → expired
+            if (template.status === "completed" || template.status === "cancelled") {
+              setAccess({
+                tournamentName,
+                state: "expired",
+                expiresAt: invite.expires_at ?? null,
+              });
+              setLoading(false);
+              return;
+            }
+          }
+        }
+
+        // 4. Determine state from expires_at
+        const expiresAt = invite.expires_at ?? profile.access_expires_at ?? null;
+        let state: AccessState = "active";
+
+        if (expiresAt) {
+          const msLeft = new Date(expiresAt).getTime() - now.getTime();
+          const hoursLeft = msLeft / (1000 * 60 * 60);
+          if (msLeft <= 0) {
+            state = "expired";
+          } else if (hoursLeft <= 24) {
+            state = "expiring";
+          }
+        }
+
+        setAccess({ tournamentName, state, expiresAt });
+      } catch (err) {
+        console.error("[JudgeLayout] access check failed:", err);
+        // Fail closed — treat unknown errors as expired
+        setAccess({ tournamentName: "", state: "expired", expiresAt: null });
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    fetchAccess();
+
+    // Re-check every 5 minutes so the banner updates without a page reload
+    const interval = setInterval(fetchAccess, 5 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [userId]);
+
+  return { access, loading };
+}
 
 function AccessStatusBanner({
   tournamentName,
@@ -22,11 +136,11 @@ function AccessStatusBanner({
 }: {
   tournamentName: string;
   state: AccessState;
-  expiresAt: string;
+  expiresAt: string | null;
 }) {
-  const msLeft = new Date(expiresAt).getTime() - Date.now();
-  const hoursLeft = Math.max(0, Math.floor(msLeft / (1000 * 60 * 60)));
-  const daysLeft = Math.floor(hoursLeft / 24);
+  const msLeft = expiresAt ? new Date(expiresAt).getTime() - Date.now() : null;
+  const hoursLeft = msLeft !== null ? Math.max(0, Math.floor(msLeft / (1000 * 60 * 60))) : null;
+  const daysLeft = hoursLeft !== null ? Math.floor(hoursLeft / 24) : null;
 
   const toneMap: Record<AccessState, { bg: string; badge: string; label: string }> = {
     active: { bg: "bg-success/8 border-success/20", badge: "badge-success", label: "Active" },
@@ -40,10 +154,10 @@ function AccessStatusBanner({
       <ShieldAlert className="size-4 shrink-0 text-muted-foreground" strokeWidth={1.75} />
       <span className="font-semibold truncate">{tournamentName}</span>
       <span className={`badge ${tone.badge} shrink-0`}>{tone.label}</span>
-      {state !== "expired" && (
+      {state !== "expired" && hoursLeft !== null && (
         <span className="text-muted-foreground text-xs shrink-0 ml-auto flex items-center gap-1">
           <Clock className="size-3" />
-          {daysLeft > 0 ? `${daysLeft}d ${hoursLeft % 24}h left` : `${hoursLeft}h left`}
+          {daysLeft && daysLeft > 0 ? `${daysLeft}d ${hoursLeft % 24}h left` : `${hoursLeft}h left`}
         </span>
       )}
     </div>
@@ -51,16 +165,36 @@ function AccessStatusBanner({
 }
 
 function JudgeLayout() {
-  const { profile, loading } = useRequireAuth("external_judge");
-  const { signOut } = useAuth();
+  const { profile, loading: authLoading } = useRequireAuth("external_judge");
+  const { user, signOut } = useAuth();
   const navigate = useNavigate();
 
-  if (loading)
+  const { access, loading: accessLoading } = useJudgeAccess(user?.id);
+
+  // ── Security gate: redirect to /judge/expired if access is revoked/expired ─
+  useEffect(() => {
+    if (accessLoading || authLoading) return;
+    if (access && access.state === "expired") {
+      navigate({ to: "/judge/expired" as any });
+    }
+  }, [access, accessLoading, authLoading, navigate]);
+
+  if (authLoading || accessLoading) {
     return (
       <div className="min-h-screen bg-background grid place-items-center">
         <span className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  // Don't render children while redirecting for expired access
+  if (!access || access.state === "expired") {
+    return (
+      <div className="min-h-screen bg-background grid place-items-center">
+        <span className="size-6 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
+      </div>
+    );
+  }
 
   async function handleSignOut() {
     await signOut();
@@ -89,11 +223,11 @@ function JudgeLayout() {
         </div>
       </header>
 
-      {/* Persistent access-status banner */}
+      {/* Persistent real access-status banner */}
       <AccessStatusBanner
-        tournamentName={MOCK_ACCESS.tournamentName}
-        state={MOCK_ACCESS.state}
-        expiresAt={MOCK_ACCESS.expiresAt}
+        tournamentName={access.tournamentName}
+        state={access.state}
+        expiresAt={access.expiresAt}
       />
 
       {/* Page content — narrow, judge-focused */}

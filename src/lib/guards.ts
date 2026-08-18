@@ -3,8 +3,15 @@ import { useNavigate } from "@tanstack/react-router";
 import { useAuth } from "@/lib/auth";
 import { UserRole } from "./supabase";
 
-// ── Generic protected route hook ───────────────────────────────────────
-// Usage: call at the top of any protected route component
+// ── Generic protected route hook ───────────────────────────────────────────────
+// Usage: call at the top of any protected route component.
+//
+// Security behaviour:
+//   loading  → do nothing (spinner shown by layout)
+//   !session → redirect to /login (unauthenticated)
+//   session + !profile (after load) → redirect to /login (profile missing / corrupted)
+//   session + is_active === false → redirect to /login (account suspended)
+//   session + wrong role → redirect to the correct role dashboard
 export function useRequireAuth(requiredRole?: UserRole) {
   const { session, profile, loading } = useAuth();
   const navigate = useNavigate();
@@ -18,10 +25,21 @@ export function useRequireAuth(requiredRole?: UserRole) {
       return;
     }
 
-    // Wait until profile is fetched
-    if (!profile) return;
+    // Loading is done + session exists but profile is still null:
+    // this means the profile fetch failed or the DB has no matching profile row.
+    // Force re-auth so the user lands on the login page cleanly.
+    if (!profile) {
+      navigate({ to: "/login" });
+      return;
+    }
 
-    // Wrong role -> navigate to correct role dashboard
+    // Account suspended / deactivated → deny access
+    if (profile.is_active === false) {
+      navigate({ to: "/login" });
+      return;
+    }
+
+    // Wrong role → navigate to the user's own dashboard
     if (requiredRole && profile.role !== requiredRole) {
       if (profile.role === "boxos_admin") {
         navigate({ to: "/boxos-admin" as any });
@@ -44,7 +62,7 @@ export function useRequireAuth(requiredRole?: UserRole) {
   return { session, profile, loading };
 }
 
-// ── Athlete route guard ───────────────────────────────────────────────
+// ── Athlete route guard ────────────────────────────────────────────────────────
 export function useRequireAthlete() {
   const { session, profile, loading } = useAuth();
   const navigate = useNavigate();
@@ -52,14 +70,23 @@ export function useRequireAthlete() {
   useEffect(() => {
     if (loading) return;
 
-    // Not logged in -> redirect to login page
+    // Not logged in
     if (!session) {
       navigate({ to: "/login" });
       return;
     }
 
-    // Wait until profile is loaded
-    if (!profile) return;
+    // Profile missing after load → force re-auth
+    if (!profile) {
+      navigate({ to: "/login" });
+      return;
+    }
+
+    // Account suspended
+    if (profile.is_active === false) {
+      navigate({ to: "/login" });
+      return;
+    }
 
     if (profile.role !== "athlete") {
       if (profile.role === "boxos_admin") {
@@ -81,13 +108,16 @@ export function useRequireAthlete() {
   return { session, profile, loading };
 }
 
-// ── Redirect logged-in users away from /login and /signup ─────────────
+// ── Redirect logged-in users away from /login and /signup ─────────────────────
 export function useRedirectIfLoggedIn() {
   const { session, profile, loading } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
     if (loading || !session || !profile) return;
+    // Suspended accounts stay on the login page (no redirect loop)
+    if (profile.is_active === false) return;
+
     const dest: string =
       profile.role === "boxos_admin" ? "/boxos-admin" :
         profile.role === "admin" ? "/admin" :

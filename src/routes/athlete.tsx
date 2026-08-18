@@ -28,31 +28,16 @@ function AthleteLayout() {
   const checkAccess = useCallback(async () => {
     if (!authUser?.id) return;
     try {
-      let { data: ap, error: apErr } = await supabase
+      const { data: ap } = await supabase
         .from("boxer_profiles")
         .select("id")
         .eq("user_id", authUser.id)
         .maybeSingle();
 
+      // No boxer_profile — athlete has not completed onboarding yet.
+      // Never auto-create one here; that bypasses the onboarding academy-code gate.
       if (!ap?.id) {
-        const { data: newAp } = await supabase
-          .from("boxer_profiles")
-          .upsert({
-            user_id: authUser.id,
-            full_name: profile?.full_name || authUser.email?.split("@")[0] || "Athlete",
-            email: authUser.email || null,
-            onboarding_complete: true,
-            verification_status: "pending",
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "user_id" })
-          .select("id")
-          .maybeSingle();
-
-        ap = newAp;
-      }
-
-      if (!ap?.id) {
-        console.log("[ACCESS] → pending_assignment (no profile)");
+        console.log("[ACCESS] → pending_assignment (no boxer profile — onboarding incomplete)");
         setStatus("pending_assignment");
         return;
       }

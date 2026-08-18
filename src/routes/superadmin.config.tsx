@@ -41,13 +41,24 @@ function ConfigPage() {
     setLoading(true);
     try {
       const targetAcademyId = profile?.academy_id;
-      const acQuery = targetAcademyId
-        ? supabase.from("academies").select("*").eq("id", targetAcademyId).maybeSingle()
-        : supabase.from("academies").select("*").limit(1).maybeSingle();
+      // Security: only query the superadmin's own academy.
+      // Never fall back to querying all academies without a filter.
+      if (!targetAcademyId) {
+        setLoading(false);
+        return;
+      }
 
-      const codeQuery = targetAcademyId
-        ? supabase.from("academy_codes").select("*").eq("academy_id", targetAcademyId).order("created_at", { ascending: false })
-        : supabase.from("academy_codes").select("*").order("created_at", { ascending: false });
+      const acQuery = supabase
+        .from("academies")
+        .select("id, name, city, state, address, latitude, longitude, attendance_radius_meters, status, active_gateway, razorpay_key_id, payu_merchant_key, created_at, updated_at")
+        .eq("id", targetAcademyId)
+        .maybeSingle();
+
+      const codeQuery = supabase
+        .from("academy_codes")
+        .select("*")
+        .eq("academy_id", targetAcademyId)
+        .order("created_at", { ascending: false });
 
       const [{ data: acData }, { data: codeData }] = await Promise.all([
         acQuery,
@@ -72,18 +83,13 @@ function ConfigPage() {
     setSaving(true);
 
     const targetId = profile?.academy_id;
-    if (targetId) {
-      await supabase.from("academies").update({
-        name: settings.academy_name,
-      }).eq("id", targetId);
-    } else {
-      const { data: firstAc } = await supabase.from("academies").select("id").limit(1).maybeSingle();
-      if (firstAc?.id) {
-        await supabase.from("academies").update({
-          name: settings.academy_name,
-        }).eq("id", firstAc.id);
-      }
+    if (!targetId) {
+      setSaving(false);
+      return;
     }
+    await supabase.from("academies").update({
+      name: settings.academy_name,
+    }).eq("id", targetId);
 
     setSaving(false);
     setSaved(true);
@@ -107,8 +113,7 @@ function ConfigPage() {
         academyId = p?.academy_id;
       }
       if (!academyId) {
-        const { data: ac } = await supabase.from("academies").select("id").limit(1).maybeSingle();
-        academyId = ac?.id;
+        throw new Error("No academy associated with your account. Cannot create an academy code.");
       }
 
       const { error } = await supabase.from("academy_codes").insert({

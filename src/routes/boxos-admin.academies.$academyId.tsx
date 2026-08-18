@@ -70,6 +70,12 @@ function AcademyDetailPage() {
     monthlyRevenue: 0,
   });
 
+  // Detailed Data
+  const [detailedBoxers, setDetailedBoxers] = useState<any[]>([]);
+  const [detailedStaff, setDetailedStaff] = useState<any[]>([]);
+  const [detailedInvoices, setDetailedInvoices] = useState<any[]>([]);
+  const [activeTab, setActiveTab] = useState<"none" | "boxers" | "staff" | "revenue" | "suspended">("none");
+
   // Action Modals
   const [showInviteModal, setShowInviteModal] = useState(false);
   const [showSuspendModal, setShowSuspendModal] = useState(false);
@@ -112,31 +118,49 @@ function AcademyDetailPage() {
         const events = await fetchLifecycleEvents(academyId);
         setLifecycleEvents(events);
 
-        // 4. Fetch Aggregate stats safely
+        // 4. Fetch Aggregate stats and details using available profiles and invoices
         try {
-          const [boxersRes, staffRes, paymentsRes] = await Promise.allSettled([
-            supabase.from("boxer_profiles").select("id, is_suspended").eq("academy_id", academyId),
-            supabase.from("profiles").select("id").eq("academy_id", academyId).neq("role", "athlete"),
+          const [profilesRes, invoicesRes, paymentsRes] = await Promise.allSettled([
+            supabase.from("profiles").select("*").eq("academy_id", academyId),
+            supabase.from("invoices").select("*").eq("academy_id", academyId),
             supabase.from("payments").select("amount, created_at").eq("academy_id", academyId).eq("status", "success"),
           ]);
 
-          const boxers = boxersRes.status === "fulfilled" ? (boxersRes.value.data ?? []) : [];
-          const totalBoxers = boxers.length;
-          const suspendedBoxers = boxers.filter(b => b.is_suspended).length;
-          const totalStaff = staffRes.status === "fulfilled" ? (staffRes.value.data?.length ?? 0) : 0;
-
+          const allProfiles = profilesRes.status === "fulfilled" ? (profilesRes.value.data ?? []) : [];
+          const boxers = allProfiles.filter(p => p.role === "athlete");
+          const staff = allProfiles.filter(p => p.role !== "athlete");
+          const invoices = invoicesRes.status === "fulfilled" ? (invoicesRes.value.data ?? []) : [];
           const payments = paymentsRes.status === "fulfilled" ? (paymentsRes.value.data ?? []) : [];
+
+          setDetailedBoxers(boxers);
+          setDetailedStaff(staff);
+          setDetailedInvoices(invoices);
+
+          const totalBoxers = boxers.length;
+          // Assume suspension info isn't directly in profiles but we use what we have (or filter by active if needed)
+          // Actually, earlier I noticed boxer_profiles has is_suspended. Let's fetch boxer_profiles just in case they have access.
+          const { data: realBoxers } = await supabase.from("boxer_profiles").select("*").eq("academy_id", academyId);
+          
+          if (realBoxers && realBoxers.length > 0) {
+            setDetailedBoxers(realBoxers);
+          }
+
+          const suspendedBoxers = realBoxers ? realBoxers.filter((b: any) => b.is_suspended).length : 0;
+          const totalStaff = staff.length;
+
           const thisMonth = new Date().getMonth();
           const thisYear = new Date().getFullYear();
           const monthlyRevenue = payments
-            .filter(p => {
+            .filter((p: any) => {
               const d = new Date(p.created_at);
               return d.getMonth() === thisMonth && d.getFullYear() === thisYear;
             })
-            .reduce((sum, p) => sum + (parseFloat(p.amount) || 0), 0);
+            .reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
 
-          setStats({ totalBoxers, suspendedBoxers, totalStaff, monthlyRevenue });
-        } catch {}
+          setStats({ totalBoxers: realBoxers?.length || totalBoxers, suspendedBoxers, totalStaff, monthlyRevenue });
+        } catch (err) {
+          console.error("Direct fetch failed:", err);
+        }
       }
     } catch (err: any) {
       console.error("Error loading academy detail:", err);
@@ -421,40 +445,117 @@ function AcademyDetailPage() {
         </div>
       </div>
 
-      {/* Live Stats Row */}
+      {/* Live Stats Row - Clickable Tabs */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="bento-card p-4">
+        <button
+          onClick={() => setActiveTab(activeTab === "boxers" ? "none" : "boxers")}
+          className={`bento-card p-4 text-left transition cursor-pointer hover:border-emerald-600/50 ${activeTab === "boxers" ? "ring-2 ring-emerald-600 border-emerald-600" : ""}`}
+        >
           <div className="flex items-center justify-between text-muted-foreground mb-1">
             <span className="text-xs font-semibold">Total Boxers</span>
             <Users className="size-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-display font-bold text-foreground">{stats.totalBoxers}</div>
-        </div>
+        </button>
 
-        <div className="bento-card p-4">
+        <button
+          onClick={() => setActiveTab(activeTab === "staff" ? "none" : "staff")}
+          className={`bento-card p-4 text-left transition cursor-pointer hover:border-blue-600/50 ${activeTab === "staff" ? "ring-2 ring-blue-600 border-blue-600" : ""}`}
+        >
           <div className="flex items-center justify-between text-muted-foreground mb-1">
             <span className="text-xs font-semibold">Total Staff</span>
             <Shield className="size-4 text-blue-600" />
           </div>
           <div className="text-2xl font-display font-bold text-foreground">{stats.totalStaff}</div>
-        </div>
+        </button>
 
-        <div className="bento-card p-4">
+        <button
+          onClick={() => setActiveTab(activeTab === "revenue" ? "none" : "revenue")}
+          className={`bento-card p-4 text-left transition cursor-pointer hover:border-fuchsia-600/50 ${activeTab === "revenue" ? "ring-2 ring-fuchsia-600 border-fuchsia-600" : ""}`}
+        >
           <div className="flex items-center justify-between text-muted-foreground mb-1">
             <span className="text-xs font-semibold">Monthly Revenue</span>
             <CreditCard className="size-4 text-fuchsia-600" />
           </div>
           <div className="text-2xl font-display font-bold text-foreground">₹{stats.monthlyRevenue.toLocaleString("en-IN")}</div>
-        </div>
+        </button>
 
-        <div className="bento-card p-4">
+        <button
+          onClick={() => setActiveTab(activeTab === "suspended" ? "none" : "suspended")}
+          className={`bento-card p-4 text-left transition cursor-pointer hover:border-destructive/50 ${activeTab === "suspended" ? "ring-2 ring-destructive border-destructive" : ""}`}
+        >
           <div className="flex items-center justify-between text-muted-foreground mb-1">
             <span className="text-xs font-semibold">Suspended Boxers</span>
             <ShieldAlert className="size-4 text-destructive" />
           </div>
           <div className="text-2xl font-display font-bold text-destructive">{stats.suspendedBoxers}</div>
-        </div>
+        </button>
       </div>
+
+      {/* Detailed Tab Content */}
+      {activeTab !== "none" && (
+        <div className="animate-fade-up">
+          {activeTab === "boxers" && (
+            <SectionCard title="All Boxers" subtitle="List of all registered boxers in this academy">
+              <DataTable
+                headers={["Full Name", "Email", "Gender", "Verification Status"]}
+                rows={detailedBoxers.map((b: any) => [
+                  b.full_name || "—",
+                  b.email || "—",
+                  b.gender || "—",
+                  <span key={b.id} className={`badge ${b.verification_status === "verified" ? "badge-success" : "badge-warning"}`}>{b.verification_status}</span>
+                ])}
+                emptyMessage="No boxers found."
+              />
+            </SectionCard>
+          )}
+
+          {activeTab === "staff" && (
+            <SectionCard title="Academy Staff" subtitle="List of all coaches and admins in this academy">
+              <DataTable
+                headers={["Full Name", "Email", "Role", "Status"]}
+                rows={detailedStaff.map((s: any) => [
+                  s.full_name || "—",
+                  s.email || "—",
+                  <span key={s.id + "role"} className="capitalize">{s.role}</span>,
+                  <span key={s.id + "status"} className={`badge ${s.is_active ? "badge-success" : "badge-neutral"}`}>{s.is_active ? "Active" : "Inactive"}</span>
+                ])}
+                emptyMessage="No staff found."
+              />
+            </SectionCard>
+          )}
+
+          {activeTab === "revenue" && (
+            <SectionCard title="Invoices & Revenue" subtitle="List of all invoices generated by this academy">
+              <DataTable
+                headers={["Invoice Number", "Amount Due", "Amount Paid", "Status", "Date"]}
+                rows={detailedInvoices.map((i: any) => [
+                  i.invoice_number,
+                  `₹${i.amount_due}`,
+                  `₹${i.amount_paid}`,
+                  <span key={i.id} className={`badge ${i.status === "paid" ? "badge-success" : (i.status === "unpaid" ? "badge-danger" : "badge-warning")}`}>{i.status}</span>,
+                  new Date(i.created_at).toLocaleDateString("en-IN")
+                ])}
+                emptyMessage="No invoices found."
+              />
+            </SectionCard>
+          )}
+
+          {activeTab === "suspended" && (
+            <SectionCard title="Suspended Boxers" subtitle="List of boxers currently suspended from this academy">
+              <DataTable
+                headers={["Full Name", "Reason for Suspension", "End Date"]}
+                rows={detailedBoxers.filter((b: any) => b.is_suspended).map((b: any) => [
+                  b.full_name || "—",
+                  b.suspension_reason || "No reason provided",
+                  b.suspension_end_date ? new Date(b.suspension_end_date).toLocaleDateString("en-IN") : "Indefinite"
+                ])}
+                emptyMessage="No suspended boxers."
+              />
+            </SectionCard>
+          )}
+        </div>
+      )}
 
       {/* Superadmins Section */}
       <SectionCard

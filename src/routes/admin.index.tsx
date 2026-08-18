@@ -29,19 +29,18 @@ function Overview() {
       const today = new Date().toISOString().split("T")[0];
       const academyId = profile?.academy_id;
 
-      let boxersQuery = supabase.from("boxer_profiles").select("id, user_id, full_name, city, stance, onboarding_complete, verification_status, created_at, academy_id");
-      let profilesQuery = supabase.from("profiles").select("id, full_name, email, role, academy_id");
-      let attendanceQuery = supabase.from("attendance").select("id, status, session_date, academy_id").eq("session_date", today).eq("status", "present");
-      let leavesQuery = supabase.from("leave_applications").select("id, start_date, end_date, reason, status, academy_id, boxer_profiles(full_name)").eq("status", "pending").order("start_date", { ascending: true }).limit(5);
-      let invoicesQuery = supabase.from("invoices").select("amount_due, amount_paid, status, academy_id");
-
-      if (academyId) {
-        boxersQuery = boxersQuery.eq("academy_id", academyId);
-        profilesQuery = profilesQuery.eq("academy_id", academyId);
-        attendanceQuery = attendanceQuery.eq("academy_id", academyId);
-        leavesQuery = leavesQuery.eq("academy_id", academyId);
-        invoicesQuery = invoicesQuery.eq("academy_id", academyId);
+      // Security: never run unfiltered cross-academy queries.
+      // An admin without an academy_id is a misconfigured account — abort early.
+      if (!academyId) {
+        setLoading(false);
+        return;
       }
+
+      const boxersQuery = supabase.from("boxer_profiles").select("id, user_id, full_name, city, stance, onboarding_complete, verification_status, created_at, academy_id").eq("academy_id", academyId);
+      const profilesQuery = supabase.from("profiles").select("id, full_name, email, role, academy_id").eq("academy_id", academyId);
+      const attendanceQuery = supabase.from("attendance").select("id, status, session_date, academy_id").eq("session_date", today).eq("status", "present").eq("academy_id", academyId);
+      const leavesQuery = supabase.from("leave_applications").select("id, start_date, end_date, reason, status, academy_id, boxer_profiles(full_name)").eq("status", "pending").eq("academy_id", academyId).order("start_date", { ascending: true }).limit(5);
+      const invoicesQuery = supabase.from("invoices").select("amount_due, amount_paid, status, academy_id").eq("academy_id", academyId);
 
       const [
         { data: boxers },
@@ -117,17 +116,26 @@ function Overview() {
 
   return (
     <div className="animate-fade-up space-y-6">
-      <PageHeader
-        title="Academy Overview"
-        subtitle={`${new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${stats.totalAthletes} active athletes`}
-        actions={
-          <Link to="/admin/athletes">
-            <button className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-card cursor-pointer">
-              <Users className="size-3.5" /> Manage Athletes
-            </button>
-          </Link>
-        }
-      />
+      {/* Guard: admin must have an academy assigned */}
+      {!profile?.academy_id && !loading && (
+        <div className="bento-card p-8 border-destructive/20 bg-destructive/5 text-center">
+          <div className="text-destructive font-semibold mb-2">No academy assigned to your account</div>
+          <div className="text-sm text-muted-foreground">Your admin account is not linked to any academy. Please contact your system administrator.</div>
+        </div>
+      )}
+      {profile?.academy_id && (
+        <>
+        <PageHeader
+          title="Academy Overview"
+          subtitle={`${new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${stats.totalAthletes} active athletes`}
+          actions={
+            <Link to="/admin/athletes">
+              <button className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-card cursor-pointer">
+                <Users className="size-3.5" /> Manage Athletes
+              </button>
+            </Link>
+          }
+        />
 
       {/* KPIs */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
@@ -219,6 +227,8 @@ function Overview() {
           </div>
         </div>
       </div>
+      </>
+      )}
     </div>
   );
 }

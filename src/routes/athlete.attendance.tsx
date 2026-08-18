@@ -74,7 +74,7 @@ function AttendancePage() {
       // Fetch academy separately if athlete has one assigned
       let acData = null;
       if (ap?.academy_id) {
-        const { data: ac } = await supabase.from("academies").select("*").eq("id", ap.academy_id).maybeSingle();
+        const { data: ac } = await supabase.from("academies").select("id, name, address, city, state, latitude, longitude, attendance_radius_meters, status, active_gateway, razorpay_key_id, payu_merchant_key, timezone").eq("id", ap.academy_id).maybeSingle();
         acData = ac;
       }
       setAcademy(acData);

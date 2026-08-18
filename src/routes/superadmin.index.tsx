@@ -51,7 +51,7 @@ function SAOverview() {
         { data: payments, error: payErr },
         { data: invoices, error: invErr }
       ] = await Promise.all([
-        supabase.from("academies").select("*").order("name"),
+        supabase.from("academies").select("id, name, city, state, status, active_gateway, created_at, updated_at").order("name"),
         supabase.from("boxer_profiles").select("id, user_id, academy_id, verification_status, onboarding_complete"),
         supabase.from("profiles").select("id, academy_id, role, full_name, email"),
         supabase.from("payments").select("id, amount, academy_id, status, created_at"),

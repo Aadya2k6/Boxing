@@ -43,18 +43,20 @@ function SASettings() {
 
   async function loadSettings() {
     const [{ data: acs }, { data: prof }] = await Promise.all([
-      supabase.from("academies").select("*").order("name"),
+      supabase.from("academies").select("id, name, city, state, address, latitude, longitude, attendance_radius_meters, status, active_gateway, razorpay_key_id, encrypted_razorpay_secret, payu_merchant_key, encrypted_payu_salt, created_at, updated_at").order("name"),
       supabase.from("profiles").select("preferred_academy_id").eq("id", user!.id).maybeSingle(),
     ]);
-    const firstAc = acs?.[0] ?? {};
-    setSettings(s => ({
-      ...s,
-      payment_gateway: firstAc.active_gateway ?? firstAc.payment_gateway ?? s.payment_gateway,
-      razorpay_key_id: firstAc.razorpay_key_id ?? s.razorpay_key_id,
-      razorpay_secret: firstAc.encrypted_razorpay_secret ?? s.razorpay_secret,
-      payu_merchant_key: firstAc.payu_merchant_key ?? s.payu_merchant_key,
-      payu_merchant_salt: firstAc.encrypted_payu_salt ?? s.payu_merchant_salt,
-    }));
+    const firstAc = acs?.[0];
+    if (firstAc) {
+      setSettings(s => ({
+        ...s,
+        payment_gateway: firstAc.active_gateway ?? s.payment_gateway,
+        razorpay_key_id: firstAc.razorpay_key_id ?? s.razorpay_key_id,
+        razorpay_secret: firstAc.encrypted_razorpay_secret ?? s.razorpay_secret,
+        payu_merchant_key: firstAc.payu_merchant_key ?? s.payu_merchant_key,
+        payu_merchant_salt: firstAc.encrypted_payu_salt ?? s.payu_merchant_salt,
+      }));
+    }
     setAcademies(acs ?? []);
     setOwnAcademyId(prof?.preferred_academy_id ?? "");
   }

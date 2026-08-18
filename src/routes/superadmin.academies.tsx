@@ -58,7 +58,7 @@ function AcademiesPage() {
     setLoading(true);
     try {
       const [{ data: acs }, { data: athletes }] = await Promise.all([
-        supabase.from("academies").select("*").order("created_at"),
+        supabase.from("academies").select("id, name, city, state, address, status, active_gateway, logo_url, onboarded_at, created_at, updated_at, suspended_at, suspended_reason, archived_at, hard_delete_eligible_at, deleted_at").order("created_at"),
         supabase
           .from("boxer_profiles")
           .select("academy_id")

@@ -2,61 +2,40 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/dashboard/DashboardLayout";
 import { useState, useEffect, useRef, useCallback } from "react";
 import {
-  Swords, ChevronRight, Clock, Tag, Calendar, X,
-  AlertTriangle, Check, Loader2, Send, Star
+  Swords, ChevronRight, Tag,
+  AlertTriangle, Check, Loader2, Send,
 } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/judge/")({ component: JudgeDashboard });
 
-// ── Stub data — TODO: wire to bout_judge_assignments + bouts + bout_rounds via Realtime
+// ── Types ──────────────────────────────────────────────────────────────────────
 interface BoutAssignment {
   id: string;
-  boutNumber: number;
+  boutNumber: number | null;
   redCorner: string;
   blueCorner: string;
   ageCategory: string;
   weightCategory: string;
-  status: "upcoming" | "active" | "scoring" | "completed";
+  status: "scheduled" | "weigh_in_confirmed" | "declaration_pending" | "ready" | "in_progress" | "paused" | "completed" | "cancelled" | "walkover";
   totalRounds: number;
   currentRound: number;
+  currentRoundState: string;
   myScores: (null | { red: number; blue: number })[];
-  events: { round: number; type: string; boxer: string; time: string }[];
+  redBoxerProfileId: string;
+  blueBoxerProfileId: string;
 }
 
-const STUB_BOUTS: BoutAssignment[] = [
-  {
-    id: "b1",
-    boutNumber: 1,
-    redCorner: "Aisha Khan",
-    blueCorner: "Priya Sharma",
-    ageCategory: "Youth (17–18)",
-    weightCategory: "60 kg",
-    status: "active",
-    totalRounds: 3,
-    currentRound: 2,
-    myScores: [{ red: 10, blue: 9 }, null, null],
-    events: [{ round: 1, type: "Knockdown", boxer: "Blue", time: "1:23" }],
-  },
-  {
-    id: "b2",
-    boutNumber: 2,
-    redCorner: "Sana Sheikh",
-    blueCorner: "Lakshmi Devi",
-    ageCategory: "Junior (15–16)",
-    weightCategory: "46 kg",
-    status: "upcoming",
-    totalRounds: 3,
-    currentRound: 0,
-    myScores: [null, null, null],
-    events: [],
-  },
-];
-
-// Real-time-like state update for active bout
-function useRoundTimer(isActive: boolean, initialTime: number) {
-  const [timeLeft, setTimeLeft] = useState(initialTime);
+// ── Round timer ────────────────────────────────────────────────────────────────
+function useRoundTimer(isActive: boolean, roundDurationSeconds: number) {
+  const [timeLeft, setTimeLeft] = useState(roundDurationSeconds);
   const ref = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    setTimeLeft(roundDurationSeconds);
+  }, [roundDurationSeconds]);
 
   useEffect(() => {
     if (isActive) {
@@ -72,15 +51,64 @@ function useRoundTimer(isActive: boolean, initialTime: number) {
   return timeLeft;
 }
 
-function ScoringCard({ bout, onScoreSubmit }: { bout: BoutAssignment; onScoreSubmit: (round: number, red: number, blue: number) => void }) {
-  const [roundToScore, setRoundToScore] = useState(bout.currentRound > 0 ? bout.currentRound : 1);
+// ── Scoring card ───────────────────────────────────────────────────────────────
+function ScoringCard({
+  bout,
+  judgeProfileId,
+  onScoreSubmit,
+}: {
+  bout: BoutAssignment;
+  judgeProfileId: string;
+  onScoreSubmit: (round: number, red: number, blue: number) => void;
+}) {
+  const [roundToScore, setRoundToScore] = useState(
+    bout.currentRound > 0 ? bout.currentRound : 1
+  );
   const [red, setRed] = useState<number | null>(null);
   const [blue, setBlue] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const timeLeft = useRoundTimer(bout.status === "active", 120);
+
+  const isActiveRound = bout.status === "in_progress" && roundToScore === bout.currentRound;
+  const timeLeft = useRoundTimer(
+    isActiveRound && bout.currentRoundState === "active",
+    180 // default; real duration would come from age_categories if needed
+  );
 
   const SCORES = [10, 9, 8, 7];
   const isCurrentRoundScored = bout.myScores[roundToScore - 1] !== null;
+
+  async function handleSubmit() {
+    if (red === null || blue === null) return;
+    setSubmitting(true);
+    try {
+      const { error } = await supabase.from("bout_round_scores").insert({
+        bout_id: bout.id,
+        round_number: roundToScore,
+        judge_profile_id: judgeProfileId,
+        red_score: red,
+        blue_score: blue,
+      });
+
+      if (error) {
+        // Unique constraint means already submitted
+        if (error.code === "23505") {
+          toast.error("Score for this round already submitted.");
+        } else {
+          toast.error(`Failed to submit score: ${error.message}`);
+        }
+        return;
+      }
+
+      onScoreSubmit(roundToScore, red, blue);
+      toast.success(`Round ${roundToScore} score submitted`);
+      setRed(null);
+      setBlue(null);
+    } catch (err: any) {
+      toast.error(err.message ?? "Unexpected error submitting score");
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   return (
     <div className="bento-card p-5 border-primary/20 bg-primary/3">
@@ -101,7 +129,7 @@ function ScoringCard({ bout, onScoreSubmit }: { bout: BoutAssignment; onScoreSub
       </div>
 
       {/* Timer (if active round) */}
-      {bout.status === "active" && roundToScore === bout.currentRound && (
+      {isActiveRound && bout.currentRoundState === "active" && (
         <div className="text-center mb-5">
           <div className="text-xs text-muted-foreground mb-1">Round {bout.currentRound} · Time remaining</div>
           <div className={`text-3xl font-display font-bold tabular ${timeLeft > 30 ? "text-success" : "text-destructive"}`}>
@@ -174,15 +202,7 @@ function ScoringCard({ bout, onScoreSubmit }: { bout: BoutAssignment; onScoreSub
               </div>
             )}
             <button
-              onClick={async () => {
-                if (red === null || blue === null) return;
-                setSubmitting(true);
-                await new Promise(r => setTimeout(r, 600));
-                onScoreSubmit(roundToScore, red, blue);
-                toast.success(`Round ${roundToScore} score submitted`);
-                setRed(null); setBlue(null);
-                setSubmitting(false);
-              }}
+              onClick={handleSubmit}
               disabled={red === null || blue === null || submitting}
               className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl font-semibold disabled:opacity-50 cursor-pointer hover:bg-primary-dark transition"
             >
@@ -192,26 +212,137 @@ function ScoringCard({ bout, onScoreSubmit }: { bout: BoutAssignment; onScoreSub
           </div>
         </>
       )}
-
-      {/* Event log for this round */}
-      {bout.events.filter(e => e.round === roundToScore).length > 0 && (
-        <div className="mt-5 border-t border-border pt-4">
-          <div className="text-xs font-semibold mb-2">Events in Round {roundToScore}</div>
-          {bout.events.filter(e => e.round === roundToScore).map((ev, i) => (
-            <div key={i} className="flex items-center gap-2 text-xs py-1.5 border-b border-border last:border-0">
-              <span className="badge badge-warning">{ev.type}</span>
-              <span className="text-muted-foreground">{ev.boxer} · {ev.time}</span>
-            </div>
-          ))}
-        </div>
-      )}
     </div>
   );
 }
 
+// ── Main dashboard ─────────────────────────────────────────────────────────────
 function JudgeDashboard() {
-  const [bouts, setBouts] = useState(STUB_BOUTS);
-  const [activeBout, setActiveBout] = useState<BoutAssignment | null>(STUB_BOUTS.find(b => b.status === "active") ?? null);
+  const { user } = useAuth();
+  const [bouts, setBouts] = useState<BoutAssignment[]>([]);
+  const [activeBout, setActiveBout] = useState<BoutAssignment | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  const fetchBouts = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      // Fetch all bout_judge_assignments for this judge
+      const { data: assignments, error: assignErr } = await supabase
+        .from("bout_judge_assignments")
+        .select("bout_id")
+        .eq("judge_profile_id", user.id);
+
+      if (assignErr) throw assignErr;
+      if (!assignments || assignments.length === 0) {
+        setBouts([]);
+        setActiveBout(null);
+        setLoading(false);
+        return;
+      }
+
+      const boutIds = assignments.map(a => a.bout_id);
+
+      // Fetch bouts with related data
+      const { data: boutRows, error: boutErr } = await supabase
+        .from("bouts")
+        .select(`
+          id,
+          bout_number,
+          status,
+          current_round,
+          current_round_state,
+          round_count,
+          boxer_red_id,
+          boxer_blue_id,
+          age_categories(name),
+          weight_categories(name)
+        `)
+        .in("id", boutIds)
+        .order("bout_number", { ascending: true });
+
+      if (boutErr) throw boutErr;
+
+      // Fetch this judge's scores for all these bouts
+      const { data: scores } = await supabase
+        .from("bout_round_scores")
+        .select("bout_id, round_number, red_score, blue_score")
+        .eq("judge_profile_id", user.id)
+        .in("bout_id", boutIds);
+
+      // Fetch boxer names
+      const allBoxerIds = new Set<string>();
+      (boutRows ?? []).forEach(b => {
+        allBoxerIds.add(b.boxer_red_id);
+        allBoxerIds.add(b.boxer_blue_id);
+      });
+
+      const { data: boxers } = await supabase
+        .from("boxer_profiles")
+        .select("id, full_name")
+        .in("id", [...allBoxerIds]);
+
+      const boxerMap: Record<string, string> = {};
+      (boxers ?? []).forEach(b => { boxerMap[b.id] = b.full_name; });
+
+      // Build score map: boutId → roundNumber → {red, blue}
+      const scoreMap: Record<string, Record<number, { red: number; blue: number }>> = {};
+      (scores ?? []).forEach(s => {
+        if (!scoreMap[s.bout_id]) scoreMap[s.bout_id] = {};
+        scoreMap[s.bout_id][s.round_number] = { red: s.red_score, blue: s.blue_score };
+      });
+
+      const mapped: BoutAssignment[] = (boutRows ?? []).map(b => {
+        const myScores: (null | { red: number; blue: number })[] = Array.from(
+          { length: b.round_count },
+          (_, i) => scoreMap[b.id]?.[i + 1] ?? null
+        );
+        return {
+          id: b.id,
+          boutNumber: b.bout_number,
+          redCorner: boxerMap[b.boxer_red_id] ?? "Red",
+          blueCorner: boxerMap[b.boxer_blue_id] ?? "Blue",
+          ageCategory: (b.age_categories as any)?.name ?? "—",
+          weightCategory: (b.weight_categories as any)?.name ?? "—",
+          status: b.status,
+          totalRounds: b.round_count,
+          currentRound: b.current_round,
+          currentRoundState: b.current_round_state,
+          myScores,
+          redBoxerProfileId: b.boxer_red_id,
+          blueBoxerProfileId: b.boxer_blue_id,
+        };
+      });
+
+      setBouts(mapped);
+
+      // Set active bout: prefer in_progress, then ready/declaration_pending
+      const active =
+        mapped.find(b => b.status === "in_progress") ??
+        mapped.find(b => b.status === "ready" || b.status === "declaration_pending") ??
+        null;
+      setActiveBout(active);
+    } catch (err: any) {
+      console.error("[JudgeDashboard] fetch error:", err);
+      toast.error("Failed to load bout assignments.");
+    } finally {
+      setLoading(false);
+    }
+  }, [user?.id]);
+
+  useEffect(() => {
+    fetchBouts();
+  }, [fetchBouts]);
+
+  // Realtime: re-fetch on any change to the judge's assignments or bouts
+  useEffect(() => {
+    if (!user?.id) return;
+    const ch = supabase
+      .channel(`judge-bouts-${user.id}`)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bouts" }, fetchBouts)
+      .on("postgres_changes", { event: "*", schema: "public", table: "bout_round_scores" }, fetchBouts)
+      .subscribe();
+    return () => { supabase.removeChannel(ch); };
+  }, [user?.id, fetchBouts]);
 
   function handleScoreSubmit(boutId: string, round: number, red: number, blue: number) {
     setBouts(prev => prev.map(b => {
@@ -230,6 +361,14 @@ function JudgeDashboard() {
     }
   }
 
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-24">
+        <Loader2 className="size-8 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -238,13 +377,15 @@ function JudgeDashboard() {
       />
 
       {/* Active bout scoring card — prominent */}
-      {activeBout && (
+      {activeBout && user?.id && (
         <div className="space-y-2">
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Active Bout</div>
           <div className="bento-card overflow-hidden">
             <div className="px-5 py-4 border-b border-border flex items-center justify-between">
               <div>
-                <div className="font-display font-bold">Bout #{activeBout.boutNumber}</div>
+                <div className="font-display font-bold">
+                  {activeBout.boutNumber != null ? `Bout #${activeBout.boutNumber}` : "Bout"}
+                </div>
                 <div className="text-xs text-muted-foreground mt-0.5 flex items-center gap-3">
                   <span className="flex items-center gap-1"><Tag className="size-3" />{activeBout.ageCategory}</span>
                   <span className="flex items-center gap-1"><Tag className="size-3" />{activeBout.weightCategory}</span>
@@ -257,27 +398,35 @@ function JudgeDashboard() {
               </div>
             </div>
             <div className="p-5">
-              <ScoringCard bout={activeBout} onScoreSubmit={(r, red, blue) => handleScoreSubmit(activeBout.id, r, red, blue)} />
+              <ScoringCard
+                bout={activeBout}
+                judgeProfileId={user.id}
+                onScoreSubmit={(r, red, blue) => handleScoreSubmit(activeBout.id, r, red, blue)}
+              />
             </div>
           </div>
         </div>
       )}
 
-      {/* Upcoming bouts list */}
-      {bouts.filter(b => b.status === "upcoming" || b.status === "completed").length > 0 && (
+      {/* All other bouts list */}
+      {bouts.filter(b => b.id !== activeBout?.id).length > 0 && (
         <div className="space-y-2">
           <div className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">All Assigned Bouts</div>
           {bouts.filter(b => b.id !== activeBout?.id).map(bout => (
             <button
               key={bout.id}
-              onClick={() => bout.status === "active" && setActiveBout(bout)}
+              onClick={() => {
+                if (bout.status === "in_progress" || bout.status === "ready") setActiveBout(bout);
+              }}
               className="w-full text-left bento-card p-4 flex items-center gap-4 hover:border-border-strong transition-all cursor-pointer"
             >
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <span className="font-semibold text-sm">Bout #{bout.boutNumber}</span>
-                  <span className={`badge ${bout.status === "completed" ? "badge-neutral" : "badge-info"}`}>
-                    {bout.status.charAt(0).toUpperCase() + bout.status.slice(1)}
+                  <span className="font-semibold text-sm">
+                    {bout.boutNumber != null ? `Bout #${bout.boutNumber}` : "Bout"}
+                  </span>
+                  <span className={`badge ${bout.status === "completed" || bout.status === "cancelled" || bout.status === "walkover" ? "badge-neutral" : bout.status === "in_progress" ? "badge-success" : "badge-info"}`}>
+                    {bout.status.replace(/_/g, " ").replace(/\b\w/g, c => c.toUpperCase())}
                   </span>
                   <span className="badge badge-neutral">{bout.weightCategory}</span>
                 </div>

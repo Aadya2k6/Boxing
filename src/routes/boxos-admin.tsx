@@ -41,6 +41,7 @@ function BoxosAdminLayout() {
           ],
         },
       ]}
+      notificationTo="/boxos-admin/notifications"
     />
   );
 }

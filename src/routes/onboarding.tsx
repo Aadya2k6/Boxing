@@ -154,10 +154,14 @@
         // If no active session OR if the onboarding form's email differs from active logged-in user:
         if (!user || (formEmail && activeEmail && formEmail !== activeEmail)) {
           const userEmail = formEmail;
-          const userPassword = data.password?.trim() || "BoxosAthlete2026!";
+          const userPassword = data.password?.trim();
 
           if (!userEmail) {
             throw new Error("Email address is required to create your account.");
+          }
+
+          if (!userPassword) {
+            throw new Error("A password is required to create your account.");
           }
 
           let authUserObj: any = null;
@@ -230,8 +234,11 @@
           }
         }
         if (!targetAcademyId) {
-          const { data: firstAcad } = await supabase.from("academies").select("id").limit(1).maybeSingle();
-          targetAcademyId = firstAcad?.id;
+          // No academy found through any source — do NOT fall back to any random academy.
+          // The athlete must verify a valid academy code before their profile can be saved.
+          throw new Error(
+            "Academy verification required. Please go back and verify your academy code before completing registration."
+          );
         }
 
         // Upsert into profiles
