@@ -18,6 +18,7 @@ function BoxosAdminLayout() {
 
   return (
     <DashboardLayout
+      themeClass="theme-boxos-admin-dark"
       basePath="/boxos-admin"
       role="BOXOS Admin"
       userName={profile?.full_name ?? "BOXOS Platform Admin"}

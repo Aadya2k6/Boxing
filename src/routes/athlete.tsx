@@ -179,6 +179,7 @@ function AthleteLayout() {
   return (
     <AthleteAccessContext.Provider value={{ isUnlocked, status, refresh: checkAccess, isRolloverPending }}>
       <DashboardLayout
+        themeClass="theme-athlete-dark"
         basePath="/athlete"
         role="Athlete"
         userName={name}

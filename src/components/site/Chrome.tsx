@@ -87,11 +87,7 @@ export function SiteHeader() {
           </Link>
           <Link
             to="/onboarding"
-            className={
-              isLanding
-                ? "group inline-flex items-center gap-1.5 text-sm font-semibold text-white/80 hover:text-white px-4 py-2.5 transition-all"
-                : "group inline-flex items-center gap-1.5 text-sm font-semibold bg-[#ef4444] text-white px-4 py-2.5 rounded-lg hover:bg-[#dc2626] transition-all shadow-card"
-            }
+            className="group inline-flex items-center gap-1.5 text-sm font-semibold bg-cinematic-red text-white px-4 py-2.5 rounded-lg hover:bg-cinematic-red-hover transition-all shadow-card"
           >
             Get started
             <ArrowUpRight className="size-3.5 group-hover:translate-x-0.5 group-hover:-translate-y-0.5 transition-transform" />
@@ -138,7 +134,7 @@ export function SiteHeader() {
             <Link
               to="/onboarding"
               onClick={() => setOpen(false)}
-              className="mt-3 text-sm font-semibold bg-[#ef4444] text-white px-4 py-3 rounded-lg text-center hover:bg-[#dc2626] transition-all"
+              className="mt-3 text-sm font-semibold bg-cinematic-red text-white px-4 py-3 rounded-lg text-center hover:bg-cinematic-red-hover transition-all shadow-card"
             >
               Get started
             </Link>

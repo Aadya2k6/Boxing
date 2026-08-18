@@ -19,7 +19,7 @@ const REPORT_TYPES = [
   { k: "rate",       label: "Collection Rate" },
 ];
 
-const COLORS = { collected: "#2E8F5A", outstanding: "#C47C1A", invoiced: "#1C212B", overdue: "#D94040" };
+const COLORS = { collected: "#10B981", outstanding: "#F59E0B", invoiced: "#3B82F6", overdue: "#EF4444" };
 
 function ReportsPage() {
   const [active, setActive] = useState("revenue");
@@ -189,10 +189,10 @@ function ReportsPage() {
                     <div className="md:col-span-2 h-64">
                       <ResponsiveContainer width="100%" height="100%">
                         <BarChart data={monthlyData}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5E5" />
-                          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} dy={8} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} dx={-8} tickFormatter={v => `₹${Math.round(v / 1000)}k`} />
-                          <Tooltip contentStyle={{ borderRadius: "8px", border: "1px solid #E5E5E5", fontSize: 12 }} formatter={(v: number) => `₹ ${v.toLocaleString("en-IN")}`} />
+                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
+                          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} dy={8} />
+                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} dx={-8} tickFormatter={v => `₹${Math.round(v / 1000)}k`} />
+                          <Tooltip contentStyle={{ backgroundColor: "#0B0F17", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.1)", color: "#F8FAFC", fontSize: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }} itemStyle={{ color: "#F8FAFC" }} labelStyle={{ color: "#94A3B8" }} formatter={(v: number) => `₹ ${v.toLocaleString("en-IN")}`} />
                           <Bar dataKey="Invoiced" fill={COLORS.invoiced} radius={[4, 4, 0, 0]} />
                           <Bar dataKey="Collected" fill={COLORS.collected} radius={[4, 4, 0, 0]} />
                           <Legend />
@@ -206,7 +206,7 @@ function ReportsPage() {
                             <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={3} dataKey="value">
                               {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
                             </Pie>
-                            <Tooltip formatter={(v: number) => `₹ ${v.toLocaleString("en-IN")}`} />
+                            <Tooltip contentStyle={{ backgroundColor: "#0B0F17", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.1)", color: "#F8FAFC", fontSize: 12 }} itemStyle={{ color: "#F8FAFC" }} labelStyle={{ color: "#94A3B8" }} formatter={(v: number) => `₹ ${v.toLocaleString("en-IN")}`} />
                           </PieChart>
                         </ResponsiveContainer>
                       </div>
@@ -398,10 +398,10 @@ function ReportsPage() {
                   <div className="h-64">
                     <ResponsiveContainer width="100%" height="100%">
                       <BarChart data={monthlyData.map(m => ({ ...m, Rate: m.Invoiced > 0 ? Math.round(m.Collected / m.Invoiced * 100) : 0 }))}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5E5" />
-                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} dy={8} />
-                        <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} tickFormatter={v => `${v}%`} />
-                        <Tooltip contentStyle={{ borderRadius: "8px", fontSize: 12 }} formatter={(v: number) => `${v}%`} />
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
+                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} dy={8} />
+                        <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} tickFormatter={v => `${v}%`} />
+                        <Tooltip contentStyle={{ backgroundColor: "#0B0F17", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.1)", color: "#F8FAFC", fontSize: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }} itemStyle={{ color: "#F8FAFC" }} labelStyle={{ color: "#94A3B8" }} formatter={(v: number) => `${v}%`} />
                         <Bar dataKey="Rate" fill={COLORS.collected} radius={[4, 4, 0, 0]} />
                       </BarChart>
                     </ResponsiveContainer>

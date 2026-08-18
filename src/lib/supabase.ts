@@ -9,18 +9,29 @@ const isBrowser = typeof window !== "undefined";
 let _client: SupabaseClient | null = null;
 
 function getOrCreateClient(): SupabaseClient {
-  if (_client) return _client;
+  const envUrl = (import.meta.env.VITE_SUPABASE_URL || (typeof process !== "undefined" ? process.env?.VITE_SUPABASE_URL : "")) as string;
+  const envKey = (import.meta.env.VITE_SUPABASE_ANON_KEY || (typeof process !== "undefined" ? process.env?.VITE_SUPABASE_ANON_KEY : "")) as string;
 
-  const url = (isBrowser ? import.meta.env.VITE_SUPABASE_URL : process.env.VITE_SUPABASE_URL) as string;
-  const key = (isBrowser ? import.meta.env.VITE_SUPABASE_ANON_KEY : process.env.VITE_SUPABASE_ANON_KEY) as string;
+  const url = (envUrl || "").trim().replace(/^["']|["']$/g, "");
+  const key = (envKey || "").trim().replace(/^["']|["']$/g, "");
 
-  if (!url || !key) {
-    console.warn("Supabase URL/Key not found. Auth will not work.");
-    // Return a minimal stub that won't throw on property access
-    _client = createClient("https://placeholder.supabase.co", "placeholder-key", {
+  const isValidUrl = Boolean(url && (url.startsWith("http://") || url.startsWith("https://")) && !url.includes("your_supabase_url"));
+  const isValidKey = Boolean(key && key.length > 20 && !key.includes("your_supabase_anon_key"));
+
+  if (!isValidUrl || !isValidKey) {
+    if (isBrowser) {
+      console.warn("[Supabase] Valid VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY not detected in env. Using offline placeholder client.", { url: url || "(empty)", isValidUrl, isValidKey });
+    }
+    // Return a minimal stub (do NOT cache in _client so it can reload when env is updated)
+    return createClient("https://placeholder.supabase.co", "placeholder-key", {
       auth: { persistSession: false, autoRefreshToken: false },
     });
-    return _client;
+  }
+
+  if (_client) return _client;
+
+  if (isBrowser) {
+    console.log("[Supabase] Client initialized successfully with URL:", url);
   }
 
   _client = createClient(url, key, {

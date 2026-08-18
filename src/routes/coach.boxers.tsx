@@ -37,7 +37,7 @@ function fitBadge(status: Boxer["fitStatus"]) {
 
 function BoxerDetailModal({ boxer, onClose }: { boxer: Boxer; onClose: () => void }) {
   return (
-    <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-surface rounded-2xl shadow-modal w-full max-w-lg max-h-[90vh] overflow-y-auto">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="flex items-center gap-3">

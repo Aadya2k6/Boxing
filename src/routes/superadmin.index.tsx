@@ -326,20 +326,6 @@ function SAOverview() {
             </div>
           </SectionCard>
         </div>
-
-        <div>
-          {/* Global alert */}
-          <div className="bento-card p-5 bg-foreground text-background relative overflow-hidden">
-            <div className="absolute -bottom-6 -right-6 size-24 gold-glow blur-xl opacity-40" />
-            <div className="relative">
-              <div className="text-[10px] tracking-widest uppercase font-semibold text-primary mb-3">System status</div>
-              <div className="font-display font-bold text-base">All systems nominal</div>
-              <div className="text-xs text-background/60 mt-1.5 leading-relaxed">
-                Supabase real-time triggers are active. Invoices and payments are fully synchronized across {stats.totalAcademies} {stats.totalAcademies === 1 ? "academy" : "academies"}.
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

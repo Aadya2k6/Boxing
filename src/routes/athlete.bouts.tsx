@@ -57,7 +57,7 @@ function BoutScorecardModal({ bout, onClose }: { bout: Bout; onClose: () => void
 
   return (
     <div
-      className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={(e) => e.target === e.currentTarget && onClose()}
     >
       <div className="bg-surface rounded-2xl shadow-modal w-full max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -79,7 +79,7 @@ function BoutScorecardModal({ bout, onClose }: { bout: Bout; onClose: () => void
           <div className="flex items-center gap-4">
             {/* Me */}
             <div className="flex-1 text-center">
-              <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full mb-2 ${bout.myCorner === "red" ? "bg-red-50 text-red-600" : "bg-blue-50 text-blue-600"}`}>
+              <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full mb-2 ${bout.myCorner === "red" ? "bg-red-500/15 text-red-400" : "bg-blue-500/15 text-blue-400"}`}>
                 {bout.myCorner === "red" ? "🔴 Red Corner" : "🔵 Blue Corner"}
               </div>
               <div className="font-semibold text-sm">You</div>
@@ -94,7 +94,7 @@ function BoutScorecardModal({ bout, onClose }: { bout: Bout; onClose: () => void
 
             {/* Opponent */}
             <div className="flex-1 text-center">
-              <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full mb-2 ${bout.myCorner === "red" ? "bg-blue-50 text-blue-600" : "bg-red-50 text-red-600"}`}>
+              <div className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded-full mb-2 ${bout.myCorner === "red" ? "bg-blue-500/15 text-blue-400" : "bg-red-500/15 text-red-400"}`}>
                 {bout.myCorner === "red" ? "🔵 Blue Corner" : "🔴 Red Corner"}
               </div>
               <div className="font-semibold text-sm">{bout.opponent}</div>
@@ -443,8 +443,8 @@ function AthleteBouts() {
       )}
       
       {modalLoading && (
-        <div className="fixed inset-0 z-[60] bg-foreground/10 flex items-center justify-center">
-          <div className="bg-surface p-4 rounded-xl shadow-lg flex items-center gap-3">
+        <div className="fixed inset-0 z-[60] bg-background/60 backdrop-blur-xs flex items-center justify-center">
+          <div className="bg-surface p-4 rounded-xl shadow-lg flex items-center gap-3 border border-border">
             <Loader2 className="size-5 animate-spin text-primary" />
             <span className="text-sm font-semibold">Loading scorecard...</span>
           </div>

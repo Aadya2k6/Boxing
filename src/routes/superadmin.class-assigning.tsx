@@ -1409,22 +1409,22 @@ function ClassAssigningPage() {
               {/* Legend */}
               <div className="hidden lg:flex items-center gap-4 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1.5">
-                  <span className="size-3 rounded" style={{ background:"linear-gradient(135deg,#2E8F5A,#4CAF7D)" }} />Classes Cancelled
+                  <span className="size-3 rounded border border-emerald-500/40 bg-emerald-500/20" />Classes Cancelled
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="size-3 rounded" style={{ background:"linear-gradient(135deg,#8B5E3C,#A6724A)" }} />Scheduled Class
+                  <span className="size-3 rounded border border-primary/40 bg-primary/20" />Scheduled Class
                 </span>
                 <span className="flex items-center gap-1.5">
-                  <span className="size-3 rounded border border-border" style={{ background:"#FDF8F0" }} />Regular Day
+                  <span className="size-3 rounded border border-white/10 bg-white/5" />Regular Day
                 </span>
               </div>
             </div>
 
             {/* Mobile legend */}
             <div className="lg:hidden px-4 pt-3 pb-1 flex items-center gap-3 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background:"#2E8F5A" }} />Cancelled</span>
-              <span className="flex items-center gap-1"><span className="size-2.5 rounded" style={{ background:"#8B5E3C" }} />Class</span>
-              <span className="flex items-center gap-1"><span className="size-2.5 rounded border border-border" style={{ background:"#FDF8F0" }} />Regular</span>
+              <span className="flex items-center gap-1"><span className="size-2.5 rounded border border-emerald-500/40 bg-emerald-500/20" />Cancelled</span>
+              <span className="flex items-center gap-1"><span className="size-2.5 rounded border border-primary/40 bg-primary/20" />Class</span>
+              <span className="flex items-center gap-1"><span className="size-2.5 rounded border border-white/10 bg-white/5" />Regular</span>
             </div>
 
             {/* Calendar grid + day detail */}
@@ -2525,12 +2525,23 @@ function SuperAdminMonthCard({
           const isSelected = selectedDay === cell.day;
 
           let bgStyle: React.CSSProperties = {};
-          let textClass = "text-foreground/80";
-          const borderClass = "border border-border/40";
+          let textClass = "text-foreground font-semibold";
+          let borderClass = "border border-white/10";
 
-          if (cell.type === "cancelled") { bgStyle = { background:"linear-gradient(135deg,#2E8F5A,#4CAF7D)" }; textClass = "text-white font-semibold"; }
-          else if (cell.type === "class") { bgStyle = { background:"linear-gradient(135deg,#8B5E3C,#A6724A)" }; textClass = "text-white font-semibold"; }
-          else { bgStyle = { background:"#FDF8F0" }; textClass = "text-foreground/70"; }
+          if (cell.type === "cancelled") { 
+            bgStyle = { background: "rgba(16, 185, 129, 0.25)" }; 
+            borderClass = "border border-emerald-500/40";
+            textClass = "text-emerald-300 font-bold"; 
+          }
+          else if (cell.type === "class") { 
+            bgStyle = { background: "rgba(239, 68, 68, 0.25)" }; 
+            borderClass = "border border-primary/50";
+            textClass = "text-white font-bold"; 
+          }
+          else { 
+            bgStyle = { background: "rgba(255, 255, 255, 0.04)" }; 
+            textClass = "text-slate-300 font-medium hover:text-white"; 
+          }
 
           let extra = "hover:scale-105 hover:shadow-xs";
           if (isToday) extra += " ring-2 ring-primary ring-offset-1 ring-offset-background z-10";

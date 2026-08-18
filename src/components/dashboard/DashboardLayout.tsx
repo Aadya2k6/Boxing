@@ -28,6 +28,7 @@ interface DashboardLayoutProps {
   accentBg?: string;
   dotColor?: string;
   notificationTo?: string;
+  themeClass?: string;
 }
 
 export function DashboardLayout({
@@ -40,6 +41,7 @@ export function DashboardLayout({
   accentBg = "bg-primary/10",
   dotColor = "bg-primary",
   notificationTo,
+  themeClass = "",
 }: DashboardLayoutProps) {
   const { pathname } = useLocation();
   const { signOut, user } = useAuth();
@@ -152,12 +154,28 @@ export function DashboardLayout({
     .slice(0, 2)
     .join("");
 
+  const isDark = themeClass.includes("dark");
+
+  useEffect(() => {
+    if (isDark) {
+      document.documentElement.style.backgroundColor = "#050811";
+      document.body.style.backgroundColor = "#050811";
+    } else {
+      document.documentElement.style.backgroundColor = "";
+      document.body.style.backgroundColor = "";
+    }
+    return () => {
+      document.documentElement.style.backgroundColor = "";
+      document.body.style.backgroundColor = "";
+    };
+  }, [isDark]);
+
   const sidebarContent = (
     <>
       {/* Logo */}
       <div className="px-5 pt-5 pb-4 border-b border-border">
         <Link to="/" className="flex items-center group transition-transform group-hover:scale-105">
-          <Logo className="h-10 w-auto" textSize="text-xl" />
+          <Logo className="h-10 w-auto" textSize="text-xl" cinematicVariant={isDark} />
         </Link>
 
         {/* Role chip */}
@@ -228,8 +246,10 @@ export function DashboardLayout({
       <div className="border-t border-border p-3 space-y-2">
         <div className="flex items-center gap-3 p-2 rounded-lg bg-subtle/50">
           <div
-            className="size-9 rounded-full grid place-items-center text-xs font-bold text-background shrink-0"
-            style={{ background: "linear-gradient(135deg, #9E7C2A 0%, #C9A84C 100%)" }}
+            className={`size-9 rounded-full grid place-items-center text-xs font-bold shrink-0 ${
+              isDark ? "bg-slate-800 text-slate-100 border border-white/10 shadow-inner" : "text-background"
+            }`}
+            style={isDark ? undefined : { background: "linear-gradient(135deg, #9E7C2A 0%, #C9A84C 100%)" }}
           >
             {initials}
           </div>
@@ -251,21 +271,29 @@ export function DashboardLayout({
   );
 
   return (
-    <div className="min-h-screen flex bg-background">
+    <div className={`min-h-screen w-full flex bg-background text-foreground relative ${themeClass}`}>
+      {/* ── Atmospheric Glows (Dark Theme Only) ────────────────────── */}
+      {isDark && (
+        <>
+          <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1200px] h-[1200px] top-0 right-0 -translate-y-1/3 translate-x-1/3 opacity-50" />
+          <div className="atmosphere-base atmosphere-red animate-ambient-drift w-[800px] h-[800px] top-1/4 right-0 translate-x-1/4 opacity-40" style={{ animationDelay: '-4s' }} />
+        </>
+      )}
+
       {/* ── Mobile Sidebar Backdrop ──────────────────────────────────── */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-foreground/20 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-background/60 backdrop-blur-sm z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
 
       {/* ── Sidebar (Desktop: fixed; Mobile: slide-in drawer) ────────── */}
       <aside
-        className={`w-[240px] bg-surface flex flex-col fixed h-screen z-50 transition-transform duration-300 ease-in-out
+        className={`w-[240px] bg-surface flex flex-col fixed top-0 bottom-0 left-0 h-full z-50 transition-transform duration-300 ease-in-out
           lg:translate-x-0
           ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}
-        style={{ boxShadow: "1px 0 0 0 rgba(15,15,20,0.06)" }}
+        style={{ boxShadow: "var(--shadow-sidebar)" }}
       >
         {/* Mobile close button — only visible on small screens */}
         <button
@@ -280,11 +308,11 @@ export function DashboardLayout({
       </aside>
 
       {/* ── Main content ────────────────────────────────────────────── */}
-      <div className="flex-1 lg:ml-[240px] min-w-0 flex flex-col">
+      <div className="flex-1 lg:ml-[240px] min-w-0 flex flex-col min-h-screen z-10">
         {/* Top bar */}
         <header
           className="sticky top-0 z-20 bg-background/90 backdrop-blur-xl h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 gap-3"
-          style={{ boxShadow: "0 1px 0 0 rgba(15,15,20,0.06)" }}
+          style={{ boxShadow: "var(--shadow-header)" }}
         >
           {/* Mobile hamburger */}
           <button
@@ -350,7 +378,7 @@ export function DashboardLayout({
         </header>
 
         {/* Page content */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full">
+        <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full min-h-[calc(100vh-4rem)] flex flex-col">
           <Outlet />
         </main>
       </div>
@@ -553,8 +581,7 @@ export function AvatarInitials({ name, size = "sm" }: { name: string; size?: "sm
   const sz = size === "sm" ? "size-7 text-[10px]" : "size-9 text-xs";
   return (
     <div
-      className={`${sz} rounded-full font-bold text-background grid place-items-center shrink-0`}
-      style={{ background: "linear-gradient(135deg, #9E7C2A 0%, #C9A84C 100%)" }}
+      className={`${sz} rounded-full font-bold bg-elevated text-foreground border border-border grid place-items-center shrink-0 shadow-sm`}
     >
       {initials}
     </div>

@@ -41,9 +41,10 @@ function SuperLayout() {
       userName={profile?.full_name ?? "Superadmin"}
       userMeta={academyName ? `${academyName} · Superadmin` : "Academy Superadmin"}
       accentClass="text-superadmin"
-      accentBg="bg-subtle"
+      accentBg="bg-superadmin/10"
       dotColor="bg-superadmin"
       notificationTo="/superadmin/notifications"
+      themeClass="theme-superadmin-dark"
       navSections={[
         {
           label: "Platform",

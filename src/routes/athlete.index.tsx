@@ -262,7 +262,7 @@ function AthleteOverview() {
             !isLocked ? (
               <button
                 onClick={() => navigate({ to: "/athlete/payments" })}
-                className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-card"
+                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-primary-dark transition-all shadow-card"
               >
                 <CreditCard className="size-4" /> Pay next fee
               </button>
@@ -1006,7 +1006,7 @@ function PaymentWall({
         <div className="mt-5 space-y-2.5">
           <button
             onClick={() => setPayMode("online")}
-            className="w-full flex items-center justify-center gap-2 bg-[#ef4444] text-white py-3 rounded-xl text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-card"
+            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 rounded-xl text-sm font-semibold hover:bg-primary-dark transition-all shadow-card"
           >
             <CreditCard className="size-4" /> Pay online · {gatewayLabel}
           </button>
@@ -1056,7 +1056,7 @@ function PaymentWall({
           <button
             onClick={handleOnlinePay}
             disabled={paying}
-            className="w-full flex items-center justify-center gap-2 bg-[#ef4444] text-white py-3 rounded-xl text-sm font-semibold hover:bg-[#dc2626] disabled:opacity-60 transition-all shadow-card"
+            className="w-full flex items-center justify-center gap-2 bg-primary text-primary-foreground py-3 rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-60 transition-all shadow-card"
           >
             {paying ? (
               <Loader2 className="size-4 animate-spin" />

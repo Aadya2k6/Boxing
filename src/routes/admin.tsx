@@ -12,12 +12,13 @@ function AdminLayout() {
     <DashboardLayout
       basePath="/admin"
       role="Admin"
+      themeClass="theme-admin-dark"
       userName={profile?.full_name ?? "Admin"}
       userMeta="Academy Director"
       accentClass="text-info"
       accentBg="bg-info/10"
       dotColor="bg-info"
-        notificationTo="/admin/notifications"
+      notificationTo="/admin/notifications"
       navSections={[
         {
           label: "Workspace",
