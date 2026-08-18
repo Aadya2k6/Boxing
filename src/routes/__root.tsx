@@ -132,6 +132,11 @@ function RootShell({ children }: { children: React.ReactNode }) {
 
 function SmoothScroll({ children }: { children: React.ReactNode }) {
   useEffect(() => {
+    // Only enable Lenis on public landing page to avoid hijacking scroll in dashboards, tables, and modals
+    if (typeof window !== "undefined" && window.location.pathname !== "/") {
+      return;
+    }
+
     const mediaQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
     if (mediaQuery.matches) return;
 
@@ -149,7 +154,7 @@ function SmoothScroll({ children }: { children: React.ReactNode }) {
       requestAnimationFrame(raf);
     }
 
-    requestAnimationFrame(raf);
+    const frameId = requestAnimationFrame(raf);
 
     const handleHashChange = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -168,6 +173,7 @@ function SmoothScroll({ children }: { children: React.ReactNode }) {
     document.documentElement.addEventListener('click', handleHashChange);
 
     return () => {
+      cancelAnimationFrame(frameId);
       lenis.destroy();
       document.documentElement.removeEventListener('click', handleHashChange);
     };

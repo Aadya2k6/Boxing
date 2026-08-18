@@ -15,6 +15,9 @@ dist-ssr
 .tanstack/**
 .nitro
 *.local
+file.sql
+schema.sql
+edge_functions.sql
 
 # Wrangler / Cloudflare / Vercel
 .wrangler/

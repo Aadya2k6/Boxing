@@ -127,7 +127,9 @@
   html {
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-
+    overflow-y: auto;
+    overflow-x: hidden;
+    scroll-behavior: smooth;
   }
 
   body {
@@ -138,6 +140,9 @@
     line-height: 1.65;
     font-feature-settings: "ss01", "cv11", "kern";
     font-optical-sizing: auto;
+    min-height: 100vh;
+    overflow-x: hidden;
+    -webkit-overflow-scrolling: touch;
   }
 
   h1, h2, h3, h4, .font-display {
@@ -270,6 +275,14 @@
     animation: shimmer 4s linear infinite;
   }
 
+  /* Modal dialog responsiveness & scroll containment */
+  .shadow-modal {
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+    overflow-y: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+
   /* Sidebar active indicator */
   .nav-active-bar {
     position: absolute;
@@ -369,12 +382,6 @@
   @media (max-width: 768px) {
     .bento-grid {
       grid-template-columns: 1fr !important;
-    }
-    table {
-      display: block;
-      width: 100%;
-      overflow-x: auto;
-      -webkit-overflow-scrolling: touch;
     }
     input, select, textarea {
       font-size: 16px !important; /* Prevents auto-zoom on iOS Safari */
