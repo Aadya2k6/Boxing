@@ -38,7 +38,7 @@ function generateAcademyPaymentReportPdf(data: {
   .header { display: flex; justify-between: space-between; align-items: center; border-bottom: 2px solid #1a1a1a; padding-bottom: 20px; margin-bottom: 24px; }
   .header h1 { font-size: 22px; font-weight: 700; }
   .header .sub { font-size: 13px; color: #666; margin-top: 4px; }
-  .badge { font-size: 12px; background: #C9A84C; color: #111; padding: 6px 14px; border-radius: 20px; font-weight: 700; }
+  .badge { font-size: 12px; background: #EF4444; color: #fff; padding: 6px 14px; border-radius: 20px; font-weight: 700; }
   .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
   .stat-card { background: #f9f9f9; border: 1px solid #eee; border-radius: 8px; padding: 16px; text-align: center; }
   .stat-card .label { font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; }
@@ -242,15 +242,26 @@ function SAReports() {
             <ChartCard title="Monthly Revenue" sub="Invoiced vs Collected across all academies">
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={monthlyData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5E5" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} tickFormatter={v => `₹${v / 1000}k`} />
-                    <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: 8, border: "1px solid #e5e5e5", fontSize: 12 }} />
-                    <Legend />
-                    <Bar dataKey="Invoiced" fill="#1C212B" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Collected" fill="#2E8F5A" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Outstanding" fill="#C47C1A" radius={[4, 4, 0, 0]} />
+                  <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} tickFormatter={v => `₹${v / 1000}k`} />
+                    <Tooltip 
+                      formatter={(v: number) => fmt(v)} 
+                      contentStyle={{ 
+                        backgroundColor: "rgba(11, 15, 23, 0.95)", 
+                        borderRadius: 12, 
+                        border: "1px solid rgba(255, 255, 255, 0.15)", 
+                        fontSize: 12, 
+                        color: "#F8FAFC",
+                        boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+                      }}
+                      itemStyle={{ color: "#F8FAFC" }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: 10, fontSize: 12, color: "#94A3B8" }} />
+                    <Bar dataKey="Invoiced" fill="#EF4444" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                    <Bar dataKey="Collected" fill="#10B981" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                    <Bar dataKey="Outstanding" fill="#F59E0B" radius={[6, 6, 0, 0]} maxBarSize={36} />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -259,14 +270,24 @@ function SAReports() {
             <ChartCard title="Cumulative Revenue Trend" sub="Running total of invoiced vs collected">
               <div className="h-64">
                 <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={cumData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5E5" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} tickFormatter={v => `₹${v / 1000}k`} />
-                    <Tooltip formatter={(v: number) => fmt(v)} contentStyle={{ borderRadius: 8, border: "1px solid #e5e5e5", fontSize: 12 }} />
-                    <Area type="monotone" dataKey="CumInvoiced" stroke="#1C212B" fill="#1C212B" fillOpacity={0.08} strokeWidth={2} name="Total Invoiced" />
-                    <Area type="monotone" dataKey="CumCollected" stroke="#2E8F5A" fill="#2E8F5A" fillOpacity={0.15} strokeWidth={2} name="Total Collected" />
-                    <Legend />
+                  <AreaChart data={cumData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} tickFormatter={v => `₹${v / 1000}k`} />
+                    <Tooltip 
+                      formatter={(v: number) => fmt(v)} 
+                      contentStyle={{ 
+                        backgroundColor: "rgba(11, 15, 23, 0.95)", 
+                        borderRadius: 12, 
+                        border: "1px solid rgba(255, 255, 255, 0.15)", 
+                        fontSize: 12, 
+                        color: "#F8FAFC",
+                        boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+                      }} 
+                    />
+                    <Area type="monotone" dataKey="CumInvoiced" stroke="#EF4444" fill="#EF4444" fillOpacity={0.15} strokeWidth={2.5} name="Total Invoiced" />
+                    <Area type="monotone" dataKey="CumCollected" stroke="#10B981" fill="#10B981" fillOpacity={0.25} strokeWidth={2.5} name="Total Collected" />
+                    <Legend wrapperStyle={{ paddingTop: 10, fontSize: 12, color: "#94A3B8" }} />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>

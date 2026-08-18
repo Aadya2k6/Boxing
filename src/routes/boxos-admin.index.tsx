@@ -429,7 +429,7 @@ function BoxosAdminAcademies() {
 
       {/* Suspend Academy Modal */}
       {suspendTarget && (
-        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setSuspendTarget(null)}>
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setSuspendTarget(null)}>
           <div className="bg-surface rounded-2xl shadow-modal w-full max-w-md animate-fade-up overflow-hidden">
             <div className="p-5 border-b border-border flex items-center justify-between">
               <div className="font-display font-bold text-base flex items-center gap-2 text-warning">
@@ -478,7 +478,7 @@ function BoxosAdminAcademies() {
 
       {/* Archive Academy Modal */}
       {archiveTarget && (
-        <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setArchiveTarget(null)}>
+        <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && setArchiveTarget(null)}>
           <div className="bg-surface rounded-2xl shadow-modal w-full max-w-md animate-fade-up overflow-hidden">
             <div className="p-5 border-b border-border flex items-center justify-between">
               <div className="font-display font-bold text-base flex items-center gap-2 text-destructive">
@@ -644,7 +644,7 @@ function CreateAcademyModal({ onClose, onSuccess }: { onClose: () => void; onSuc
   }
 
   return (
-    <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-surface rounded-2xl shadow-modal w-full max-w-2xl max-h-[90vh] overflow-y-auto animate-fade-up">
         <div className="p-5 border-b border-border sticky top-0 bg-surface/95 backdrop-blur-md z-10 flex items-center justify-between">
           <div>

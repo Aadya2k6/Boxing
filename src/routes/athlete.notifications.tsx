@@ -504,7 +504,7 @@ function NotifPage() {
                             <button
                               onClick={() => submitRsvp(n.id, n.related_entity_id, false)}
                               disabled={state.loading || !state.reason.trim()}
-                              className="px-4 py-2 text-sm font-semibold bg-[#ef4444] text-white rounded-lg hover:bg-[#dc2626] disabled:opacity-50 transition flex items-center gap-2"
+                              className="px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-lg hover:bg-primary-dark disabled:opacity-50 transition flex items-center gap-2"
                             >
                               {state.loading && <Loader2 className="size-3.5 animate-spin" />}
                               Submit Reason

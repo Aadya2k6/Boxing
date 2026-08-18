@@ -308,7 +308,7 @@ function LogEventModal({ onClose }: { onClose: () => void }) {
   const [desc, setDesc] = useState("");
 
   return (
-    <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-surface rounded-2xl shadow-modal w-full max-w-md">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="font-display font-bold">Log Event</div>
@@ -354,7 +354,7 @@ function RecordDecisionModal({ onClose }: { onClose: () => void }) {
   const [confirmed, setConfirmed] = useState(false);
 
   return (
-    <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-surface rounded-2xl shadow-modal w-full max-w-md">
         <div className="flex items-center justify-between p-5 border-b border-border">
           <div className="font-display font-bold">Record Bout Decision</div>

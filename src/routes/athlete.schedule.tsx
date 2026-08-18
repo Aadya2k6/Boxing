@@ -409,11 +409,11 @@ function SchedulePage() {
           {/* Legend */}
           <div className="hidden md:flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1.5">
-              <span className="size-3 rounded" style={{ background: "linear-gradient(135deg, #8B5E3C, #A6724A)" }} />
+              <span className="size-3 rounded bg-primary" />
               Class
             </span>
             <span className="flex items-center gap-1.5">
-              <span className="size-3 rounded border border-border" style={{ background: "#FDF8F0" }} />
+              <span className="size-3 rounded border border-border bg-subtle" />
               Regular
             </span>
           </div>
@@ -422,11 +422,11 @@ function SchedulePage() {
         {/* Mobile Legend */}
         <div className="md:hidden px-5 pt-3 pb-1 flex items-center gap-3 text-[10px] text-muted-foreground">
           <span className="flex items-center gap-1">
-            <span className="size-2.5 rounded" style={{ background: "#8B5E3C" }} />
+            <span className="size-2.5 rounded bg-primary" />
             Class
           </span>
           <span className="flex items-center gap-1">
-            <span className="size-2.5 rounded border border-border" style={{ background: "#FDF8F0" }} />
+            <span className="size-2.5 rounded border border-border bg-subtle" />
             Regular
           </span>
         </div>
@@ -498,7 +498,7 @@ function SchedulePage() {
                           </div>
                           {s.focus && (
                             <div className="mt-2">
-                              <Badge tone="gold">{s.focus}</Badge>
+                              <Badge tone="info">{s.focus}</Badge>
                             </div>
                           )}
                         </div>
@@ -561,7 +561,7 @@ function SchedulePage() {
                       {s.coach && <span>· {s.coach}</span>}
                     </div>
                   </div>
-                  {s.focus && <Badge tone="gold">{s.focus}</Badge>}
+                  {s.focus && <Badge tone="info">{s.focus}</Badge>}
                 </li>
               ))}
             </ul>
@@ -700,11 +700,11 @@ function MonthCard({
             bgStyle = { background: "linear-gradient(135deg, #991b1b, #dc2626)" };
             textClass = "text-white font-semibold";
           } else if (cell.type === "class") {
-            bgStyle = { background: "linear-gradient(135deg, #8B5E3C, #A6724A)" };
+            bgStyle = { background: "linear-gradient(135deg, #EF4444, #DC2626)" };
             textClass = "text-white font-semibold";
           } else {
-            bgStyle = { background: "#FDF8F0" };
-            textClass = "text-foreground/70";
+            bgStyle = { background: "var(--color-subtle)" };
+            textClass = "text-muted-foreground font-medium";
           }
 
           let extraClass = "hover:scale-105 hover:shadow-xs";

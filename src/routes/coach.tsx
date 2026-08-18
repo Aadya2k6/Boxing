@@ -15,13 +15,14 @@ function CoachLayout() {
     );
   return (
     <DashboardLayout
+      themeClass="theme-coach-dark"
       basePath="/coach"
       role="Coach"
       userName={profile?.full_name ?? "Coach"}
       userMeta="Boxing Coach"
-      accentClass="text-primary-dark"
-      accentBg="bg-primary/10"
-      dotColor="bg-primary"
+      accentClass="text-coach"
+      accentBg="bg-coach/10"
+      dotColor="bg-coach"
       notificationTo="/coach/notifications"
       navSections={[
         {

@@ -199,7 +199,7 @@ function AdminScheduling() {
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-semibold text-sm">{t.name}</span>
-                          {t.isTournament && <span className="badge badge-gold">Tournament</span>}
+                          {t.isTournament && <span className="badge badge-neutral">Tournament</span>}
                         </div>
                         <div className="text-xs text-muted-foreground mt-1 flex items-center gap-2 flex-wrap">
                           <span>{t.days.join(", ")}</span>
@@ -249,7 +249,7 @@ function NewScheduleModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 bg-foreground/30 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
       <div className="bg-surface rounded-2xl shadow-modal w-full max-w-lg">
         {/* Header */}
         <div className="flex items-center justify-between p-5 border-b border-border">

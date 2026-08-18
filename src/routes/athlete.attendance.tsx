@@ -594,7 +594,7 @@ function AttendancePage() {
                 <button
                   onClick={handleMarkAttendance}
                   disabled={marking || !academy?.latitude}
-                  className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#dc2626] disabled:opacity-50 transition shadow-card"
+                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-50 transition shadow-card"
                 >
                   {marking ? <Loader2 className="size-4 animate-spin" /> : <CalendarCheck className="size-4" />}
                   {marking ? "Locating…" : "Mark attendance"}
@@ -722,7 +722,7 @@ function AttendancePage() {
                 </div>
               )}
               <button type="submit" disabled={submittingLeave}
-                className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#dc2626] disabled:opacity-50 transition shadow-card">
+                className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-50 transition shadow-card">
                 {submittingLeave ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
                 {submittingLeave ? "Submitting…" : "Submit leave application"}
               </button>

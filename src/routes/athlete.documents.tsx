@@ -119,7 +119,7 @@ function DocumentsPage() {
           <button
             onClick={() => inputRef.current?.click()}
             disabled={uploading}
-            className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2 rounded-md text-sm hover:bg-[#dc2626] transition disabled:opacity-60"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-md text-sm hover:bg-primary-dark transition disabled:opacity-60"
           >
             {uploading ? (
               <Loader2 className="size-4 animate-spin" />

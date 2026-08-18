@@ -179,7 +179,7 @@ function ProfilePage() {
             <Badge tone={athleteProfile.verification_status === "verified" ? "success" : "warning"}>
               {athleteProfile.verification_status === "verified" ? "Verified" : athleteProfile.verification_status === "rejected" ? "Rejected" : "Pending"}
             </Badge>
-            <Badge tone="gold">{athleteProfile.national_federation_boxer_id ? "Registered" : "New"}</Badge>
+            <Badge tone="info">{athleteProfile.national_federation_boxer_id ? "Registered" : "New"}</Badge>
           </div>
           <div className="mt-6 pt-6 border-t border-border space-y-2 text-left text-sm">
             <Row icon={Mail} k={profile?.email || "—"} />
@@ -346,7 +346,7 @@ function ProfilePage() {
               </div>
               <div className="flex items-center justify-end gap-2 pt-2">
                 <button type="button" onClick={() => setEditOpen(false)} className="px-4 py-2 rounded-xl border border-border text-sm hover:bg-subtle">Cancel</button>
-                <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#ef4444] text-white text-sm font-semibold hover:bg-[#dc2626] disabled:opacity-60">
+                <button type="submit" disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold hover:bg-primary-dark disabled:opacity-60">
                   {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />} {saving ? "Saving…" : "Save changes"}
                 </button>
               </div>

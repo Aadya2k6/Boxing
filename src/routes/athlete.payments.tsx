@@ -489,7 +489,7 @@ function PaymentsPage() {
               {planAmount > 0 ? (
                 <button
                   onClick={() => handlePay(activeInvoice)}
-                  className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#dc2626] transition shadow-card cursor-pointer"
+                  className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark transition shadow-card cursor-pointer"
                 >
                   <CreditCard className="size-4" /> Pay online ₹
                   {Math.max(0, Number(activeInvoice.balance_outstanding ?? activeInvoice.amount_due ?? planAmount) - discountAmount).toLocaleString("en-IN")}
@@ -565,7 +565,7 @@ function PaymentsPage() {
                 {planAmount > 0 ? (
                   <button
                     onClick={() => handlePay(activeInvoice)}
-                    className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#dc2626] transition shadow-card cursor-pointer"
+                    className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark transition shadow-card cursor-pointer"
                   >
                     <CreditCard className="size-4" /> Pay online ₹
                     {Math.max(0, Number(activeInvoice.balance_outstanding ?? activeInvoice.amount_due ?? planAmount) - discountAmount).toLocaleString("en-IN")}

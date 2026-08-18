@@ -1,11 +1,13 @@
 import { useEffect } from "react";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import Lenis from "lenis";
+import "lenis/dist/lenis.css";
 import {
   Outlet,
   Link,
   createRootRouteWithContext,
   useRouter,
+  useLocation,
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
@@ -131,6 +133,8 @@ function RootShell({ children }: { children: React.ReactNode }) {
 }
 
 function SmoothScroll({ children }: { children: React.ReactNode }) {
+  const location = useLocation();
+
   useEffect(() => {
     // Only enable Lenis on public landing page to avoid hijacking scroll in dashboards, tables, and modals
     if (typeof window !== "undefined" && window.location.pathname !== "/") {
@@ -147,14 +151,18 @@ function SmoothScroll({ children }: { children: React.ReactNode }) {
       gestureOrientation: 'vertical',
       smoothWheel: true,
       wheelMultiplier: 1,
+      autoResize: true,
     });
 
+    (window as any).__lenis = lenis;
+
+    let rafId: number;
     function raf(time: number) {
       lenis.raf(time);
-      requestAnimationFrame(raf);
+      rafId = requestAnimationFrame(raf);
     }
 
-    const frameId = requestAnimationFrame(raf);
+    rafId = requestAnimationFrame(raf);
 
     const handleHashChange = (e: MouseEvent) => {
       const target = e.target as HTMLElement;
@@ -164,20 +172,45 @@ function SmoothScroll({ children }: { children: React.ReactNode }) {
         const el = document.getElementById(id);
         if (el) {
           e.preventDefault();
-          // -96 accounts for the sticky header height
           lenis.scrollTo(el, { offset: -96 });
         }
       }
     };
 
+    const resizeObserver = new ResizeObserver(() => {
+      lenis.resize();
+    });
+    if (document.body) {
+      resizeObserver.observe(document.body);
+    }
+
     document.documentElement.addEventListener('click', handleHashChange);
 
     return () => {
-      cancelAnimationFrame(frameId);
+      cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
       lenis.destroy();
+      delete (window as any).__lenis;
       document.documentElement.removeEventListener('click', handleHashChange);
     };
   }, []);
+
+  useEffect(() => {
+    const lenis = (window as any).__lenis;
+    if (location.hash) {
+      const id = location.hash.substring(1);
+      const el = document.getElementById(id);
+      if (el && lenis) {
+        lenis.scrollTo(el, { offset: -96, immediate: true });
+        return;
+      }
+    }
+    if (lenis) {
+      lenis.scrollTo(0, { immediate: true });
+    } else {
+      window.scrollTo(0, 0);
+    }
+  }, [location.pathname]);
 
   return <>{children}</>;
 }
