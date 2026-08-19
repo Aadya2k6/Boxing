@@ -306,30 +306,19 @@
             height_cm: data.heightCm ? parseFloat(data.heightCm) : null,
             reach_cm: data.reachCm ? parseFloat(data.reachCm) : null,
             national_federation_boxer_id: data.nationalFederationBoxerId?.trim() || null,
-            record_wins: data.recordWins ? parseInt(data.recordWins, 10) : 0,
-            record_losses: data.recordLosses ? parseInt(data.recordLosses, 10) : 0,
-            record_draws: data.recordDraws ? parseInt(data.recordDraws, 10) : 0,
-            record_kos: data.recordKos ? parseInt(data.recordKos, 10) : 0,
-
             years_boxing_experience: data.yearsBoxingExperience ? parseInt(data.yearsBoxingExperience, 10) : null,
             current_coach_preference: data.coachName || data.currentCoachPreference || null,
             state_association_id: data.stateAssociationId || null,
             international_federation_id: data.internationalFederationId || null,
 
-            experience_level: data.experienceLevel || null,
-            health_insurance_provider: data.healthInsuranceProvider || null,
-            fight_record_text: data.fightRecord || null,
-            previous_club: data.previousClub || null,
-            preferred_class_schedule: data.preferredClassSchedule || null,
-
-            verification_status: "pending",
             onboarding_complete: true,
           }, { onConflict: "user_id" })
           .select("id")
           .maybeSingle();
 
         if (apErr) {
-          console.warn("boxer_profiles upsert notice:", apErr.message);
+          console.warn("boxer_profiles upsert error:", apErr.message);
+          throw new Error("Failed to save athlete profile: " + apErr.message);
         }
 
         const boxerProfileId = ap?.id;

@@ -56,6 +56,10 @@ function PaymentsPage() {
   const [rolloverSubmitting, setRolloverSubmitting] = useState(false);
   const [hasUsedRollover, setHasUsedRollover] = useState(false);
 
+  // Gateway state
+  const [availableGateways, setAvailableGateways] = useState<string[]>([]);
+  const [selectedGateway, setSelectedGateway] = useState<string>("razorpay");
+
   async function loadData() {
     // Always clear state first so no stale data from a previous user is ever shown
     setInvoices([]);
@@ -73,7 +77,7 @@ function PaymentsPage() {
     // Strictly fetch athlete_profile for the currently logged-in user only
     const { data: ap } = await supabase
       .from("boxer_profiles")
-      .select("id, academy_id")
+      .select("id, academy_id, center_id")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -129,32 +133,40 @@ function PaymentsPage() {
     setPayments(paymentRows || []);
     setHasUsedRollover(!!(unclearedRollover && unclearedRollover.length > 0));
 
-    if (ap.academy_id) {
+    if (ap.center_id) {
       setAthleteAcademyId(ap.academy_id);
-      const { data: ac } = await supabase
-        .from("academies")
-        .select("active_gateway")
-        .eq("id", ap.academy_id)
+      
+      const { data: c } = await supabase
+        .from("centers")
+        .select("is_active, id")
+        .eq("id", ap.center_id)
         .maybeSingle();
 
-      if (ac?.active_gateway) {
-        setAthleteAcademy({ payment_gateway: ac.active_gateway });
+      if (c) {
+        setAthleteAcademy(c);
+        
+        // Fetch specific gateway config for this academy
+        const { data: gwData } = await supabase
+          .from("academies")
+          .select("active_gateway, razorpay_key_id, payu_merchant_key, encrypted_payu_salt")
+          .eq("id", ap.academy_id)
+          .maybeSingle();
+
+        const gws = [];
+        if (gwData?.razorpay_key_id) gws.push("razorpay");
+        if (gwData?.payu_merchant_key && gwData?.encrypted_payu_salt) gws.push("payu");
+        if (gws.length === 0) gws.push(gwData?.active_gateway || "razorpay");
+        
+        setAvailableGateways(gws);
+        setSelectedGateway(gws.includes(gwData?.active_gateway) ? gwData?.active_gateway : gws[0]);
         setLoading(false);
         return;
       }
     }
 
-    // Fallback: Check active_gateway from academies table
-    const { data: firstAc } = await supabase
-      .from("academies")
-      .select("active_gateway")
-      .not("active_gateway", "is", null)
-      .limit(1)
-      .maybeSingle();
-
-    const resolvedGateway = firstAc?.active_gateway || "razorpay";
-    setAthleteAcademy({ payment_gateway: resolvedGateway });
-
+    // Fallback: Check active_gateway from centers table if we must, or just fallback
+    setSelectedGateway("razorpay");
+    setAvailableGateways(["razorpay"]);
     setLoading(false);
   }
 

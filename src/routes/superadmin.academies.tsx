@@ -17,11 +17,9 @@ import {
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { encryptSecret } from "@/lib/encryption";
 
 export const Route = createFileRoute("/superadmin/academies")({ component: AcademiesPage });
-
-// Per-academy gateway config is stored directly in academies table columns:
-// (active_gateway, razorpay_key_id, payu_merchant_key, encrypted_payu_salt, encrypted_razorpay_secret)
 
 const emptyForm = {
   name: "",
@@ -31,7 +29,6 @@ const emptyForm = {
   latitude: "",
   longitude: "",
   attendance_radius_meters: "200",
-  // Gateway fields (stored directly in academies table columns)
   payment_gateway: "razorpay" as "razorpay" | "payu",
   razorpay_key_id: "",
   payu_merchant_key: "",
@@ -57,19 +54,50 @@ function AcademiesPage() {
   async function loadAcademies() {
     setLoading(true);
     try {
-      const [{ data: acs }, { data: athletes }] = await Promise.all([
-        supabase.from("academies").select("id, name, city, state, address, status, active_gateway, logo_url, onboarded_at, created_at, updated_at, suspended_at, suspended_reason, archived_at, hard_delete_eligible_at, deleted_at").order("created_at"),
+      const { data: profile } = await supabase.from("profiles").select("academy_id").eq("id", user?.id).single();
+      
+      const [ { data: acs }, { data: athletes } ] = await Promise.all([
+        supabase
+          .from("centers")
+          .select("id, name, city, state, address, latitude, longitude, attendance_radius_meters, is_active, created_at, updated_at")
+          .eq("academy_id", profile?.academy_id)
+          .order("created_at"),
         supabase
           .from("boxer_profiles")
-          .select("academy_id")
-          .not("academy_id", "is", null),
+          .select("center_id")
+          .not("center_id", "is", null)
       ]);
+
+      const centers = acs ?? [];
+      
+      // Fetch academy gateway config
+      const { data: academyConfig } = await supabase
+        .from("academies")
+        .select("active_gateway, razorpay_key_id, payu_merchant_key, encrypted_payu_salt")
+        .eq("id", profile?.academy_id)
+        .maybeSingle();
+
+      const gwMap = centers.reduce((acc, curr) => {
+        acc[curr.id] = {
+          id: curr.id,
+          payment_gateway: academyConfig?.active_gateway || "razorpay",
+          has_razorpay_key: !!academyConfig?.razorpay_key_id,
+          has_payu_key: !!(academyConfig?.payu_merchant_key && academyConfig?.encrypted_payu_salt)
+        };
+        return acc;
+      }, {} as Record<string, any>);
+
       setAcademies(
-        (acs ?? []).map((a) => ({
+        centers.map((a) => ({
           ...a,
-          athlete_count: athletes?.filter((ap) => ap.academy_id === a.id).length ?? 0,
+          athlete_count: athletes?.filter((ap) => ap.center_id === a.id).length ?? 0,
+          active_gateway: gwMap[a.id]?.payment_gateway ?? "razorpay",
+          has_razorpay_key: gwMap[a.id]?.has_razorpay_key ?? false,
+          has_payu_key: gwMap[a.id]?.has_payu_key ?? false,
         })),
       );
+    } catch (e) {
+      console.error(e);
     } finally {
       setLoading(false);
     }
@@ -93,10 +121,10 @@ function AcademiesPage() {
       latitude: String(a.latitude ?? ""),
       longitude: String(a.longitude ?? ""),
       attendance_radius_meters: String(a.attendance_radius_meters ?? "200"),
-      payment_gateway: (a.active_gateway ?? a.payment_gateway ?? "razorpay") as "razorpay" | "payu",
-      razorpay_key_id: a.razorpay_key_id ?? "",
-      payu_merchant_key: a.payu_merchant_key ?? "",
-      payu_merchant_salt: a.encrypted_payu_salt ?? a.payu_merchant_salt ?? "",
+      payment_gateway: a.active_gateway ?? "razorpay",
+      razorpay_key_id: "", 
+      payu_merchant_key: "",
+      payu_merchant_salt: "",
     });
     setShowModal(true);
   }
@@ -117,8 +145,11 @@ function AcademiesPage() {
     e.preventDefault();
     setSaving(true);
     try {
-      // Save directly into academies table columns in Supabase
-      const academyPayload = {
+      if (!form.name) throw new Error("Name is required");
+
+      const { data: profile } = await supabase.from("profiles").select("academy_id").eq("id", user?.id).single();
+      
+      const payload = {
         name: form.name,
         address: form.address,
         city: form.city,
@@ -126,20 +157,39 @@ function AcademiesPage() {
         latitude: form.latitude ? parseFloat(form.latitude) : null,
         longitude: form.longitude ? parseFloat(form.longitude) : null,
         attendance_radius_meters: parseInt(form.attendance_radius_meters) || 200,
-        razorpay_key_id: form.razorpay_key_id.trim() || null,
-        payu_merchant_key: form.payu_merchant_key.trim() || null,
-        encrypted_payu_salt: form.payu_merchant_salt.trim() || null,
-        active_gateway: form.payment_gateway,
       };
 
+      let centerId = editing?.id;
+
       if (editing) {
-        const { error } = await supabase.from("academies").update(academyPayload).eq("id", editing.id);
+        const { error } = await supabase.from("centers").update(payload).eq("id", centerId);
         if (error) throw error;
       } else {
-        const { error } = await supabase
-          .from("academies")
-          .insert({ ...academyPayload, onboarded_by: user?.id });
+        const { data, error } = await supabase
+          .from("centers")
+          .insert({ ...payload, academy_id: profile?.academy_id, created_by: user?.id })
+          .select("id")
+          .single();
         if (error) throw error;
+        centerId = data.id;
+      }
+
+      // Save gateway keys using the academies table (academy-wide config)
+      if (form.razorpay_key_id || form.payu_merchant_key || form.payment_gateway) {
+        const academyPayload = {
+          active_gateway: form.payment_gateway,
+          razorpay_key_id: form.razorpay_key_id || null,
+          payu_merchant_key: form.payu_merchant_key || null,
+          encrypted_payu_salt: form.payu_merchant_salt ? await encryptSecret(form.payu_merchant_salt) : null
+        };
+        const { error: gwError } = await supabase
+          .from("academies")
+          .update(academyPayload)
+          .eq("id", profile?.academy_id);
+        
+        if (gwError) {
+          console.warn("Could not save payment keys to academy:", gwError);
+        }
       }
 
       setShowModal(false);
@@ -181,11 +231,10 @@ function AcademiesPage() {
           </div>
         ) : (
           academies.map((a) => {
-            // Read gateway config directly from academies table columns
             const activeGw = a.active_gateway || "razorpay";
-            const hasRzpKey = activeGw === "razorpay" && !!a.razorpay_key_id;
-            const hasPayUKey =
-              activeGw === "payu" && !!a.payu_merchant_key && !!a.encrypted_payu_salt;
+            const hasRzpKey = a.has_razorpay_key;
+            const hasPayUKey = a.has_payu_key;
+            
             const gwLabel =
               activeGw === "razorpay"
                 ? hasRzpKey
@@ -250,7 +299,6 @@ function AcademiesPage() {
         )}
       </div>
 
-      {/* Create/Edit Modal */}
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-lg animate-fade-up overflow-hidden max-h-[90vh] overflow-y-auto">
@@ -306,7 +354,6 @@ function AcademiesPage() {
                 </div>
               </div>
 
-              {/* Geo section */}
               <fieldset>
                 <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
                   Geo-fence coordinates
@@ -368,7 +415,6 @@ function AcademiesPage() {
                 </div>
               </fieldset>
 
-              {/* Payment gateway section */}
               <fieldset>
                 <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
                   <CreditCard className="size-3.5" /> Payment gateway
@@ -398,7 +444,7 @@ function AcademiesPage() {
                       onChange={(e) => setF("razorpay_key_id", e.target.value)}
                       className="input-premium font-mono"
                       placeholder={
-                        editing?.razorpay_key_id
+                        editing?.has_razorpay_key
                           ? "🔒 Configured — leave blank to keep"
                           : "rzp_live_… or rzp_test_…"
                       }
@@ -420,7 +466,7 @@ function AcademiesPage() {
                         onChange={(e) => setF("payu_merchant_key", e.target.value)}
                         className="input-premium font-mono"
                         placeholder={
-                          editing?.payu_merchant_key
+                          editing?.has_payu_key
                             ? "🔒 Configured — leave blank to keep"
                             : "Your PayU merchant key"
                         }
@@ -437,7 +483,7 @@ function AcademiesPage() {
                           onChange={(e) => setF("payu_merchant_salt", e.target.value)}
                           className="input-premium font-mono pr-10"
                           placeholder={
-                            editing?.encrypted_payu_salt || editing?.payu_merchant_salt
+                            editing?.has_payu_key
                               ? "🔒 Configured — leave blank to keep"
                               : "Your PayU merchant salt"
                           }

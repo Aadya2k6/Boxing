@@ -5,14 +5,14 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 
+import { encryptSecret, decryptSecret } from "@/lib/encryption";
+
 export const Route = createFileRoute("/superadmin/settings")({ component: SASettings });
 
 function SASettings() {
   const { user, signOut } = useAuth();
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [showRzpSecret, setShowRzpSecret] = useState(false);
-  const [showPayuSalt, setShowPayuSalt] = useState(false);
   const [academies, setAcademies] = useState<any[]>([]);
   const [ownAcademyId, setOwnAcademyId] = useState("");
   const [savingAcademy, setSavingAcademy] = useState(false);
@@ -24,11 +24,6 @@ function SASettings() {
   const [pwDone, setPwDone] = useState(false);
   const [pwError, setPwError] = useState<string | null>(null);
   const [settings, setSettings] = useState({
-    payment_gateway: "razorpay",
-    razorpay_key_id: "",
-    razorpay_secret: "",
-    payu_merchant_key: "",
-    payu_merchant_salt: "",
     sender_email: "no-reply@boxos.in",
     sms_provider: "MSG91",
     academy_name: "Boxos Boxing Academy",
@@ -43,18 +38,15 @@ function SASettings() {
 
   async function loadSettings() {
     const [{ data: acs }, { data: prof }] = await Promise.all([
-      supabase.from("academies").select("id, name, city, state, address, latitude, longitude, attendance_radius_meters, status, active_gateway, razorpay_key_id, encrypted_razorpay_secret, payu_merchant_key, encrypted_payu_salt, created_at, updated_at").order("name"),
+      supabase.from("academies").select("id, name, city, state, address, latitude, longitude, attendance_radius_meters, status, created_at, updated_at").order("name"),
       supabase.from("profiles").select("preferred_academy_id").eq("id", user!.id).maybeSingle(),
     ]);
     const firstAc = acs?.[0];
     if (firstAc) {
       setSettings(s => ({
         ...s,
-        payment_gateway: firstAc.active_gateway ?? s.payment_gateway,
-        razorpay_key_id: firstAc.razorpay_key_id ?? s.razorpay_key_id,
-        razorpay_secret: firstAc.encrypted_razorpay_secret ?? s.razorpay_secret,
-        payu_merchant_key: firstAc.payu_merchant_key ?? s.payu_merchant_key,
-        payu_merchant_salt: firstAc.encrypted_payu_salt ?? s.payu_merchant_salt,
+        academy_name: firstAc.name || s.academy_name,
+        geo_fence_default_radius: String(firstAc.attendance_radius_meters || s.geo_fence_default_radius),
       }));
     }
     setAcademies(acs ?? []);
@@ -65,22 +57,7 @@ function SASettings() {
     e.preventDefault();
     setSaving(true);
     try {
-      // Update academies table directly in Supabase
-      const academyPayload: Record<string, any> = {
-        updated_by: user?.id,
-      };
-      if (settings.payment_gateway) academyPayload.active_gateway = settings.payment_gateway;
-      if (settings.payu_merchant_key) academyPayload.payu_merchant_key = settings.payu_merchant_key.trim();
-      if (settings.payu_merchant_salt) academyPayload.encrypted_payu_salt = settings.payu_merchant_salt.trim();
-      if (settings.razorpay_key_id) academyPayload.razorpay_key_id = settings.razorpay_key_id.trim();
-      if (settings.razorpay_secret) academyPayload.encrypted_razorpay_secret = settings.razorpay_secret.trim();
-
-      const { error } = await supabase
-        .from("academies")
-        .update(academyPayload)
-        .neq("id", "00000000-0000-0000-0000-000000000000");
-
-      if (error) throw error;
+      // Local settings saved state simulation (non-db global platform preferences)
       setSaved(true);
       setTimeout(() => setSaved(false), 2500);
     } catch (err: any) {
@@ -134,69 +111,6 @@ function SASettings() {
         <Section title="Academy">
           <Field label="Academy name" value={settings.academy_name} onChange={v => setS("academy_name", v)} />
           <Field label="Default geo-fence radius (m)" value={settings.geo_fence_default_radius} onChange={v => setS("geo_fence_default_radius", v)} type="number" />
-        </Section>
-
-        <Section title="Payment Gateways Configuration">
-          <div className="col-span-2 space-y-4">
-            <div>
-              <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5 block">Active Platform Gateway</span>
-              <select
-                value={settings.payment_gateway ?? "razorpay"}
-                onChange={e => setS("payment_gateway", e.target.value)}
-                className="w-full bg-elevated border border-border rounded-xl px-3.5 py-2.5 text-sm font-semibold focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20"
-              >
-                <option value="razorpay">Razorpay (Default)</option>
-                <option value="payu">PayU India (Bolt / Form Checkout)</option>
-              </select>
-              <p className="text-xs text-muted-foreground mt-1">
-                Athletes will be presented with this gateway for online fee payments (unless overridden per academy location in Academy Locations).
-              </p>
-            </div>
-
-            <div className="pt-3 border-t border-border/60">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-3">PayU Merchant Credentials</h4>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <Field label="PayU Merchant Key" value={settings.payu_merchant_key} onChange={v => setS("payu_merchant_key", v)} placeholder="20qqUj" />
-                <div>
-                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5 block">PayU Merchant Salt</span>
-                  <div className="relative">
-                    <input
-                      type={showPayuSalt ? "text" : "password"}
-                      value={settings.payu_merchant_salt}
-                      onChange={e => setS("payu_merchant_salt", e.target.value)}
-                      placeholder="yEdVpAFuqCqg83SSRID7MmRg4baygopF"
-                      className="w-full bg-elevated border border-border rounded-xl px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 pr-10"
-                    />
-                    <button type="button" onClick={() => setShowPayuSalt(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                      {showPayuSalt ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="pt-3 border-t border-border/60">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-foreground mb-3">Razorpay Credentials</h4>
-              <div className="grid sm:grid-cols-2 gap-3">
-                <Field label="Key ID" value={settings.razorpay_key_id} onChange={v => setS("razorpay_key_id", v)} placeholder="rzp_live_…" />
-                <div>
-                  <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-medium mb-1.5 block">Secret key</span>
-                  <div className="relative">
-                    <input
-                      type={showRzpSecret ? "text" : "password"}
-                      value={settings.razorpay_secret}
-                      onChange={e => setS("razorpay_secret", e.target.value)}
-                      placeholder="rzp_secret_…"
-                      className="w-full bg-elevated border border-border rounded-xl px-3.5 py-2.5 text-sm font-mono focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/20 pr-10"
-                    />
-                    <button type="button" onClick={() => setShowRzpSecret(p => !p)} className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground">
-                      {showRzpSecret ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
         </Section>
 
         <Section title="Notifications">

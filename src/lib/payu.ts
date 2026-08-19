@@ -67,6 +67,8 @@ async function computePayUHash(
   return hashArray.map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
+import { decryptSecret } from "./encryption";
+
 /**
  * Reads PayU merchant key + salt directly from academies table columns.
  * - Primary: academies.payu_merchant_key + academies.encrypted_payu_salt for the given academyId
@@ -84,7 +86,7 @@ async function getPayUCredentials(academyId?: string): Promise<{ key: string; sa
       .maybeSingle();
 
     key = ac?.payu_merchant_key?.trim() || "";
-    salt = ac?.encrypted_payu_salt?.trim() || "";
+    salt = await decryptSecret(ac?.encrypted_payu_salt);
   }
 
   // Fallback: any academy row that has PayU credentials set
@@ -98,7 +100,7 @@ async function getPayUCredentials(academyId?: string): Promise<{ key: string; sa
       .maybeSingle();
 
     key = key || ac?.payu_merchant_key?.trim() || "";
-    salt = salt || ac?.encrypted_payu_salt?.trim() || "";
+    salt = salt || (await decryptSecret(ac?.encrypted_payu_salt));
   }
 
   // Fallback 2: Environment variables

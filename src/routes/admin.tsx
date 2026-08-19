@@ -30,6 +30,7 @@ function AdminLayout() {
             { to: "attendance", label: "Attendance & Leaves", icon: CalendarCheck },
             { to: "scheduling", label: "Scheduling", icon: CalendarCheck },
             { to: "bouts", label: "Bout Management", icon: Swords },
+            { to: "coaches", label: "Coaches", icon: Users },
             { to: "judges", label: "Judges", icon: Gavel },
           ],
         },

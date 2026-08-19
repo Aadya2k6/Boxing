@@ -73,15 +73,6 @@ function InviteModal({
         throw authError;
       }
 
-      if (authData?.user) {
-        await supabase.from("profiles").upsert({
-          id: authData.user.id,
-          email,
-          full_name: name || "Judge",
-          role: "external_judge",
-          academy_id: academyId,
-        });
-      }
 
       // 2. Insert into external_judge_invites
       const { error: inviteErr } = await supabase.from("external_judge_invites").insert({

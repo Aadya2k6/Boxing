@@ -29,14 +29,33 @@ function FeesPage() {
 
   async function loadData() {
     setLoading(true);
+    const academyId = profile?.academy_id;
+    if (!academyId) return;
+
+    const { data: assignment } = await supabase
+      .from("admin_center_assignments")
+      .select("center_id")
+      .eq("profile_id", user?.id)
+      .limit(1)
+      .single();
+    
+    const centerId = assignment?.center_id;
+    if (!centerId) {
+      setLoading(false);
+      return;
+    }
+
+    // Pass centerId for the insert later
+    (window as any)._adminCenterId = centerId;
+
     const [
       { data: pData },
       { data: aData },
       { data: athData }
     ] = await Promise.all([
-      supabase.from("fee_plans").select("*").order("created_at"),
-      supabase.from("fee_assignments").select("*, fee_plans(*), boxer_profiles(full_name)"),
-      supabase.from("boxer_profiles").select("id, full_name").eq("onboarding_complete", true)
+      supabase.from("fee_plans").select("*").eq("center_id", centerId).order("created_at"),
+      supabase.from("fee_assignments").select("*, fee_plans(*), boxer_profiles(full_name)").eq("center_id", centerId),
+      supabase.from("boxer_profiles").select("id, full_name").eq("onboarding_complete", true).eq("center_id", centerId)
     ]);
 
     if (pData) {
@@ -72,6 +91,7 @@ function FeesPage() {
       boxer_profile_id: athleteId,
       fee_plan_id: planId,
       academy_id: selectedPlan?.academy_id || profile?.academy_id,
+      center_id: (window as any)._adminCenterId,
       assigned_by: user?.id,
       status: "active",
     });

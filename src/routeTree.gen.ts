@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as SuperadminRouteImport } from './routes/superadmin'
+import { Route as Scratch_schedulingRouteImport } from './routes/scratch_scheduling'
+import { Route as Scratch_admin_schedulingRouteImport } from './routes/scratch_admin_scheduling'
 import { Route as OnboardingRouteImport } from './routes/onboarding'
 import { Route as LoginRouteImport } from './routes/login'
 import { Route as JudgeRouteImport } from './routes/judge'
@@ -63,6 +65,7 @@ import { Route as AdminNotificationsRouteImport } from './routes/admin.notificat
 import { Route as AdminJudgesRouteImport } from './routes/admin.judges'
 import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminFeesRouteImport } from './routes/admin.fees'
+import { Route as AdminCoachesRouteImport } from './routes/admin.coaches'
 import { Route as AdminBoutsRouteImport } from './routes/admin.bouts'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
 import { Route as AdminAthletesRouteImport } from './routes/admin.athletes'
@@ -73,6 +76,17 @@ const SuperadminRoute = SuperadminRouteImport.update({
   path: '/superadmin',
   getParentRoute: () => rootRouteImport,
 } as any)
+const Scratch_schedulingRoute = Scratch_schedulingRouteImport.update({
+  id: '/scratch_scheduling',
+  path: '/scratch_scheduling',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const Scratch_admin_schedulingRoute =
+  Scratch_admin_schedulingRouteImport.update({
+    id: '/scratch_admin_scheduling',
+    path: '/scratch_admin_scheduling',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const OnboardingRoute = OnboardingRouteImport.update({
   id: '/onboarding',
   path: '/onboarding',
@@ -339,6 +353,11 @@ const AdminFeesRoute = AdminFeesRouteImport.update({
   path: '/fees',
   getParentRoute: () => AdminRoute,
 } as any)
+const AdminCoachesRoute = AdminCoachesRouteImport.update({
+  id: '/coaches',
+  path: '/coaches',
+  getParentRoute: () => AdminRoute,
+} as any)
 const AdminBoutsRoute = AdminBoutsRouteImport.update({
   id: '/bouts',
   path: '/bouts',
@@ -370,10 +389,13 @@ export interface FileRoutesByFullPath {
   '/judge': typeof JudgeRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/scratch_admin_scheduling': typeof Scratch_admin_schedulingRoute
+  '/scratch_scheduling': typeof Scratch_schedulingRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/bouts': typeof AdminBoutsRoute
+  '/admin/coaches': typeof AdminCoachesRoute
   '/admin/fees': typeof AdminFeesRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/judges': typeof AdminJudgesRoute
@@ -425,9 +447,12 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/scratch_admin_scheduling': typeof Scratch_admin_schedulingRoute
+  '/scratch_scheduling': typeof Scratch_schedulingRoute
   '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/bouts': typeof AdminBoutsRoute
+  '/admin/coaches': typeof AdminCoachesRoute
   '/admin/fees': typeof AdminFeesRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/judges': typeof AdminJudgesRoute
@@ -485,10 +510,13 @@ export interface FileRoutesById {
   '/judge': typeof JudgeRouteWithChildren
   '/login': typeof LoginRoute
   '/onboarding': typeof OnboardingRoute
+  '/scratch_admin_scheduling': typeof Scratch_admin_schedulingRoute
+  '/scratch_scheduling': typeof Scratch_schedulingRoute
   '/superadmin': typeof SuperadminRouteWithChildren
   '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
   '/admin/bouts': typeof AdminBoutsRoute
+  '/admin/coaches': typeof AdminCoachesRoute
   '/admin/fees': typeof AdminFeesRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/judges': typeof AdminJudgesRoute
@@ -547,10 +575,13 @@ export interface FileRouteTypes {
     | '/judge'
     | '/login'
     | '/onboarding'
+    | '/scratch_admin_scheduling'
+    | '/scratch_scheduling'
     | '/superadmin'
     | '/admin/athletes'
     | '/admin/attendance'
     | '/admin/bouts'
+    | '/admin/coaches'
     | '/admin/fees'
     | '/admin/invoices'
     | '/admin/judges'
@@ -602,9 +633,12 @@ export interface FileRouteTypes {
     | '/'
     | '/login'
     | '/onboarding'
+    | '/scratch_admin_scheduling'
+    | '/scratch_scheduling'
     | '/admin/athletes'
     | '/admin/attendance'
     | '/admin/bouts'
+    | '/admin/coaches'
     | '/admin/fees'
     | '/admin/invoices'
     | '/admin/judges'
@@ -661,10 +695,13 @@ export interface FileRouteTypes {
     | '/judge'
     | '/login'
     | '/onboarding'
+    | '/scratch_admin_scheduling'
+    | '/scratch_scheduling'
     | '/superadmin'
     | '/admin/athletes'
     | '/admin/attendance'
     | '/admin/bouts'
+    | '/admin/coaches'
     | '/admin/fees'
     | '/admin/invoices'
     | '/admin/judges'
@@ -722,6 +759,8 @@ export interface RootRouteChildren {
   JudgeRoute: typeof JudgeRouteWithChildren
   LoginRoute: typeof LoginRoute
   OnboardingRoute: typeof OnboardingRoute
+  Scratch_admin_schedulingRoute: typeof Scratch_admin_schedulingRoute
+  Scratch_schedulingRoute: typeof Scratch_schedulingRoute
   SuperadminRoute: typeof SuperadminRouteWithChildren
 }
 
@@ -732,6 +771,20 @@ declare module '@tanstack/react-router' {
       path: '/superadmin'
       fullPath: '/superadmin'
       preLoaderRoute: typeof SuperadminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scratch_scheduling': {
+      id: '/scratch_scheduling'
+      path: '/scratch_scheduling'
+      fullPath: '/scratch_scheduling'
+      preLoaderRoute: typeof Scratch_schedulingRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/scratch_admin_scheduling': {
+      id: '/scratch_admin_scheduling'
+      path: '/scratch_admin_scheduling'
+      fullPath: '/scratch_admin_scheduling'
+      preLoaderRoute: typeof Scratch_admin_schedulingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/onboarding': {
@@ -1105,6 +1158,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeesRouteImport
       parentRoute: typeof AdminRoute
     }
+    '/admin/coaches': {
+      id: '/admin/coaches'
+      path: '/coaches'
+      fullPath: '/admin/coaches'
+      preLoaderRoute: typeof AdminCoachesRouteImport
+      parentRoute: typeof AdminRoute
+    }
     '/admin/bouts': {
       id: '/admin/bouts'
       path: '/bouts'
@@ -1140,6 +1200,7 @@ interface AdminRouteChildren {
   AdminAthletesRoute: typeof AdminAthletesRoute
   AdminAttendanceRoute: typeof AdminAttendanceRoute
   AdminBoutsRoute: typeof AdminBoutsRoute
+  AdminCoachesRoute: typeof AdminCoachesRoute
   AdminFeesRoute: typeof AdminFeesRoute
   AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminJudgesRoute: typeof AdminJudgesRoute
@@ -1154,6 +1215,7 @@ const AdminRouteChildren: AdminRouteChildren = {
   AdminAthletesRoute: AdminAthletesRoute,
   AdminAttendanceRoute: AdminAttendanceRoute,
   AdminBoutsRoute: AdminBoutsRoute,
+  AdminCoachesRoute: AdminCoachesRoute,
   AdminFeesRoute: AdminFeesRoute,
   AdminInvoicesRoute: AdminInvoicesRoute,
   AdminJudgesRoute: AdminJudgesRoute,
@@ -1296,6 +1358,8 @@ const rootRouteChildren: RootRouteChildren = {
   JudgeRoute: JudgeRouteWithChildren,
   LoginRoute: LoginRoute,
   OnboardingRoute: OnboardingRoute,
+  Scratch_admin_schedulingRoute: Scratch_admin_schedulingRoute,
+  Scratch_schedulingRoute: Scratch_schedulingRoute,
   SuperadminRoute: SuperadminRouteWithChildren,
 }
 export const routeTree = rootRouteImport

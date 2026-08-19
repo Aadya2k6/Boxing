@@ -28,12 +28,13 @@ function PlatformReportsPage() {
     suspendedAcademies: 0,
     archivedAcademies: 0,
     totalBoxers: 0,
+    totalStaff: 0,
     totalRevenue: 0,
     activeTournaments: 0,
   });
 
   const [topAcademies, setTopAcademies] = useState<
-    { id: string; name: string; city: string | null; boxers: number; revenue: number; status: string }[]
+    { id: string; name: string; city: string | null; boxers: number; staff: number; revenue: number; status: string }[]
   >([]);
 
   useEffect(() => {
@@ -52,10 +53,14 @@ function PlatformReportsPage() {
       const suspendedAcademies = academies.filter((a: any) => a.status === "suspended").length;
       const archivedAcademies = academies.filter((a: any) => a.status === "archived").length;
 
-      // 2. Fetch boxers and staff using profiles table (which boxos_admin has access to)
-      const { data: profiles } = await supabase.from("profiles").select("id, academy_id, role");
-      const boxers = (profiles || []).filter(p => p.role === "athlete");
+      // 2. Fetch boxers and staff
+      const { data: boxerProfiles } = await supabase.from("boxer_profiles").select("id, academy_id");
+      const boxers = boxerProfiles || [];
       const totalBoxers = boxers.length;
+
+      const { data: staffProfiles } = await supabase.from("profiles").select("id, academy_id, role").in("role", ["admin", "superadmin", "coach", "staff"]);
+      const staff = staffProfiles || [];
+      const totalStaff = staff.length;
 
       // 3. Fetch payments
       const { data: paymentsRes } = await supabase
@@ -93,12 +98,13 @@ function PlatformReportsPage() {
         suspendedAcademies,
         archivedAcademies,
         totalBoxers,
+        totalStaff,
         totalRevenue,
         activeTournaments,
       });
 
       // Aggregate Top Academies list
-      const academyMap: Record<string, { id: string; name: string; city: string | null; boxers: number; revenue: number; status: string }> = {};
+      const academyMap: Record<string, { id: string; name: string; city: string | null; boxers: number; staff: number; revenue: number; status: string }> = {};
 
       academies.forEach((a: any) => {
         academyMap[a.id] = {
@@ -106,6 +112,7 @@ function PlatformReportsPage() {
           name: a.name,
           city: a.city,
           boxers: 0,
+          staff: 0,
           revenue: 0,
           status: a.status,
         };
@@ -114,6 +121,12 @@ function PlatformReportsPage() {
       boxers.forEach((b: any) => {
         if (b.academy_id && academyMap[b.academy_id]) {
           academyMap[b.academy_id].boxers++;
+        }
+      });
+      
+      staff.forEach((s: any) => {
+        if (s.academy_id && academyMap[s.academy_id]) {
+          academyMap[s.academy_id].staff++;
         }
       });
 
@@ -178,7 +191,16 @@ function PlatformReportsPage() {
             <Users className="size-4 text-emerald-600" />
           </div>
           <div className="text-3xl font-display font-bold text-foreground">{metrics.totalBoxers}</div>
-          <div className="text-xs text-muted-foreground mt-1">Enrolled across all tenants</div>
+          <div className="text-xs text-muted-foreground mt-1">Total Athletes</div>
+        </div>
+        
+        <div className="bento-card p-5">
+          <div className="flex items-center justify-between text-muted-foreground mb-2">
+            <span className="text-xs font-semibold">Platform Staff</span>
+            <ShieldCheck className="size-4 text-indigo-600" />
+          </div>
+          <div className="text-3xl font-display font-bold text-foreground">{metrics.totalStaff}</div>
+          <div className="text-xs text-muted-foreground mt-1">Admins & Coaches</div>
         </div>
 
         <div className="bento-card p-5">
@@ -271,7 +293,7 @@ function PlatformReportsPage() {
               <div className="py-8 text-center text-sm text-muted-foreground">No academy data to rank.</div>
             ) : (
               <DataTable
-                headers={["Academy", "Location", "Boxers", "Revenue", "Status", ""]}
+                headers={["Academy", "Location", "Boxers", "Staff", "Revenue", "Status", ""]}
                 rows={topAcademies.slice(0, 10).map((a, idx) => [
                   <div className="flex items-center gap-2">
                     <span className="text-xs font-bold text-muted-foreground font-mono">#{idx + 1}</span>
@@ -279,6 +301,7 @@ function PlatformReportsPage() {
                   </div>,
                   <span className="text-xs text-muted-foreground">{a.city || "—"}</span>,
                   <span className="font-semibold text-sm tabular">{a.boxers}</span>,
+                  <span className="font-semibold text-sm tabular">{a.staff}</span>,
                   <span className="font-semibold text-sm tabular text-foreground">₹{a.revenue.toLocaleString("en-IN")}</span>,
                   <span className={`badge ${a.status === "active" ? "badge-success" : a.status === "suspended" ? "badge-warning" : "badge-neutral"}`}>
                     {a.status}
