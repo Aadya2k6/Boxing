@@ -42,7 +42,10 @@ export function useRequireAuth(requiredRole?: UserRole) {
     // Wrong role → navigate to the user's own dashboard
     if (requiredRole && profile.role !== requiredRole) {
       if (profile.role === "boxos_admin") {
-        navigate({ to: "/boxos-admin" as any });
+        // Check if this is a federation account disguised as boxos_admin
+        const perms: any[] = profile.granted_permissions ?? [];
+        const isFed = perms.some((p: any) => p?.type === "federation");
+        navigate({ to: (isFed ? "/federation" : "/boxos-admin") as any });
       } else if (profile.role === "admin") {
         navigate({ to: "/admin" });
       } else if (profile.role === "superadmin") {
@@ -59,7 +62,7 @@ export function useRequireAuth(requiredRole?: UserRole) {
     }
   }, [session, profile, loading, requiredRole, navigate]);
 
-  return { session, profile, loading };
+  return { session, user: session?.user ?? null, profile, loading };
 }
 
 // ── Athlete route guard ────────────────────────────────────────────────────────

@@ -1,55 +1,87 @@
-# BOXOS - Development Progress Tracker
+# BOXOS - Development Progress Tracker (16 Parts)
 
-## 🟢 Completed (What is done)
+## 🟢 Completed Parts (9/16)
 
-### 1. Authentication & Security
+### Part 1: Authentication & Security Core
 - [x] Full RBAC implementation (`superadmin`, `admin`, `coach`, `athlete`, `boxos_admin`, `external_judge`).
-- [x] Secure RLS (Row Level Security) across all critical tables (`invoices`, `payments`, `profiles`, `boxer_profiles`).
-- [x] Supabase Edge Functions (`gateway-secrets`, `platform-reports`) to isolate sensitive data away from the client.
+- [x] Secure RLS (Row Level Security) across all critical tables.
+- [x] Supabase Edge Functions (`gateway-secrets`, `platform-reports`).
 
-### 2. Multi-Center (Location) Management
+### Part 2: Multi-Center Tenant Architecture
 - [x] Migration from flat `academies` to hierarchical `academies` -> `centers`.
-- [x] **Superadmin Dashboard**: Can view and edit multiple centers.
-- [x] **Admin/Coach Assignments**: Admins and Coaches are restricted to their assigned `center_id` instead of the global `academy_id`.
+- [x] Admin and Coach scope restricted to specific `center_id`.
+- [x] Superadmin Dashboard for multi-center management.
 
-### 3. Payment Gateway Integrations
-- [x] Razorpay & PayU multi-tenant integration.
-- [x] Per-center payment key configuration via Edge Function.
-- [x] Client-side fallback mechanisms for edge functions.
-- [x] Athlete dashboard payment processing flow (`athlete.payments.tsx`).
-- [x] Payment verification webhooks and database sync (`payments` and `invoices` tables).
+### Part 3: Payment Gateway Integrations
+- [x] Razorpay & PayU multi-tenant integration with per-center keys.
+- [x] Client-side fallbacks & webhook syncs.
+- [x] Athlete dashboard payment flow.
 
-### 4. User Dashboards & Modules
-- [x] **Superadmin Dashboard**: Academy locations, overall stats, global settings.
-- [x] **Admin Dashboard**: Coach management (`admin.coaches.tsx`), Fee management scoped to center (`admin.fees.tsx`).
-- [x] **Athlete Dashboard**: Payment history, fee assignments, profile details.
-- [x] **Coach Dashboard**: Basic foundation.
+### Part 4: Core User Dashboards
+- [x] Athlete profiles, medical records, and verification basics.
+- [x] Superadmin & Admin UI foundations.
+- [x] Coach Dashboard baseline.
+
+### Part 5: Fee & Coupon Management
+- [x] Plan creation, assignment, and discount handling.
+- [x] Invoice generation.
+
+### Part 6: Attendance & Leave Management
+- [x] Geotagged attendance tracking.
+- [x] Leave requests and approval flows.
+
+### Part 7: Notice & Ad Placement Systems
+- [x] Sophisticated frontend UI placeholders for 1 complementary global Notice and 1+ Ads.
+- [x] Target-specific rendering on dashboards.
+
+### Part 8: Ring Allocation & Center Synchronization
+- [x] Simultaneous ring allocation integrated directly into the Center creation flow for Superadmins.
+- [x] `academy_locations` mapped directly to Centers.
+
+### Part 9: Medical Suspensions & Athlete Roster Filtering
+- [x] Suspending athletes and blocking check-ins.
+- [x] Auto-excluding suspended athletes from bout selection and rosters.
 
 ---
 
-## 🟡 In Progress (Currently working on)
+## 🟡 In Progress / Next Up (0/16)
 
-### 1. Refactoring Aftermath
-- [/] Ensuring UI stability across all tables after migrating foreign keys to use `center_id` instead of `academy_id` directly. 
-
-### 2. Notifications & Alerts
-- [/] Implementing real-time notifications for athletes when fees are generated or overdue.
+*(No active development - pending architecture review)*
 
 ---
 
-## 🔴 Pending (What is left)
+## 🔴 Pending Parts (7/16)
 
-### 1. Advanced Modules
-- [ ] **Bout Scheduling & Matchmaking**: Fully functional UI for creating brackets and bout matches between athletes.
-- [ ] **External Judge Scoring**: Finalize the real-time scoring interface for `external_judge` roles during tournaments.
-- [ ] **Attendance Tracking System**: QR code-based or manual attendance logging for athletes by coaches/admins.
-- [ ] **Leave Management**: Allow athletes to request leaves and have admins approve/reject them with automated fee roll-overs.
+### Part 10: Database & Backend Polishing
+- [ ] Fix Admin Feature Permissions (requires Edge Function or RLS tweak).
+- [ ] Notices & Ads System Backend (storage buckets, DB tables, and RLS).
 
-### 2. Analytics & Reporting
-- [ ] **Comprehensive Superadmin Analytics**: Drill down revenue reports by `center_id`, growth metrics, and churn rates.
-- [ ] **BOXOS Admin Platform View**: Global platform statistics, active vs. inactive academies.
+### Part 11: Government Academy Fee Disabling
+- [ ] Implement a `fees_disabled` toggle managed by the BOXOS Admin (dev account) to completely disable fee flows for government-backed academies.
 
-### 3. Production Readiness
-- [ ] Deployment and environment variable configuration for production.
-- [ ] E2E testing of the payment flows with real Sandbox/Test API keys from both Razorpay and PayU.
-- [ ] Finalizing terms of service and legal opt-ins on the athlete onboarding screen.
+### Part 12: Minor Guardian Accounts
+- [ ] Introduce a distinct `guardian` portal/account type.
+- [ ] Allow guardians to manage minor athlete schedules.
+
+### Part 13: Federation Portals (National, State, Custom)
+- [ ] Create specialized Federation portals via dev account.
+- [ ] Data filtering rules (National = all, State = state-only, Custom = specific allied cities/regions).
+- [ ] Restrict access to display only athlete sports data (matches, demographics) and hide academy-sensitive schedules.
+- *Note: User will create a separate DB/tables for Federations. Do not mix with existing roles/permissions.*
+
+### Part 14: Federation Tournament Engine & Staff SOP
+- [ ] Implement World Boxing rules tournament creation for Federations.
+- [ ] Enable nationwide/regionwide student selection.
+- [ ] Auto-generation of Tournament Staff (Judges, Referees, Time Handlers) with cross-functional permissions (e.g., time handler can also referee).
+- [ ] Automated push notifications to selected students, coaches, and academies.
+- [ ] Auto-revoke all tournament staff credentials the moment scores are finalized. *(Left to do: Needs clarification on whether to set `is_active = false` or just clear `judge_scope_tournament_id`. Kept false/disabled for now).*
+
+### Part 15: Attendance Polls & Pregnancy Declarations
+- [ ] Attach Pregnancy Declarations directly to class attendance poll notifications.
+- [ ] Route minor pregnancy declarations exclusively to the new Guardian accounts.
+
+### Part 16: Final Analytics, E2E Testing, & Production
+- [ ] Comprehensive Superadmin Analytics (revenue by center, growth metrics).
+- [ ] BOXOS Admin global statistics.
+- [ ] E2E testing of payment flows with real Sandbox keys.
+- [ ] Production deployment and environment lock-down.

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, StatCard } from "@/components/dashboard/DashboardLayout";
-import { FileDown, FileText, Loader2, TrendingUp, Users, MapPin, CalendarCheck, Percent, Download, X, CheckCircle, CreditCard, ExternalLink } from "lucide-react";
+import { FileDown, FileText, Loader2, TrendingUp, Users, MapPin, CalendarCheck, Percent, Download, X, CheckCircle, CreditCard, ExternalLink, Swords } from "lucide-react";
 import { useState, useEffect } from "react";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -148,7 +148,7 @@ function generateAcademyPaymentReportPdf(data: {
 function SAReports() {
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [tab, setTab] = useState<"revenue" | "attendance" | "dues" | "discounts">("revenue");
+  const [tab, setTab] = useState<"revenue" | "dues" | "discounts" | "bouts">("revenue");
   const [selectedAcademy, setSelectedAcademy] = useState<any | null>(null);
   const [modalTab, setModalTab] = useState<"history" | "invoices">("history");
 
@@ -156,7 +156,7 @@ function SAReports() {
 
   if (loading || !data) return <div className="py-20 flex justify-center"><Loader2 className="size-8 animate-spin text-muted-foreground" /></div>;
 
-  const { invoices, payments, athletes, attendance, leaves, academies, discounts, refunds } = data;
+  const { invoices, payments, athletes, attendance, leaves, academies, discounts, refunds, bouts } = data;
 
   // ── Metrics ──
   const totalInvoiced = invoices.reduce((a: number, i: any) => a + Number(i.amount_due ?? 0), 0);
@@ -164,8 +164,10 @@ function SAReports() {
   const totalOutstanding = invoices.filter((i: any) => i.status !== "paid").reduce((a: number, i: any) => a + Number(i.balance_outstanding ?? 0), 0);
   const collectionRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
   const overdueCount = invoices.filter((i: any) => i.status === "overdue").length;
-  const presentCount = attendance.filter((a: any) => a.status === "present").length;
-  const attendanceRate = attendance.length > 0 ? Math.round((presentCount / attendance.length) * 100) : 0;
+  
+  const paymentPerBoxer = athletes.length > 0 ? totalCollected / athletes.length : 0;
+  const activeDiscounts = discounts.filter((d: any) => d.is_active).length;
+  const completedBouts = bouts?.filter((b: any) => b.status === "completed")?.length || 0;
 
   // ── Chart data ──
   const monthlyData = buildMonthlyData(invoices);
@@ -196,9 +198,9 @@ function SAReports() {
 
   const tabs = [
     { key: "revenue", label: "Revenue" },
-    { key: "attendance", label: "Attendance" },
     { key: "dues", label: "Outstanding Dues" },
     { key: "discounts", label: "Discounts & Refunds" },
+    { key: "bouts", label: "Bout Results" },
   ] as const;
 
   return (
@@ -221,12 +223,12 @@ function SAReports() {
 
         {/* Stat cards */}
         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
-          <MiniStat icon={TrendingUp} label="YTD Revenue" value={fmtK(totalCollected)} sub={fmt(totalCollected)} color="text-success" />
-          <MiniStat icon={FileText} label="Total Invoiced" value={fmtK(totalInvoiced)} sub={`${invoices.length} invoices`} color="text-foreground" />
-          <MiniStat icon={Percent} label="Collection Rate" value={`${collectionRate}%`} sub="Platform-wide" color={collectionRate >= 80 ? "text-success" : "text-warning"} />
-          <MiniStat icon={FileDown} label="Outstanding" value={fmtK(totalOutstanding)} sub={`${overdueCount} overdue`} color="text-warning" />
-          <MiniStat icon={Users} label="Athletes" value={String(athletes.length)} sub="Onboarded" color="text-info" />
-          <MiniStat icon={CalendarCheck} label="Attendance Rate" value={`${attendanceRate}%`} sub={`${presentCount} records`} color="text-primary" />
+          <MiniStat icon={TrendingUp} label="Revenue" value={fmtK(totalCollected)} sub={fmt(totalCollected)} color="text-success" />
+          <MiniStat icon={FileDown} label="Outstanding Dues" value={fmtK(totalOutstanding)} sub={`${overdueCount} overdue`} color="text-warning" />
+          <MiniStat icon={Users} label="Payment / Boxer" value={fmtK(paymentPerBoxer)} sub="Average" color="text-info" />
+          <MiniStat icon={Percent} label="Discounts" value={String(activeDiscounts)} sub="Active" color="text-primary" />
+          <MiniStat icon={FileText} label="Collection Rate" value={`${collectionRate}%`} sub="Platform-wide" color={collectionRate >= 80 ? "text-success" : "text-warning"} />
+          <MiniStat icon={Swords} label="Bout Results" value={String(completedBouts)} sub="Completed" color="text-foreground" />
         </div>
 
         {/* Tab bar */}
@@ -359,32 +361,7 @@ function SAReports() {
           </div>
         )}
 
-        {/* Attendance tab */}
-        {tab === "attendance" && (
-          <div className="space-y-6">
-            <ChartCard title="Monthly Attendance Overview" sub="Present / Absent / Approved Leave breakdown">
-              <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={attendanceData}>
-                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E5E5" />
-                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} />
-                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#737373" }} />
-                    <Tooltip contentStyle={{ borderRadius: 8, border: "1px solid #e5e5e5", fontSize: 12 }} />
-                    <Legend />
-                    <Bar dataKey="Present" fill="#2E8F5A" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Absent" fill="#DC2626" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="Leave" fill="#0EA5E9" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </ChartCard>
-            <div className="grid sm:grid-cols-3 gap-4">
-              <StatCard label="Total present" value={String(presentCount)} delta="All time" />
-              <StatCard label="Total absent" value={String(attendance.filter((a: any) => a.status === "absent").length)} deltaTone="danger" delta="All time" />
-              <StatCard label="Approved leaves" value={String(leaves.filter((l: any) => l.status === "approved").length)} delta="All time" />
-            </div>
-          </div>
-        )}
+        {/* Removed attendance tab */}
 
         {/* Outstanding dues tab */}
         {tab === "dues" && (
@@ -466,6 +443,39 @@ function SAReports() {
               </table>
             </ChartCard>
           </div>
+        )}
+
+        {/* Bout Results tab */}
+        {tab === "bouts" && (
+          <ChartCard title="Bout Results" sub="Details of all completed and active bouts">
+            <table className="w-full text-sm">
+              <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="text-left py-2 font-medium">Bout #</th>
+                <th className="text-left py-2 font-medium">Type</th>
+                <th className="text-left py-2 font-medium">Red Corner</th>
+                <th className="text-left py-2 font-medium">Blue Corner</th>
+                <th className="text-right py-2 font-medium">Status</th>
+              </tr></thead>
+              <tbody>
+                {(bouts || []).map((b: any) => {
+                  const red = athletes.find((a: any) => a.id === b.boxer_red_id)?.full_name || "Unknown";
+                  const blue = athletes.find((a: any) => a.id === b.boxer_blue_id)?.full_name || "Unknown";
+                  return (
+                    <tr key={b.id} className="border-b border-border hover:bg-subtle/50 transition">
+                      <td className="py-3 font-medium">#{b.bout_number}</td>
+                      <td className="py-3 text-muted-foreground capitalize">{b.bout_type}</td>
+                      <td className="py-3 font-medium text-red-500">{red}</td>
+                      <td className="py-3 font-medium text-blue-500">{blue}</td>
+                      <td className="py-3 text-right">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${b.status === "completed" ? "bg-success/10 text-success" : b.status === "active" ? "bg-primary/10 text-primary-dark" : "bg-muted text-muted-foreground"}`}>{b.status}</span>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {(!bouts || bouts.length === 0) && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No bout results available</td></tr>}
+              </tbody>
+            </table>
+          </ChartCard>
         )}
 
         {/* Monthly summary table (always visible in print) */}

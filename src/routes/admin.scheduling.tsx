@@ -1514,7 +1514,10 @@ function BoxerMultiSelect({ label, selectedIds, onChange, allBoxers }: {
   label: string; selectedIds: string[]; onChange: (ids: string[]) => void; allBoxers: Boxer[];
 }) {
   const [search, setSearch] = useState("");
-  const filtered = allBoxers.filter(b => b.full_name.toLowerCase().includes(search.toLowerCase()));
+  const filtered = allBoxers.filter(b => 
+    (selectedIds.includes(b.id) || !b.is_suspended) && 
+    b.full_name.toLowerCase().includes(search.toLowerCase())
+  );
   const toggle = (id: string) => {
     if (selectedIds.includes(id)) onChange(selectedIds.filter(x => x !== id));
     else onChange([...selectedIds, id]);
@@ -1534,7 +1537,10 @@ function BoxerMultiSelect({ label, selectedIds, onChange, allBoxers }: {
             const isSelected = selectedIds.includes(b.id);
             return (
               <button key={b.id} type="button" onClick={() => toggle(b.id)} className={`w-full flex items-center justify-between px-3 py-2 text-xs font-medium transition hover:bg-elevated/60 ${isSelected ? "bg-primary/5 text-primary-dark" : "text-foreground"}`}>
-                <span>{b.full_name}</span>
+                <div className="flex items-center gap-2">
+                  <span className={b.is_suspended ? "text-muted-foreground line-through" : ""}>{b.full_name}</span>
+                  {b.is_suspended && <span className="text-[9px] uppercase tracking-wider font-bold bg-destructive/10 text-destructive px-1.5 py-0.5 rounded">Suspended</span>}
+                </div>
                 {isSelected && <Check className="size-3.5 text-primary shrink-0" />}
               </button>
             );

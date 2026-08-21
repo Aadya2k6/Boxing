@@ -593,7 +593,7 @@ function AttendancePage() {
               ) : (
                 <button
                   onClick={handleMarkAttendance}
-                  disabled={marking || !academy?.latitude}
+                  disabled={marking || !academy?.latitude || (athleteProfile as any)?.is_suspended}
                   className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-50 transition shadow-card"
                 >
                   {marking ? <Loader2 className="size-4 animate-spin" /> : <CalendarCheck className="size-4" />}

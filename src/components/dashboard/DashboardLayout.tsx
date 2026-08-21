@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "@tanstack/react-router";
 import { Outlet, useLocation } from "@tanstack/react-router";
-import { Bell, Search, LogOut, ChevronDown, Menu, X, type LucideIcon } from "lucide-react";
+import { Bell, Search, LogOut, ChevronDown, Menu, X, Shield, Megaphone, type LucideIcon } from "lucide-react";
 import { ReactNode, useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
@@ -23,11 +23,12 @@ interface DashboardLayoutProps {
   basePath: string;
   role: "Athlete" | "Admin" | "Superadmin" | "Coach" | "Judge" | "BOXOS Admin";
   userName: string;
-  userMeta: string;
+  userMeta?: string;
   accentClass?: string;
   accentBg?: string;
   dotColor?: string;
   notificationTo?: string;
+  unauthorizedMessage?: string;
   themeClass?: string;
 }
 
@@ -37,17 +38,148 @@ export function DashboardLayout({
   role,
   userName,
   userMeta,
-  accentClass = "text-primary-dark",
+  accentClass = "text-primary",
   accentBg = "bg-primary/10",
   dotColor = "bg-primary",
   notificationTo,
-  themeClass = "",
+  unauthorizedMessage: initialUnauthorizedMessage,
+  themeClass = "theme-superadmin-dark",
 }: DashboardLayoutProps) {
   const { pathname } = useLocation();
   const { signOut, user } = useAuth();
   const navigate = useNavigate();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [unauthorizedMessage, setUnauthorizedMessage] = useState<string | null>(initialUnauthorizedMessage || null);
   const [unreadCount, setUnreadCount] = useState(0);
+
+  // Helper to match active notice/ad against current time and target role
+  const checkMarketingMatch = (items: any[]) => {
+    if (!Array.isArray(items) || items.length === 0) return null;
+    const now = new Date();
+    const pad = (n: number) => String(n).padStart(2, "0");
+    const currentDate = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+    const currentTime = `${pad(now.getHours())}:${pad(now.getMinutes())}`;
+
+    const normalizedRole = role.toLowerCase().replace(/[\s_-]/g, "");
+    const roleTarget = (normalizedRole === "boxer" || normalizedRole === "athletes") ? "athlete" : normalizedRole;
+
+    return items.find((item: any) => {
+      if (!item || item.active === false) return false;
+      
+      // Normalize target roles in item
+      const itemTargets = (Array.isArray(item.targets) ? item.targets : [item.targets])
+        .filter(Boolean)
+        .map((t: string) => {
+          const n = String(t).toLowerCase().replace(/[\s_-]/g, "");
+          return (n === "boxer" || n === "athletes") ? "athlete" : n;
+        });
+
+      if (!itemTargets.includes(roleTarget)) return false;
+      if (item.startDate && item.startDate > currentDate) return false;
+      if (item.endDate && item.endDate < currentDate) return false;
+      if (item.startTime && item.startTime !== "00:00" && item.startTime > currentTime) return false;
+      if (item.endTime && item.endTime !== "23:59" && item.endTime < currentTime) return false;
+      return true;
+    }) || null;
+  };
+
+  // Marketing State initialized synchronously to prevent visual flicker or lost state on refresh
+  const [activeNotice, setActiveNotice] = useState<any>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem("boxos_notices");
+      return saved ? checkMarketingMatch(JSON.parse(saved)) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [activeAd, setActiveAd] = useState<any>(() => {
+    if (typeof window === "undefined") return null;
+    try {
+      const saved = localStorage.getItem("boxos_ads");
+      return saved ? checkMarketingMatch(JSON.parse(saved)) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [adDismissed, setAdDismissed] = useState(false);
+
+  useEffect(() => {
+    const loadMarketing = async () => {
+      // 1. Sync from localStorage first
+      try {
+        const savedNotices = localStorage.getItem("boxos_notices");
+        if (savedNotices) {
+          const matched = checkMarketingMatch(JSON.parse(savedNotices));
+          setActiveNotice(matched);
+        } else {
+          setActiveNotice(null);
+        }
+      } catch (e) {}
+
+      if (!adDismissed) {
+        try {
+          const savedAds = localStorage.getItem("boxos_ads");
+          if (savedAds) {
+            const matched = checkMarketingMatch(JSON.parse(savedAds));
+            if (matched && (!activeAd || matched.id !== activeAd.id)) {
+              setActiveAd(matched);
+            } else if (!matched) {
+              setActiveAd(null);
+            }
+          }
+        } catch (e) {}
+      }
+
+      // 2. Sync from remote Supabase storage if available
+      try {
+        const { data: nData, error: nErr } = await supabase.storage.from('marketing').download('config/notices.json');
+        if (!nErr && nData) {
+          const parsed = JSON.parse(await nData.text());
+          if (Array.isArray(parsed)) {
+            localStorage.setItem("boxos_notices", JSON.stringify(parsed));
+            const matched = checkMarketingMatch(parsed);
+            setActiveNotice(matched);
+          }
+        }
+      } catch (e) {}
+
+      if (!adDismissed) {
+        try {
+          const { data: aData, error: aErr } = await supabase.storage.from('marketing').download('config/ads.json');
+          if (!aErr && aData) {
+            const parsed = JSON.parse(await aData.text());
+            if (Array.isArray(parsed)) {
+              localStorage.setItem("boxos_ads", JSON.stringify(parsed));
+              const matched = checkMarketingMatch(parsed);
+              if (matched && (!activeAd || matched.id !== activeAd.id)) {
+                setActiveAd(matched);
+              } else if (!matched) {
+                setActiveAd(null);
+              }
+            }
+          }
+        } catch (e) {}
+      }
+    };
+    
+    loadMarketing();
+    
+    // Listen for storage events across tabs & custom events in the same tab
+    window.addEventListener("storage", loadMarketing);
+    window.addEventListener("boxos_marketing_update", loadMarketing);
+    
+    // Poll every 10 seconds
+    const interval = setInterval(loadMarketing, 10000);
+    
+    return () => {
+      window.removeEventListener("storage", loadMarketing);
+      window.removeEventListener("boxos_marketing_update", loadMarketing);
+      clearInterval(interval);
+    };
+  }, [role, adDismissed]);
 
   // Read the 'q' search parameter from URL
   const searchParams = new URLSearchParams(
@@ -309,6 +441,34 @@ export function DashboardLayout({
 
       {/* ── Main content ────────────────────────────────────────────── */}
       <div className="flex-1 lg:ml-[240px] min-w-0 flex flex-col min-h-screen z-10">
+        {/* Notice Banner */}
+        {activeNotice && (
+          <div className="bg-[#ef4444] text-white text-xs sm:text-sm font-semibold py-2 px-4 shadow-md shrink-0 z-30 flex items-center gap-3">
+            <div className="flex items-center gap-1.5 shrink-0 bg-black/30 text-white px-2.5 py-0.5 rounded-full text-[11px] uppercase tracking-wider font-bold shadow-xs">
+              <Megaphone className="size-3.5" />
+              <span>Notice</span>
+            </div>
+            <div className="overflow-hidden relative flex-1 whitespace-nowrap">
+              <div className="inline-block animate-marquee pl-4">
+                <span className="mx-6 font-medium">{activeNotice.text}</span>
+                <span className="mx-6 font-medium">{activeNotice.text}</span>
+                <span className="mx-6 font-medium">{activeNotice.text}</span>
+              </div>
+            </div>
+            <style>{`
+              @keyframes marquee {
+                0% { transform: translateX(0%); }
+                100% { transform: translateX(-33.33%); }
+              }
+              .animate-marquee {
+                display: inline-block;
+                white-space: nowrap;
+                animation: marquee 20s linear infinite;
+              }
+            `}</style>
+          </div>
+        )}
+
         {/* Top bar */}
         <header
           className="sticky top-0 z-20 bg-background/90 backdrop-blur-xl h-16 flex items-center justify-between px-4 sm:px-6 lg:px-8 gap-3"
@@ -379,9 +539,48 @@ export function DashboardLayout({
 
         {/* Page content */}
         <main className="flex-1 p-4 sm:p-6 lg:p-8 max-w-[1440px] w-full min-h-[calc(100vh-4rem)] flex flex-col">
-          <Outlet />
+          {unauthorizedMessage ? (
+            <div className="flex-1 flex flex-col items-center justify-center">
+              <div className="bg-destructive/10 border border-destructive/20 text-destructive p-8 rounded-2xl max-w-md text-center shadow-card">
+                <Shield className="size-12 mx-auto mb-4 opacity-80" />
+                <h2 className="text-lg font-bold mb-2">Access Denied</h2>
+                <p className="text-sm leading-relaxed">{unauthorizedMessage}</p>
+                <Link to={basePath} className="mt-6 inline-block bg-background border border-border px-6 py-2.5 rounded-lg text-sm font-medium hover:bg-subtle transition">
+                  Return to Dashboard
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
+
+      {/* Popup Ad Modal */}
+      {activeAd && !adDismissed && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="relative bg-surface rounded-2xl shadow-2xl overflow-hidden max-w-lg w-full border border-border animate-in fade-in zoom-in duration-300">
+            <button
+              onClick={() => setAdDismissed(true)}
+              className="absolute top-3 right-3 z-10 size-8 rounded-full bg-black/50 text-white flex items-center justify-center hover:bg-black/70 transition-colors"
+            >
+              <X className="size-4" />
+            </button>
+            <div className="w-full aspect-video bg-black/5 flex items-center justify-center">
+              {activeAd.mediaType === "video" ? (
+                <video src={activeAd.mediaUrl} autoPlay muted loop playsInline className="w-full h-full object-cover" />
+              ) : (
+                <img src={activeAd.mediaUrl} alt="Advertisement" className="w-full h-full object-cover" />
+              )}
+            </div>
+            <div className="p-4 bg-surface text-center">
+              <button onClick={() => setAdDismissed(true)} className="btn-primary w-full max-w-xs mx-auto">
+                Continue to Dashboard
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

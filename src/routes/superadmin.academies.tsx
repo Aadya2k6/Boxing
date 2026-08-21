@@ -33,6 +33,7 @@ const emptyForm = {
   razorpay_key_id: "",
   payu_merchant_key: "",
   payu_merchant_salt: "",
+  rings: [{ name: "Ring 1", address: "", latitude: "", longitude: "", geofence_meters: "200" }],
 };
 
 function AcademiesPage() {
@@ -125,6 +126,7 @@ function AcademiesPage() {
       razorpay_key_id: "", 
       payu_merchant_key: "",
       payu_merchant_salt: "",
+      rings: [],
     });
     setShowModal(true);
   }
@@ -172,6 +174,25 @@ function AcademiesPage() {
           .single();
         if (error) throw error;
         centerId = data.id;
+        
+        // Insert rings mapped to academy (center_id column pending in DB)
+        if (form.rings && form.rings.length > 0) {
+          try {
+              const ringsPayload = form.rings.map(r => ({
+                name: r.name,
+                address: r.address || payload.address,
+                academy_id: profile?.academy_id,
+                latitude: r.latitude ? parseFloat(r.latitude) : payload.latitude,
+                longitude: r.longitude ? parseFloat(r.longitude) : payload.longitude,
+                geofence_meters: r.geofence_meters ? parseInt(r.geofence_meters) : payload.attendance_radius_meters,
+                is_active: true
+              }));
+            const { error: ringErr } = await supabase.from("academy_rings").insert(ringsPayload);
+            if (ringErr) console.warn("Failed to insert rings:", ringErr);
+          } catch (e) {
+            console.warn("Ring insertion error:", e);
+          }
+        }
       }
 
       // Save gateway keys using the academies table (academy-wide config)
@@ -204,14 +225,14 @@ function AcademiesPage() {
   return (
     <>
       <PageHeader
-        title="Academy locations"
-        subtitle="Manage academy ranges with geo-fencing for attendance"
+        title="Centers"
+        subtitle="Manage training centers with geo-fencing for attendance"
         actions={
           <button
             onClick={openCreate}
             className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition shadow-card"
           >
-            <Plus className="size-3.5" /> Add location
+            <Plus className="size-3.5" /> Add Center
           </button>
         }
       />
@@ -224,7 +245,7 @@ function AcademiesPage() {
         ) : academies.length === 0 ? (
           <div className="col-span-3 bento-card p-12 text-center">
             <Crosshair className="size-8 text-muted-foreground mx-auto mb-3" />
-            <p className="text-sm font-semibold">No academies configured</p>
+            <p className="text-sm font-semibold">No centers configured</p>
             <p className="text-xs text-muted-foreground mt-1">
               Add your first training location to enable geo-fenced attendance.
             </p>
@@ -289,9 +310,25 @@ function AcademiesPage() {
                     <Badge tone={gwTone}>{gwLabel}</Badge>
                   </div>
                   <div className="flex items-center justify-between border-t border-border pt-2">
-                    <span className="text-muted-foreground">Athletes assigned</span>
+                    <span className="text-muted-foreground">Boxers assigned</span>
                     <span className="font-semibold">{a.athlete_count}</span>
                   </div>
+                  <div className="flex items-center justify-between pt-2">
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge tone={a.is_active ? "success" : undefined}>{a.is_active ? "Active" : "Inactive"}</Badge>
+                  </div>
+                  {a.is_active && (
+                    <button
+                      onClick={async () => {
+                        if (!confirm(`Deactivate center "${a.name}"?`)) return;
+                        await supabase.from("centers").update({ is_active: false }).eq("id", a.id);
+                        loadAcademies();
+                      }}
+                      className="w-full mt-2 py-1.5 rounded-lg text-xs font-semibold text-destructive border border-destructive/30 hover:bg-destructive/10 transition"
+                    >
+                      Deactivate Center
+                    </button>
+                  )}
                 </div>
               </div>
             );
@@ -304,7 +341,7 @@ function AcademiesPage() {
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-lg animate-fade-up overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-surface z-10">
               <h3 className="font-display font-semibold">
-                {editing ? "Edit academy location" : "Add academy location"}
+                {editing ? "Edit Center" : "Add Center"}
               </h3>
               <button
                 onClick={() => setShowModal(false)}
@@ -315,7 +352,7 @@ function AcademiesPage() {
             </div>
             <form onSubmit={handleSave} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold mb-1.5">Academy name *</label>
+                <label className="block text-xs font-semibold mb-1.5">Center name *</label>
                 <input
                   required
                   value={form.name}
@@ -414,6 +451,98 @@ function AcademiesPage() {
                   </p>
                 </div>
               </fieldset>
+
+              {!editing && (
+                <fieldset>
+                  <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                    <Target className="size-3.5" /> Ring Allocation
+                  </legend>
+                  <div className="mb-4">
+                    <label className="block text-xs font-semibold mb-1.5">How many training rings at this center?</label>
+                    <input
+                      type="number"
+                      min="1"
+                      max="10"
+                      value={form.rings.length}
+                      onChange={(e) => {
+                        const count = parseInt(e.target.value) || 1;
+                        const newRings = [...form.rings];
+                        while (newRings.length < count) newRings.push({ name: `Ring ${newRings.length + 1}`, address: "", latitude: "", longitude: "", geofence_meters: "200" });
+                        while (newRings.length > count) newRings.pop();
+                        setF("rings", newRings);
+                      }}
+                      className="input-premium"
+                    />
+                  </div>
+                  <div className="space-y-3">
+                    {form.rings.map((ring, idx) => (
+                      <div key={idx} className="p-3 bg-subtle/20 border border-border rounded-xl space-y-3">
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="text"
+                            value={ring.name}
+                            onChange={(e) => {
+                              const newRings = [...form.rings];
+                              newRings[idx].name = e.target.value;
+                              setF("rings", newRings);
+                            }}
+                            className="input-premium flex-1"
+                            placeholder={`Ring ${idx + 1} Name`}
+                          />
+                          <input
+                            type="text"
+                            value={ring.address}
+                            onChange={(e) => {
+                              const newRings = [...form.rings];
+                              newRings[idx].address = e.target.value;
+                              setF("rings", newRings);
+                            }}
+                            className="input-premium flex-1"
+                            placeholder="Specific location/address (optional)"
+                          />
+                        </div>
+                        <div className="flex items-center gap-3">
+                          <input
+                            type="number"
+                            step="any"
+                            value={ring.latitude}
+                            onChange={(e) => {
+                              const newRings = [...form.rings];
+                              newRings[idx].latitude = e.target.value;
+                              setF("rings", newRings);
+                            }}
+                            className="input-premium flex-1"
+                            placeholder="Latitude"
+                          />
+                          <input
+                            type="number"
+                            step="any"
+                            value={ring.longitude}
+                            onChange={(e) => {
+                              const newRings = [...form.rings];
+                              newRings[idx].longitude = e.target.value;
+                              setF("rings", newRings);
+                            }}
+                            className="input-premium flex-1"
+                            placeholder="Longitude"
+                          />
+                          <input
+                            type="number"
+                            value={ring.geofence_meters}
+                            onChange={(e) => {
+                              const newRings = [...form.rings];
+                              newRings[idx].geofence_meters = e.target.value;
+                              setF("rings", newRings);
+                            }}
+                            className="input-premium flex-1"
+                            placeholder="Radius (m)"
+                          />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </fieldset>
+              )}
 
               <fieldset>
                 <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">

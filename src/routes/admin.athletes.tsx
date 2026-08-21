@@ -97,6 +97,48 @@ function FullAthleteDetailView({
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<"overview" | "payments" | "attendance" | "leaves">("overview");
   const [processingLeaveId, setProcessingLeaveId] = useState<string | null>(null);
+  
+  // Suspension State
+  const [showSuspensionModal, setShowSuspensionModal] = useState(false);
+  const [suspendForm, setSuspendForm] = useState({
+    is_suspended: false,
+    suspension_reason: "",
+    suspension_end_date: "",
+  });
+  const [suspending, setSuspending] = useState(false);
+
+  useEffect(() => {
+    if (data?.ap) {
+      setSuspendForm({
+        is_suspended: !!data.ap.is_suspended,
+        suspension_reason: data.ap.suspension_reason || "",
+        suspension_end_date: data.ap.suspension_end_date || "",
+      });
+    }
+  }, [data?.ap]);
+
+  const handleSaveSuspension = async () => {
+    if (!data?.ap) return;
+    setSuspending(true);
+    try {
+      const payload = {
+        is_suspended: suspendForm.is_suspended,
+        suspension_reason: suspendForm.is_suspended ? suspendForm.suspension_reason : null,
+        suspension_end_date: suspendForm.is_suspended ? (suspendForm.suspension_end_date || null) : null,
+        suspended_by: suspendForm.is_suspended && !data.ap.is_suspended ? user?.id : (data.ap.is_suspended ? data.ap.suspended_by : null),
+        suspended_at: suspendForm.is_suspended && !data.ap.is_suspended ? new Date().toISOString() : (data.ap.is_suspended ? data.ap.suspended_at : null),
+        reinstated_by: !suspendForm.is_suspended && data.ap.is_suspended ? user?.id : (data.ap.is_suspended ? data.ap.reinstated_by : null),
+        reinstated_at: !suspendForm.is_suspended && data.ap.is_suspended ? new Date().toISOString() : (data.ap.is_suspended ? data.ap.reinstated_at : null),
+      };
+      const { error } = await supabase.from("boxer_profiles").update(payload).eq("id", athleteId);
+      if (error) throw error;
+      setShowSuspensionModal(false);
+    } catch (e: any) {
+      alert("Failed to update suspension: " + e.message);
+    } finally {
+      setSuspending(false);
+    }
+  };
 
   const handleLeaveAction = async (leaveId: string, action: "approved" | "rejected", leaveDate: string) => {
     setProcessingLeaveId(leaveId);
@@ -316,9 +358,17 @@ function FullAthleteDetailView({
         <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => onOpenReassignAcademy(ap)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-elevated text-xs font-semibold transition shadow-sm"
+            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-info/10 text-info text-xs font-semibold hover:bg-info/20 transition"
           >
-            <MapPin className="size-3.5 text-primary" /> Reassign Academy
+            <MapPin className="size-3.5" />
+            Reassign Academy
+          </button>
+          <button
+            onClick={() => setShowSuspensionModal(true)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${ap.is_suspended ? "bg-warning text-warning-foreground hover:bg-warning/90" : "bg-destructive/10 text-destructive hover:bg-destructive/20"}`}
+          >
+            <Ban className="size-3.5" />
+            {ap.is_suspended ? "Manage Suspension (Active)" : "Manage Suspension"}
           </button>
 
           {(payStatus === "cash_pending" || payStatus === "online_pending") && (
@@ -763,6 +813,78 @@ function FullAthleteDetailView({
             </div>
           )}
         </SectionCard>
+      )}
+
+      {/* Suspension Modal */}
+      {showSuspensionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-md p-6 animate-fade-up">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-destructive/10 grid place-items-center shrink-0">
+                  <Ban className="size-4 text-destructive" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Medical Suspension</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Manage training restriction for {ap.full_name}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowSuspensionModal(false)} className="p-2 hover:bg-subtle rounded-lg text-muted-foreground">
+                <X className="size-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <label className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer hover:bg-subtle/50 transition">
+                <input
+                  type="checkbox"
+                  checked={suspendForm.is_suspended}
+                  onChange={e => setSuspendForm(f => ({ ...f, is_suspended: e.target.checked }))}
+                  className="size-4 rounded border-border text-destructive focus:ring-destructive"
+                />
+                <span className="text-sm font-semibold text-destructive">Suspend Athlete</span>
+              </label>
+
+              {suspendForm.is_suspended && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5">Reason for Suspension *</label>
+                    <input 
+                      type="text" 
+                      value={suspendForm.suspension_reason} 
+                      onChange={e => setSuspendForm(f => ({ ...f, suspension_reason: e.target.value }))}
+                      className="input-premium" 
+                      placeholder="e.g. Broken thumb" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5 flex justify-between">
+                      <span>Suspension End Date</span>
+                      <span className="text-muted-foreground font-normal">(Optional / Indefinite)</span>
+                    </label>
+                    <input 
+                      type="date" 
+                      value={suspendForm.suspension_end_date} 
+                      onChange={e => setSuspendForm(f => ({ ...f, suspension_end_date: e.target.value }))}
+                      className="input-premium" 
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowSuspensionModal(false)} className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition">Cancel</button>
+              <button 
+                onClick={handleSaveSuspension} 
+                disabled={suspending || (suspendForm.is_suspended && !suspendForm.suspension_reason.trim())} 
+                className="flex-1 px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {suspending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

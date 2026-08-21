@@ -1,5 +1,6 @@
-  import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
   import { useMemo, useState, useEffect, useCallback } from "react";
+  import { State, City } from "country-state-city";
   import {
     Check, ChevronLeft, ChevronRight, Shield,
     CircleCheck, User, Users, Trophy, Heart, Phone,
@@ -32,6 +33,7 @@
     { key: "emergency",  label: "Emergency Contact",     icon: Phone,      desc: "In case of emergency" },
     { key: "medical",    label: "Medical History",       icon: Heart,      desc: "Health & conditions" },
     { key: "sports",     label: "Sports Profile",        icon: Crosshair,  desc: "Boxing stats & goals" },
+    { key: "federation", label: "Federation IDs",        icon: Trophy,     desc: "National, State & City IDs" },
   ];
 
   // ── Form state type ───────────────────────────────────────────────────
@@ -40,12 +42,9 @@
   // ── Validation logic ─────────────────────────────────────────────────
   function validateStep(stepKey: string, data: FormData, user?: any, isMinor?: boolean): string | null {
     if (stepKey === "personal") {
-      if (!data.fullName?.trim()) return "Full name is required.";
       if (!data.dob) return "Date of birth is required.";
       if (!data.gender) return "Gender is required.";
       if (!data.phone?.trim()) return "Phone number is required.";
-      if (!data.email?.trim()) return "Email address is required.";
-      if (!user && (!data.password || data.password.length < 8)) return "Password (minimum 8 characters) is required to create your account.";
       if (!data.city?.trim() || !data.state?.trim() || !data.country?.trim()) return "City, state, and country are required.";
     }
     if (stepKey === "guardian" && isMinor) {
@@ -65,9 +64,10 @@
     if (stepKey === "sports") {
       if (!data.boxingStance) return "Boxing stance is required (Orthodox or Southpaw).";
       if (!data.ageCategoryId) return "Age category is required.";
-      if (!data.weightCategoryId) return "Weight category is required.";
       if (!data.weightKg) return "Declared weight in kg is required.";
+      if (!data.weightCategoryId) return "Valid weight category could not be found for the entered weight, gender, and age category.";
       if (!data.heightCm) return "Height in cm is required.";
+      if (!data.preferredCenterId) return "Please select a preferred training center.";
     }
     return null;
   }
@@ -84,12 +84,12 @@
     // Restore draft from localStorage
     const DRAFT_KEY = `boxos_onboard_draft_${user?.id ?? "guest"}`;
     const [data, setData] = useState<FormData>(() => {
-      if (typeof window === "undefined") return { nationality: "Indian", country: "India", recordWins: 0, recordLosses: 0, recordDraws: 0, recordKos: 0, medicalFitnessDeclared: true };
+      if (typeof window === "undefined") return { nationality: "Indian", country: "India", medicalFitnessDeclared: true };
       try {
         const saved = localStorage.getItem(`boxos_onboard_draft_${user?.id ?? "guest"}`);
         if (saved) return JSON.parse(saved);
       } catch {}
-      return { nationality: "Indian", country: "India", recordWins: 0, recordLosses: 0, recordDraws: 0, recordKos: 0, medicalFitnessDeclared: true };
+      return { nationality: "Indian", country: "India", medicalFitnessDeclared: true };
     });
 
     // Save draft on every change
@@ -123,11 +123,33 @@
 
     const [ageCategories, setAgeCategories] = useState<any[]>([]);
     const [weightCategories, setWeightCategories] = useState<any[]>([]);
+    const [centers, setCenters] = useState<any[]>([]);
 
     useEffect(() => {
       supabase.from("age_categories").select("*").order("min_age", { ascending: true }).then(({ data }) => setAgeCategories(data || []));
       supabase.from("weight_categories").select("*").order("sort_order", { ascending: true }).then(({ data }) => setWeightCategories(data || []));
     }, []);
+
+    useEffect(() => {
+      let acId = profile?.academy_id;
+      if (!acId && typeof window !== "undefined") {
+        acId = localStorage.getItem("boxos_verified_academy_id");
+      }
+      if (!acId) {
+        const storedCode = typeof window !== "undefined" ? localStorage.getItem("boxos_verified_code") : null;
+        if (storedCode) {
+          supabase.from("academy_codes").select("academy_id").eq("code", storedCode).maybeSingle().then(({ data }) => {
+            if (data?.academy_id) {
+              supabase.from("centers").select("*").eq("academy_id", data.academy_id).then(({ data: centersData }) => setCenters(centersData || []));
+            }
+          });
+          return;
+        }
+      }
+      if (acId) {
+        supabase.from("centers").select("*").eq("academy_id", acId).then(({ data }) => setCenters(data || []));
+      }
+    }, [profile?.academy_id]);
 
     // If the profile explicitly says NOT verified, clear any stale localStorage flag
     useEffect(() => {
@@ -145,77 +167,11 @@
       setSubmitting(true);
       setSubmitError(null);
       try {
-        const formEmail = data.email?.trim().toLowerCase();
-        const activeEmail = user?.email?.trim().toLowerCase();
-
-        let currentUserId: string | null = null;
-        let currentUserEmail: string | null = null;
-
-        // If no active session OR if the onboarding form's email differs from active logged-in user:
-        if (!user || (formEmail && activeEmail && formEmail !== activeEmail)) {
-          const userEmail = formEmail;
-          const userPassword = data.password?.trim();
-
-          if (!userEmail) {
-            throw new Error("Email address is required to create your account.");
-          }
-
-          if (!userPassword) {
-            throw new Error("A password is required to create your account.");
-          }
-
-          let authUserObj: any = null;
-
-          // Attempt sign up
-          const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
-            email: userEmail,
-            password: userPassword,
-            options: { data: { full_name: data.fullName } },
-          });
-
-          if (signUpErr) {
-            const errMsg = (signUpErr.message || "").toLowerCase();
-            // If already registered, attempt to sign in with provided password
-            if (errMsg.includes("already registered") || errMsg.includes("already exists") || errMsg.includes("user already exists")) {
-              const { data: signInData, error: signInErr } = await supabase.auth.signInWithPassword({
-                email: userEmail,
-                password: userPassword,
-              });
-              if (signInErr) {
-                throw new Error(`An account with ${userEmail} already exists. Please verify your password: ${signInErr.message}`);
-              }
-              authUserObj = signInData?.user;
-            } else {
-              throw new Error(signUpErr.message);
-            }
-          } else {
-            authUserObj = signUpData?.user;
-            // Establish session if not automatically signed in
-            if (!signUpData?.session) {
-              const { data: signInData } = await supabase.auth.signInWithPassword({
-                email: userEmail,
-                password: userPassword,
-              }).catch(() => ({ data: null }));
-              if (signInData?.user) authUserObj = signInData.user;
-            }
-          }
-
-          if (!authUserObj?.id) {
-            // Fallback check if session is active
-            const { data: sessionData } = await supabase.auth.getUser();
-            if (sessionData?.user) {
-              authUserObj = sessionData.user;
-            } else {
-              throw new Error("Could not authenticate user session. Please check your credentials.");
-            }
-          }
-
-          currentUserId = authUserObj.id;
-          currentUserEmail = userEmail;
-        } else {
-          currentUserId = user.id;
-          currentUserEmail = activeEmail ?? formEmail;
+        if (!user) {
+          throw new Error("You must be logged in to complete onboarding.");
         }
+        
+        const currentUserId = user.id;
 
         // Resolve target academy_id
         let targetAcademyId = profile?.academy_id;
@@ -234,55 +190,23 @@
           }
         }
         if (!targetAcademyId) {
-          // No academy found through any source — do NOT fall back to any random academy.
-          // The athlete must verify a valid academy code before their profile can be saved.
-          throw new Error(
-            "Academy verification required. Please go back and verify your academy code before completing registration."
-          );
-        }
-
-        // Upsert into profiles
-        const { error: profileErr } = await supabase
-          .from("profiles")
-          .upsert({
-            id: currentUserId,
-            role: "athlete",
-            full_name: data.fullName,
-            email: data.email || currentUserEmail || null,
-            phone: data.phone || null,
-            academy_id: targetAcademyId || null,
-            academy_code_verified: true,
-            updated_at: new Date().toISOString(),
-          }, { onConflict: "id" });
-
-        if (profileErr) {
-          console.warn("profiles upsert notice:", profileErr.message);
-          // Fallback update
-          await supabase.from("profiles").update({
-            role: "athlete",
-            full_name: data.fullName,
-            email: data.email || currentUserEmail || null,
-            phone: data.phone || null,
-            academy_id: targetAcademyId || null,
-            academy_code_verified: true,
-            updated_at: new Date().toISOString(),
-          }).eq("id", currentUserId);
+          throw new Error("Academy verification required. Please go back and verify your academy code before completing registration.");
         }
 
         const cleanStance = (data.boxingStance || "orthodox").toLowerCase() === "southpaw" ? "southpaw" : "orthodox";
 
-        // Upsert into boxer_profiles
-        const { data: ap, error: apErr } = await supabase
+        const { data: existingBp } = await supabase
           .from("boxer_profiles")
-          .upsert({
-            user_id: currentUserId,
-            academy_id: targetAcademyId || null,
-            full_name: data.fullName.trim(),
+          .select("id")
+          .eq("user_id", currentUserId)
+          .maybeSingle();
+
+        const bpPayload = {
+            full_name: user?.user_metadata?.full_name || "Athlete",
             date_of_birth: data.dob,
             gender: ["Male", "Female", "Other"].includes(data.gender) ? data.gender : "Male",
             nationality: data.nationality || "Indian",
             phone: data.phone || null,
-            email: data.email || null,
             city: data.city || null,
             state: data.state || null,
             country: data.country || "India",
@@ -306,24 +230,42 @@
             height_cm: data.heightCm ? parseFloat(data.heightCm) : null,
             reach_cm: data.reachCm ? parseFloat(data.reachCm) : null,
             national_federation_boxer_id: data.nationalFederationBoxerId?.trim() || null,
-            years_boxing_experience: data.yearsBoxingExperience ? parseInt(data.yearsBoxingExperience, 10) : null,
-            current_coach_preference: data.coachName || data.currentCoachPreference || null,
-            state_association_id: data.stateAssociationId || null,
-            international_federation_id: data.internationalFederationId || null,
+            state_federation_boxer_id: data.stateFederationBoxerId?.trim() || null,
+            city_federation_boxer_id: data.cityFederationBoxerId?.trim() || null,
+            preferred_center_id: data.preferredCenterId || null,
 
             onboarding_complete: true,
-          }, { onConflict: "user_id" })
-          .select("id")
-          .maybeSingle();
+        };
 
-        if (apErr) {
-          console.warn("boxer_profiles upsert error:", apErr.message);
-          throw new Error("Failed to save athlete profile: " + apErr.message);
+        let ap, apErr;
+
+        if (existingBp) {
+          const { data, error } = await supabase
+            .from("boxer_profiles")
+            .update(bpPayload)
+            .eq("user_id", currentUserId)
+            .select("id")
+            .maybeSingle();
+          ap = data;
+          apErr = error;
+        } else {
+          const { data, error } = await supabase
+            .from("boxer_profiles")
+            .insert({
+              ...bpPayload,
+              user_id: currentUserId,
+              academy_id: targetAcademyId || null,
+            })
+            .select("id")
+            .maybeSingle();
+          ap = data;
+          apErr = error;
         }
+
+        if (apErr) throw new Error("Failed to save athlete profile: " + apErr.message);
 
         const boxerProfileId = ap?.id;
 
-        // Handle guardian_details: insert ONLY if minor
         if (isMinor && data.gName && boxerProfileId) {
           try {
             await supabase.from("guardian_details").upsert({
@@ -333,18 +275,10 @@
               phone: data.gPhone.trim(),
               email: data.gEmail?.trim() || null,
               consent_given: !!data.gConsent,
-              updated_at: new Date().toISOString(),
             }, { onConflict: "boxer_profile_id" });
-          } catch (gErr) {
-            console.warn("guardian_details upsert notice:", gErr);
-          }
-        } else if (!isMinor && boxerProfileId) {
-          try {
-            await supabase.from("guardian_details").delete().eq("boxer_profile_id", boxerProfileId);
-          } catch {}
+          } catch (gErr) { console.warn("guardian_details upsert notice:", gErr); }
         }
 
-        // Cleanup local draft and mark verified
         try {
           localStorage.removeItem(DRAFT_KEY);
           localStorage.setItem("boxos_code_verified", "true");
@@ -352,8 +286,6 @@
         } catch {}
 
         setDone(true);
-
-        // Immediate hard redirect to ensure AuthProvider re-loads session & opens athlete dashboard
         window.location.href = "/athlete";
       } catch (err: any) {
         console.error("Onboarding submission error:", err);
@@ -363,28 +295,20 @@
       }
     }
 
-    // Auth guard — render loading state while checking session
     if (authLoading) return (
       <div className="min-h-screen theme-cinematic-dark bg-cinematic-base grid place-items-center">
         <span className="size-6 border-2 border-cinematic-red border-t-transparent rounded-full animate-spin" />
       </div>
     );
 
-    // Academy Access Code Gate — verified if:
-    // 1. Logged-in user's profile has academy_code_verified = true (persisted in DB), OR
-    // 2. They entered a valid code in this exact session (codeVerifiedInSession set by handleVerify)
-    // NOTE: localStorage alone cannot bypass the gate — the useEffect above clears stale flags
-    //       when profile says unverified. For anonymous users (no profile), they must always verify.
     const isCodeVerified = profile?.academy_code_verified === true || codeVerifiedInSession;
 
     const deadlineDate = profile?.academy_code_deadline ? new Date(profile.academy_code_deadline) : null;
     const isDeadlinePassed = deadlineDate ? deadlineDate.getTime() < Date.now() : false;
     const daysRemaining = deadlineDate ? Math.max(0, Math.ceil((deadlineDate.getTime() - Date.now()) / (1000 * 60 * 60 * 24))) : 15;
 
-    if (done) {
-      return <SuccessScreen name={data.fullName || "Athlete"} />;
-    }
-
+    if (done) return null;
+    if (!user) return <SignupScreen />;
     if (!isCodeVerified) {
       if (isDeadlinePassed) {
         return <AcademyCodeExpiredScreen deadline={profile?.academy_code_deadline} />;
@@ -401,37 +325,21 @@
 
     return (
       <CinematicLayout maxWidth="max-w-[900px]">
-        {/* Atmospheric Lighting */}
-        <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
-        <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-1/4 right-0 translate-x-1/3 opacity-70" style={{ animationDelay: '-3s' }} />
-        <div className="atmosphere-base atmosphere-warm animate-ambient-drift w-[1000px] h-[1000px] top-1/3 right-0 translate-x-1/4 opacity-80" style={{ animationDelay: '-6s' }} />
-
-        <CinematicMedia allowVideo={false} />
-        
         <div className="w-full relative z-10 flex flex-col flex-1 justify-center py-8">
-          {/* Global progress bar */}
           <div className="w-full px-6 lg:px-8 mb-6">
             <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold text-cinematic-primary tracking-wider uppercase">
-                Step {step + 1} of {totalSteps}
-              </span>
+              <span className="text-xs font-semibold text-cinematic-primary tracking-wider uppercase">Step {step + 1} of {totalSteps}</span>
               <span className="text-xs text-cinematic-secondary">{current.label}</span>
             </div>
             <div className="h-1.5 w-full bg-white/10 rounded-full overflow-hidden">
-              <div
-                className="h-full bg-cinematic-red transition-all duration-500 ease-out rounded-full"
-                style={{ width: `${progress}%` }}
-              />
+              <div className="h-full bg-cinematic-red transition-all duration-500 ease-out rounded-full" style={{ width: `${progress}%` }} />
             </div>
           </div>
 
           <div className="w-full px-6 lg:px-8 flex flex-col lg:flex-row gap-6 lg:gap-8 mx-auto">
-            {/* LEFT — step sidebar */}
             <div className="hidden lg:block w-40 xl:w-48 shrink-0">
               <StepSidebar steps={visibleSteps} current={step} onJump={(i) => i < step && setStep(i)} />
             </div>
-
-            {/* RIGHT — form content */}
             <main className="flex-1 w-full min-w-0">
               <FormPanel
                 current={current}
@@ -443,6 +351,7 @@
                 isMinor={isMinor}
                 ageCategories={ageCategories}
                 weightCategories={weightCategories}
+                centers={centers}
                 onPrev={() => setStep(s => Math.max(0, s - 1))}
                 onNext={() => {
                   if (step < totalSteps - 1) setStep(s => s + 1);
@@ -459,7 +368,6 @@
     );
   }
 
-  // ── Sidebar ───────────────────────────────────────────────────────────
   function StepSidebar({ steps, current, onJump }: { steps: typeof STEPS; current: number; onJump: (i: number) => void }) {
     return (
       <aside className="w-full">
@@ -483,9 +391,7 @@
                 }`}>
                   {state === "done" ? <Check className="size-3.5" strokeWidth={2.5} /> : i + 1}
                 </span>
-                <div className="min-w-0">
-                  <div className="truncate">{s.label}</div>
-                </div>
+                <div className="min-w-0"><div className="truncate">{s.label}</div></div>
               </button>
             );
           })}
@@ -494,37 +400,29 @@
     );
   }
 
-  // ── FormPanel wrapper ─────────────────────────────────────────────────
   function FormPanel({
-    current, step, totalSteps, data, set, user, isMinor, ageCategories, weightCategories, onPrev, onNext, isLast, submitting, submitError
+    current, step, totalSteps, data, set, user, isMinor, ageCategories, weightCategories, centers, onPrev, onNext, isLast, submitting, submitError
   }: {
     current: typeof STEPS[0]; step: number; totalSteps: number;
     data: FormData; set: (k: string, v: any) => void; user?: any; isMinor?: boolean;
-    ageCategories: any[]; weightCategories: any[];
+    ageCategories: any[]; weightCategories: any[]; centers: any[];
     onPrev: () => void; onNext: () => void; isLast: boolean;
     submitting?: boolean; submitError?: string | null;
   }) {
     const Icon = current.icon;
     const [valError, setValError] = useState<string | null>(null);
 
-    // Clear step validation error when step changes
-    useEffect(() => {
-      setValError(null);
-    }, [step]);
+    useEffect(() => { setValError(null); }, [step]);
 
     function handleAttemptNext() {
       const err = validateStep(current.key, data, user, isMinor);
-      if (err) {
-        setValError(err);
-        return;
-      }
+      if (err) { setValError(err); return; }
       setValError(null);
       onNext();
     }
 
     return (
       <CinematicWizardPanel>
-        {/* Section header */}
         <div className="px-5 md:px-8 py-6 border-b border-white/5 bg-black/20">
           <div className="flex items-center gap-4">
             <div className="size-12 rounded-xl bg-cinematic-blue/10 border border-cinematic-blue/20 grid place-items-center shrink-0">
@@ -537,13 +435,13 @@
           </div>
         </div>
 
-        {/* Form body */}
         <div className="px-5 md:px-8 py-6">
           {current.key === "personal"   && <PersonalStep   data={data} set={set} user={user} />}
           {current.key === "guardian"   && <GuardianStep   data={data} set={set} />}
           {current.key === "emergency"  && <EmergencyStep  data={data} set={set} />}
           {current.key === "medical"    && <MedicalStep    data={data} set={set} />}
-          {current.key === "sports"     && <SportsStep     data={data} set={set} ageCategories={ageCategories} weightCategories={weightCategories} />}
+          {current.key === "sports"     && <SportsStep     data={data} set={set} ageCategories={ageCategories} weightCategories={weightCategories} centers={centers} />}
+          {current.key === "federation" && <FederationStep data={data} set={set} />}
         </div>
 
         {/* Step Validation error alert */}
@@ -669,9 +567,6 @@
     return (
       <div className="space-y-6">
         <div className="grid md:grid-cols-2 gap-6">
-          <Field label="Full name" required hint="As per official government ID">
-            <CinematicInput value={data.fullName || ""} onChange={e => set("fullName", e.target.value)} placeholder="Aarav Mehta" />
-          </Field>
           <Field label="Date of birth" required hint="Used to verify age category and minor status">
             <CinematicInput type="date" value={data.dob || ""} onChange={e => set("dob", e.target.value)} />
           </Field>
@@ -702,24 +597,40 @@
           <Field label="Phone number" required hint="Primary contact number">
             <CinematicInput value={data.phone || ""} onChange={e => set("phone", e.target.value)} placeholder="+91 98765 43210" type="tel" />
           </Field>
-          <Field label="Email address" required hint="Used to access your athlete dashboard">
-            <CinematicInput type="email" value={data.email || ""} onChange={e => set("email", e.target.value)} placeholder="aarav@example.com" />
-          </Field>
-          {!user && (
-            <Field label="Create password" required hint="Min 8 characters to secure your account">
-              <CinematicInput type="password" value={data.password || ""} onChange={e => set("password", e.target.value)} placeholder="••••••••" />
-            </Field>
-          )}
         </div>
         <div className="grid md:grid-cols-3 gap-6 pt-2">
-          <Field label="City" required>
-            <CinematicInput value={data.city || ""} onChange={e => set("city", e.target.value)} placeholder="e.g. Mumbai" />
-          </Field>
           <Field label="State" required>
-            <CinematicInput value={data.state || ""} onChange={e => set("state", e.target.value)} placeholder="e.g. Maharashtra" />
+            <Select 
+              value={data.state || ""} 
+              onChange={e => {
+                set("state", e.target.value);
+                set("city", ""); // Reset city when state changes
+              }}
+            >
+              <option value="">Select State…</option>
+              {State.getStatesOfCountry("IN").map(s => (
+                <option key={s.isoCode} value={s.name}>{s.name}</option>
+              ))}
+            </Select>
+          </Field>
+          <Field label="City" required hint={!data.state ? "Select State first" : undefined}>
+            <Select 
+              value={data.city || ""} 
+              onChange={e => set("city", e.target.value)}
+              disabled={!data.state}
+            >
+              <option value="">Select City…</option>
+              {(() => {
+                const st = State.getStatesOfCountry("IN").find(s => s.name === data.state);
+                if (!st) return null;
+                return City.getCitiesOfState("IN", st.isoCode).map(c => (
+                  <option key={c.name} value={c.name}>{c.name}</option>
+                ));
+              })()}
+            </Select>
           </Field>
           <Field label="Country" required>
-            <CinematicInput value={data.country || "India"} onChange={e => set("country", e.target.value)} placeholder="e.g. India" />
+            <CinematicInput value={data.country || "India"} onChange={e => set("country", e.target.value)} disabled placeholder="India" />
           </Field>
         </div>
       </div>
@@ -826,7 +737,7 @@
     );
   }
 
-  function SportsStep({ data, set, ageCategories, weightCategories }: { data: FormData; set: (k: string, v: any) => void; ageCategories: any[]; weightCategories: any[] }) {
+  function SportsStep({ data, set, ageCategories, weightCategories, centers }: { data: FormData; set: (k: string, v: any) => void; ageCategories: any[]; weightCategories: any[]; centers: any[] }) {
     const gender = data.gender;
     const filteredAgeCategories = ageCategories.filter(a => {
       if (a.gender_scope === 'all') return true;
@@ -842,6 +753,18 @@
       return false;
     });
 
+    const weightKg = parseFloat(data.weightKg);
+    const matchedCategory = useMemo(() => {
+      if (isNaN(weightKg) || !data.ageCategoryId) return null;
+      return filteredWeightCategories.find(w => weightKg > w.min_kg && (w.max_kg === null || weightKg <= w.max_kg)) || null;
+    }, [weightKg, data.ageCategoryId, filteredWeightCategories]);
+
+    useEffect(() => {
+      if (matchedCategory?.id !== data.weightCategoryId) {
+        set("weightCategoryId", matchedCategory?.id || "");
+      }
+    }, [matchedCategory?.id, data.weightCategoryId, set]);
+
     return (
       <div className="space-y-6">
         <div className="grid md:grid-cols-2 gap-6">
@@ -851,9 +774,6 @@
               <option value="Orthodox">Orthodox (Left hand lead / Right-handed)</option>
               <option value="Southpaw">Southpaw (Right hand lead / Left-handed)</option>
             </Select>
-          </Field>
-          <Field label="National Federation Boxer ID" hint="Optional (e.g. BFI ID / Regional Registration)">
-            <Input value={data.nationalFederationBoxerId || ""} onChange={e => set("nationalFederationBoxerId", e.target.value)} placeholder="e.g. BFI-IND-10492" />
           </Field>
           
           <Field label="Age Category" required hint="Based on calendar year of birth">
@@ -872,15 +792,20 @@
               ))}
             </Select>
           </Field>
-          <Field label="Weight Category" required hint={!data.ageCategoryId ? "Select an Age Category first" : "Your current weight class"}>
-            <Select value={data.weightCategoryId || ""} onChange={e => set("weightCategoryId", e.target.value)} disabled={!data.ageCategoryId}>
-              <option value="">Select Weight Category…</option>
-              {filteredWeightCategories.map(w => (
-                <option key={w.id} value={w.id}>
-                  {w.name} ({w.min_kg}kg {w.max_kg ? `- ${w.max_kg}kg` : "+"})
-                </option>
-              ))}
-            </Select>
+          <Field label="Weight Category" hint="Automatically assigned based on weight and age category">
+            <div className="w-full bg-[#0B0F17]/60 border border-[#ffffff1a] rounded-lg px-4 py-3 text-sm text-[#94A3B8] flex items-center h-[46px]">
+              {data.ageCategoryId && data.weightKg ? (
+                matchedCategory ? (
+                  <span className="text-[#F8FAFC] font-medium">
+                    {matchedCategory.name} ({matchedCategory.min_kg}kg {matchedCategory.max_kg ? `- ${matchedCategory.max_kg}kg` : "+"})
+                  </span>
+                ) : (
+                  <span className="text-cinematic-red">No matching category found for this weight.</span>
+                )
+              ) : (
+                "Enter weight and select age category"
+              )}
+            </div>
           </Field>
           <Field label="Declared Weight (kg)" required hint="Used for weight category assignment">
             <CinematicInput type="number" step="0.1" value={data.weightKg || ""} onChange={e => set("weightKg", e.target.value)} placeholder="e.g. 71.5" />
@@ -899,40 +824,41 @@
               <option value="Advanced">Advanced (Sparring or competition experience)</option>
             </Select>
           </Field>
-          <Field label="Amateur / Fight Record" hint="Optional (Wins-Losses-Draws)">
-            <CinematicInput value={data.fightRecord || ""} onChange={e => set("fightRecord", e.target.value)} placeholder="e.g. 3-1-0 or N/A" />
-          </Field>
           <Field label="Previous/Current Club" hint="Optional">
             <CinematicInput value={data.previousClub || ""} onChange={e => set("previousClub", e.target.value)} placeholder="e.g. Kronk Gym" />
           </Field>
           <Field label="Coach Name" hint="Optional">
             <CinematicInput value={data.coachName || ""} onChange={e => set("coachName", e.target.value)} placeholder="Coach Name" />
           </Field>
-          <Field label="Preferred Class Schedule & Time Slots" hint="Optional">
-            <CinematicInput value={data.preferredClassSchedule || ""} onChange={e => set("preferredClassSchedule", e.target.value)} placeholder="e.g. Weekdays Evening, Weekends Morning" />
+          <Field label="Preferred Center" hint="Select the center/branch you plan to attend">
+            <Select value={data.preferredCenterId || ""} onChange={e => set("preferredCenterId", e.target.value)}>
+              <option value="">Select Center…</option>
+              {centers.map(c => (
+                <option key={c.id} value={c.id}>{c.name} {c.city ? `(${c.city})` : ""}</option>
+              ))}
+            </Select>
           </Field>
         </div>
+      </div>
+    );
+  }
 
-        {/* Fight Record Section */}
-        <div className="border border-border rounded-xl p-5 bg-subtle/30 space-y-4">
-          <div>
-            <h4 className="text-sm font-semibold text-foreground">Career Bout Record (Amateur / Pro)</h4>
-            <p className="text-xs text-muted-foreground mt-0.5">Leave as 0 if you are a beginner with no official bouts.</p>
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            <Field label="Wins (W)">
-              <Input type="number" min="0" value={data.recordWins ?? 0} onChange={e => set("recordWins", e.target.value)} />
-            </Field>
-            <Field label="Losses (L)">
-              <Input type="number" min="0" value={data.recordLosses ?? 0} onChange={e => set("recordLosses", e.target.value)} />
-            </Field>
-            <Field label="Draws (D)">
-              <Input type="number" min="0" value={data.recordDraws ?? 0} onChange={e => set("recordDraws", e.target.value)} />
-            </Field>
-            <Field label="Knockouts (KOs)">
-              <Input type="number" min="0" value={data.recordKos ?? 0} onChange={e => set("recordKos", e.target.value)} />
-            </Field>
-          </div>
+  function FederationStep({ data, set }: { data: FormData; set: (k: string, v: any) => void }) {
+    return (
+      <div className="space-y-6">
+        <div className="grid md:grid-cols-2 gap-6">
+          <Field label="National Federation ID" hint="Optional (e.g. BFI ID)">
+            <CinematicInput value={data.nationalFederationBoxerId || ""} onChange={e => set("nationalFederationBoxerId", e.target.value)} placeholder="e.g. BFI-IND-10492" />
+          </Field>
+          <Field label="State Federation ID" hint="Optional">
+            <CinematicInput value={data.stateAssociationId || ""} onChange={e => set("stateAssociationId", e.target.value)} placeholder="e.g. State Boxing Assoc. ID" />
+          </Field>
+          <Field label="City Federation ID" hint="Optional">
+            <CinematicInput value={data.cityAssociationId || ""} onChange={e => set("cityAssociationId", e.target.value)} placeholder="e.g. City Boxing Assoc. ID" />
+          </Field>
+          <Field label="International Federation ID" hint="Optional (e.g. IBA ID)">
+            <CinematicInput value={data.internationalFederationId || ""} onChange={e => set("internationalFederationId", e.target.value)} placeholder="e.g. IBA-12345" />
+          </Field>
         </div>
       </div>
     );
@@ -1190,6 +1116,107 @@
             </div>
           </div>
         </CinematicCard>
+        </div>
+      </CinematicLayout>
+    );
+  }
+  
+  // ── Signup screen (Phase 1) ──────────────────────────────────────────
+  function SignupScreen() {
+    const [fullName, setFullName] = useState("");
+    const [email, setEmail] = useState("");
+    const [password, setPassword] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    async function handleSignup(e: React.FormEvent) {
+      e.preventDefault();
+      setLoading(true);
+      setError(null);
+
+      try {
+        const userEmail = email.trim().toLowerCase();
+        const userPassword = password.trim();
+
+        if (!userEmail || !userPassword || !fullName.trim()) {
+          throw new Error("All fields are required.");
+        }
+
+        const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
+          email: userEmail,
+          password: userPassword,
+          options: { data: { full_name: fullName.trim() } },
+        });
+
+        if (signUpErr) {
+          const errMsg = (signUpErr.message || "").toLowerCase();
+          if (errMsg.includes("already registered") || errMsg.includes("already exists") || errMsg.includes("user already exists")) {
+            const { error: signInErr } = await supabase.auth.signInWithPassword({
+              email: userEmail,
+              password: userPassword,
+            });
+            if (signInErr) {
+              throw new Error(`An account with ${userEmail} already exists. Please verify your password: ${signInErr.message}`);
+            }
+          } else {
+            throw new Error(signUpErr.message);
+          }
+        }
+        
+        // Wait for session to propagate and useAuth to re-render OnboardingPage
+      } catch (err: any) {
+        setError(err.message || "Failed to create account.");
+        setLoading(false);
+      }
+    }
+
+    return (
+      <CinematicLayout>
+        <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[1400px] h-[1400px] top-0 right-0 -translate-y-1/4 translate-x-1/4" />
+        <CinematicMedia allowVideo={false} />
+
+        <div className="relative z-10 w-full flex flex-col items-center py-8">
+          <CinematicCard>
+            <div className="text-center mb-8">
+              <h1 className="text-3xl font-display font-bold text-cinematic-primary tracking-tight">Create Athlete Account</h1>
+              <p className="text-sm text-cinematic-secondary mt-3">Step 1 of 3: Set up your login credentials.</p>
+            </div>
+
+            <form onSubmit={handleSignup} className="space-y-5">
+              <div>
+                <label className="block text-xs font-semibold text-cinematic-primary mb-2">Full Name</label>
+                <CinematicInput value={fullName} onChange={(e) => setFullName(e.target.value)} required placeholder="Aarav Mehta" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-cinematic-primary mb-2">Email Address</label>
+                <CinematicInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="aarav@example.com" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-cinematic-primary mb-2">Password</label>
+                <CinematicInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={8} />
+                <p className="text-[10px] text-cinematic-secondary/70 mt-1">Minimum 8 characters.</p>
+              </div>
+
+              {error && (
+                <div className="flex items-start gap-3 p-4 rounded-xl bg-cinematic-red/10 border border-cinematic-red/20 text-sm text-cinematic-red font-medium">
+                  <AlertCircle className="size-5 shrink-0 mt-0.5" />
+                  <span className="leading-relaxed">{error}</span>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                disabled={loading || !fullName || !email || !password}
+                className="w-full flex items-center justify-center gap-2 bg-cinematic-blue text-white py-4 rounded-xl text-sm font-bold hover:bg-blue-600 disabled:opacity-50 transition shadow-xl mt-4"
+              >
+                {loading ? <><Loader2 className="size-4.5 animate-spin" /> Creating Account…</> : "Continue to Next Step"}
+              </button>
+            </form>
+            
+            <div className="mt-8 pt-6 border-t border-white/5 text-center text-sm text-cinematic-secondary">
+              Already have an account? <Link to="/login" className="text-cinematic-primary hover:text-cinematic-blue font-medium transition-colors">Sign in</Link>
+            </div>
+          </CinematicCard>
         </div>
       </CinematicLayout>
     );

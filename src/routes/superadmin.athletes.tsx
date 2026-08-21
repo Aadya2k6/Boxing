@@ -6,7 +6,7 @@ import {
   User, Phone, Mail, CalendarDays, BookOpen, Shield, Award,
   Clock, CheckCircle2, XCircle, AlertCircle,
   FileText, Receipt, ClipboardList,
-  IndianRupee, Wallet, Star, Calendar, Download,
+  IndianRupee, Wallet, Star, Calendar, Download, Ban
 } from "lucide-react";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -73,7 +73,130 @@ function StatusPill({ status }: { status: string }) {
   );
 }
 
-// ── FULL PAGE ATHLETE DETAIL VIEW ────────────────────────────────────────────
+// ── FITNESS RECORDS TAB ────────────────────────────────────────────────────────
+
+function FitnessRecordsTab({ boxerProfileId, records, onRefresh, academyId }: {
+  boxerProfileId: string;
+  records: any[];
+  onRefresh: () => void;
+  academyId: string | null;
+}) {
+  const { user } = useAuth();
+  const [showAdd, setShowAdd] = useState(false);
+  const [testTypes, setTestTypes] = useState<any[]>([]);
+  const [form, setForm] = useState({ test_type_id: "", value: "", recorded_date: new Date().toISOString().split("T")[0], notes: "" });
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    if (!showAdd) return;
+    supabase
+      .from("fitness_test_types")
+      .select("id, name, unit")
+      .eq("is_active", true)
+      .order("name")
+      .then(({ data }) => setTestTypes(data ?? []));
+  }, [showAdd]);
+
+  async function handleAdd(e: React.FormEvent) {
+    e.preventDefault();
+    if (!form.test_type_id || !form.value) return;
+    setSaving(true);
+    try {
+      const type = testTypes.find(t => t.id === form.test_type_id);
+      const { error } = await supabase.from("fitness_test_records").insert({
+        boxer_profile_id: boxerProfileId,
+        test_type_id: form.test_type_id,
+        value: parseFloat(form.value),
+        unit_snapshot: type?.unit ?? "",
+        recorded_date: form.recorded_date,
+        recorded_by: user?.id,
+        notes: form.notes || null,
+      });
+      if (error) throw error;
+      setShowAdd(false);
+      setForm({ test_type_id: "", value: "", recorded_date: new Date().toISOString().split("T")[0], notes: "" });
+      onRefresh();
+    } catch (err: any) {
+      alert(err.message);
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <SectionCard title="Fitness Records" icon={Award}>
+      <div className="flex justify-end mb-4">
+        <button
+          onClick={() => setShowAdd(!showAdd)}
+          className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-primary/10 text-primary text-xs font-semibold hover:bg-primary/20 transition"
+        >
+          {showAdd ? "Cancel" : "+ Add Record"}
+        </button>
+      </div>
+
+      {showAdd && (
+        <form onSubmit={handleAdd} className="bg-elevated/60 border border-border rounded-xl p-4 mb-5 space-y-3">
+          <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-2">Add Fitness Record</div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Test Type *</label>
+            <select value={form.test_type_id} onChange={e => setForm(f => ({ ...f, test_type_id: e.target.value }))} className="input-premium" required>
+              <option value="">Select test...</option>
+              {testTypes.map(t => <option key={t.id} value={t.id}>{t.name} ({t.unit})</option>)}
+            </select>
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold mb-1">Value *</label>
+              <input type="number" step="any" value={form.value} onChange={e => setForm(f => ({ ...f, value: e.target.value }))} className="input-premium" required />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold mb-1">Date *</label>
+              <input type="date" value={form.recorded_date} onChange={e => setForm(f => ({ ...f, recorded_date: e.target.value }))} className="input-premium" required />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold mb-1">Notes (optional)</label>
+            <input type="text" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} className="input-premium" placeholder="Optional notes..." />
+          </div>
+          <button type="submit" disabled={saving} className="w-full py-2 rounded-xl bg-primary text-primary-foreground text-sm font-semibold disabled:opacity-50">
+            {saving ? "Saving..." : "Save Record"}
+          </button>
+        </form>
+      )}
+
+      {records.length === 0 ? (
+        <p className="text-sm text-muted-foreground text-center py-6">No fitness records yet.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead>
+              <tr className="border-b border-border">
+                <th className="text-left py-2 font-semibold text-muted-foreground">Test</th>
+                <th className="text-left py-2 font-semibold text-muted-foreground">Value</th>
+                <th className="text-left py-2 font-semibold text-muted-foreground">Unit</th>
+                <th className="text-left py-2 font-semibold text-muted-foreground">Date</th>
+                <th className="text-left py-2 font-semibold text-muted-foreground">Notes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {records.map((r: any) => (
+                <tr key={r.id} className="border-b border-border/40 hover:bg-elevated/40">
+                  <td className="py-2.5 font-medium">{r.fitness_test_types?.name ?? "—"}</td>
+                  <td className="py-2.5 font-bold text-primary">{r.value}</td>
+                  <td className="py-2.5 text-muted-foreground">{r.unit_snapshot}</td>
+                  <td className="py-2.5">{new Date(r.recorded_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+                  <td className="py-2.5 text-muted-foreground">{r.notes ?? "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </SectionCard>
+  );
+}
+
+// ── FULL PAGE BOXER DETAIL VIEW ───────────────────────────────────────────────
 
 function FullAthleteDetailView({
   athleteId,
@@ -95,8 +218,50 @@ function FullAthleteDetailView({
   const { user } = useAuth();
   const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"overview" | "payments" | "attendance" | "leaves">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "fitness" | "payments" | "attendance" | "leaves">("overview");
   const [processingLeaveId, setProcessingLeaveId] = useState<string | null>(null);
+  
+  // Suspension State
+  const [showSuspensionModal, setShowSuspensionModal] = useState(false);
+  const [suspendForm, setSuspendForm] = useState({
+    is_suspended: false,
+    suspension_reason: "",
+    suspension_end_date: "",
+  });
+  const [suspending, setSuspending] = useState(false);
+
+  useEffect(() => {
+    if (data?.ap) {
+      setSuspendForm({
+        is_suspended: !!data.ap.is_suspended,
+        suspension_reason: data.ap.suspension_reason || "",
+        suspension_end_date: data.ap.suspension_end_date || "",
+      });
+    }
+  }, [data?.ap]);
+
+  const handleSaveSuspension = async () => {
+    if (!data?.ap) return;
+    setSuspending(true);
+    try {
+      const payload = {
+        is_suspended: suspendForm.is_suspended,
+        suspension_reason: suspendForm.is_suspended ? suspendForm.suspension_reason : null,
+        suspension_end_date: suspendForm.is_suspended ? (suspendForm.suspension_end_date || null) : null,
+        suspended_by: suspendForm.is_suspended && !data.ap.is_suspended ? user?.id : (data.ap.is_suspended ? data.ap.suspended_by : null),
+        suspended_at: suspendForm.is_suspended && !data.ap.is_suspended ? new Date().toISOString() : (data.ap.is_suspended ? data.ap.suspended_at : null),
+        reinstated_by: !suspendForm.is_suspended && data.ap.is_suspended ? user?.id : (data.ap.is_suspended ? data.ap.reinstated_by : null),
+        reinstated_at: !suspendForm.is_suspended && data.ap.is_suspended ? new Date().toISOString() : (data.ap.is_suspended ? data.ap.reinstated_at : null),
+      };
+      const { error } = await supabase.from("boxer_profiles").update(payload).eq("id", athleteId);
+      if (error) throw error;
+      setShowSuspensionModal(false);
+    } catch (e: any) {
+      alert("Failed to update suspension: " + e.message);
+    } finally {
+      setSuspending(false);
+    }
+  };
 
   const handleLeaveAction = async (leaveId: string, action: "approved" | "rejected", leaveDate: string) => {
     setProcessingLeaveId(leaveId);
@@ -176,7 +341,7 @@ function FullAthleteDetailView({
         { data: payments },
         { data: attendance },
         { data: leaves },
-        // { data: discounts },
+        { data: fitnessRecords },
       ] = await Promise.all([
         ap.academy_id
           ? supabase.from("academies").select("id, name, city, state").eq("id", ap.academy_id).maybeSingle()
@@ -214,10 +379,10 @@ function FullAthleteDetailView({
           .eq("boxer_profile_id", athleteId)
           .order("created_at", { ascending: false }),
         supabase
-          .from("discount_applications")
-          .select("*, discount_schemes(name, discount_type, discount_value)")
+          .from("fitness_test_records")
+          .select("*, fitness_test_types(name, unit)")
           .eq("boxer_profile_id", athleteId)
-          .order("created_at", { ascending: false }),
+          .order("recorded_date", { ascending: false }),
       ]);
 
       const fullAp = {
@@ -234,7 +399,7 @@ function FullAthleteDetailView({
         payments: payments ?? [],
         attendance: attendance ?? [],
         leaves: leaves ?? [],
-        discounts: discounts ?? [],
+        fitnessRecords: fitnessRecords ?? [],
       });
     } catch (err) {
       console.error("Exception loading athlete detail page:", err);
@@ -274,12 +439,12 @@ function FullAthleteDetailView({
     return (
       <div className="space-y-6">
         <button onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-muted-foreground hover:text-foreground transition">
-          <ArrowLeft className="size-4" /> Back to Athletes
+          <ArrowLeft className="size-4" /> Back to Boxers
         </button>
         <div className="bg-surface border border-border rounded-2xl p-12 text-center">
           <AlertCircle className="size-10 text-muted-foreground mx-auto mb-3" />
-          <h3 className="text-lg font-semibold">Athlete Not Found</h3>
-          <p className="text-sm text-muted-foreground mt-1">The requested athlete record could not be loaded.</p>
+          <h3 className="text-lg font-semibold">Boxer Not Found</h3>
+          <p className="text-sm text-muted-foreground mt-1">The requested boxer record could not be loaded.</p>
         </div>
       </div>
     );
@@ -310,7 +475,7 @@ function FullAthleteDetailView({
     });
   };
 
-  const { ap, fa, invoices, payments, attendance, leaves, discounts } = data;
+  const { ap, fa, invoices, payments, attendance, leaves, fitnessRecords } = data;
   const initials = (ap.full_name ?? "?").split(" ").map((w: string) => w[0]).join("").substring(0, 2).toUpperCase();
   const presentCount  = attendance.filter((a: any) => a.status === "present").length;
   const absentCount   = attendance.filter((a: any) => a.status === "absent").length;
@@ -325,6 +490,7 @@ function FullAthleteDetailView({
 
   const TABS = [
     { id: "overview",   label: "Profile & Overview",   icon: User },
+    { id: "fitness",    label: "Fitness Records",       icon: Award },
     { id: "payments",   label: "Billing & Payments",   icon: IndianRupee },
     { id: "attendance", label: "Attendance Records",   icon: CalendarDays },
     { id: "leaves",     label: "Leave Applications",   icon: ClipboardList },
@@ -339,7 +505,7 @@ function FullAthleteDetailView({
           className="inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-surface border border-border text-sm font-semibold hover:bg-subtle transition shadow-sm"
         >
           <ArrowLeft className="size-4 text-primary" />
-          Back to Athletes List
+          Back to Boxers List
         </button>
 
         <div className="flex items-center gap-2">
@@ -349,6 +515,13 @@ function FullAthleteDetailView({
           >
             <MapPin className="size-3.5" />
             Reassign Academy
+          </button>
+          <button
+            onClick={() => setShowSuspensionModal(true)}
+            className={`inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition ${ap.is_suspended ? "bg-warning text-warning-foreground hover:bg-warning/90" : "bg-destructive/10 text-destructive hover:bg-destructive/20"}`}
+          >
+            <Ban className="size-3.5" />
+            {ap.is_suspended ? "Manage Suspension (Active)" : "Suspend Boxer"}
           </button>
           <button
             onClick={() => onOpenSendModal(ap)}
@@ -373,7 +546,7 @@ function FullAthleteDetailView({
                 <StatusPill status={payStatus} />
               </div>
               <p className="text-sm text-muted-foreground mt-1">
-                {ap.primary_discipline ?? "Boxing Athlete"} · {ap.training_year ?? "General Training"}
+                {ap.primary_discipline ?? "Boxer"} · {ap.training_year ?? "General Training"}
               </p>
               <div className="flex items-center gap-4 mt-2.5 text-xs text-muted-foreground flex-wrap">
                 {ap.academies?.name && (
@@ -540,25 +713,7 @@ function FullAthleteDetailView({
             <DetailRow label="Start Date" value={fa?.fee_start_date ? new Date(fa.fee_start_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : null} />
           </SectionCard>
 
-          {discounts.length > 0 && (
-            <SectionCard title="Applied Discounts & Coupons" icon={Receipt} className="md:col-span-2">
-              <div className="divide-y divide-border">
-                {discounts.map((d: any) => (
-                  <div key={d.id} className="flex items-center justify-between py-3">
-                    <div>
-                      <div className="text-sm font-semibold">{d.discount_schemes?.name ?? "Discount Offer"}</div>
-                      <div className="text-xs text-muted-foreground">Applied on {d.created_at ? new Date(d.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" }) : ""}</div>
-                    </div>
-                    <span className="text-sm font-bold text-success">
-                      {d.discount_schemes?.value_type === "percentage"
-                        ? `-${d.discount_schemes.value}% Discount`
-                        : `-₹${Number(d.discount_schemes?.value ?? 0).toLocaleString("en-IN")}`}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </SectionCard>
-          )}
+
 
           {ap.additional_notes && (
             <SectionCard title="Special Notes & Remarks" icon={BookOpen} className="md:col-span-2">
@@ -568,7 +723,17 @@ function FullAthleteDetailView({
         </div>
       )}
 
-      {/* TAB 2: BILLING & PAYMENTS */}
+      {/* TAB 2: FITNESS RECORDS */}
+      {activeTab === "fitness" && (
+        <FitnessRecordsTab
+          boxerProfileId={athleteId}
+          records={fitnessRecords}
+          onRefresh={loadDetails}
+          academyId={ap.academy_id}
+        />
+      )}
+
+      {/* TAB 3: BILLING & PAYMENTS */}
       {activeTab === "payments" && (
         <div className="space-y-6">
           {latestInvoice && (
@@ -838,6 +1003,78 @@ function FullAthleteDetailView({
             </div>
           )}
         </SectionCard>
+      )}
+
+      {/* Suspension Modal */}
+      {showSuspensionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-md p-6 animate-fade-up">
+            <div className="flex items-center justify-between mb-5">
+              <div className="flex items-center gap-3">
+                <div className="size-10 rounded-xl bg-destructive/10 grid place-items-center shrink-0">
+                  <Ban className="size-4 text-destructive" />
+                </div>
+                <div>
+                  <h3 className="font-semibold text-base">Medical Suspension</h3>
+                  <p className="text-xs text-muted-foreground mt-0.5">Manage training restriction for {ap.full_name}</p>
+                </div>
+              </div>
+              <button onClick={() => setShowSuspensionModal(false)} className="p-2 hover:bg-subtle rounded-lg text-muted-foreground">
+                <X className="size-4" />
+              </button>
+            </div>
+            
+            <div className="space-y-4 mb-6">
+              <label className="flex items-center gap-3 p-3 rounded-xl border cursor-pointer hover:bg-subtle/50 transition">
+                <input
+                  type="checkbox"
+                  checked={suspendForm.is_suspended}
+                  onChange={e => setSuspendForm(f => ({ ...f, is_suspended: e.target.checked }))}
+                  className="size-4 rounded border-border text-destructive focus:ring-destructive"
+                />
+                <span className="text-sm font-semibold text-destructive">Suspend Boxer</span>
+              </label>
+
+              {suspendForm.is_suspended && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5">Reason for Suspension *</label>
+                    <input 
+                      type="text" 
+                      value={suspendForm.suspension_reason} 
+                      onChange={e => setSuspendForm(f => ({ ...f, suspension_reason: e.target.value }))}
+                      className="input-premium" 
+                      placeholder="e.g. Broken thumb" 
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5 flex justify-between">
+                      <span>Suspension End Date</span>
+                      <span className="text-muted-foreground font-normal">(Optional / Indefinite)</span>
+                    </label>
+                    <input 
+                      type="date" 
+                      value={suspendForm.suspension_end_date} 
+                      onChange={e => setSuspendForm(f => ({ ...f, suspension_end_date: e.target.value }))}
+                      className="input-premium" 
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3">
+              <button onClick={() => setShowSuspensionModal(false)} className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition">Cancel</button>
+              <button 
+                onClick={handleSaveSuspension} 
+                disabled={suspending || (suspendForm.is_suspended && !suspendForm.suspension_reason.trim())} 
+                className="flex-1 px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {suspending ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />} Save
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );
@@ -1349,8 +1586,8 @@ function SuperAdminAthletesPage() {
   return (
     <div className="space-y-6">
       <PageHeader
-        title="Athletes Management"
-        subtitle={`${athletes.length} enrolled athletes · ${cashPending.length} cash pending · ${rolloverPending.length} rollover${rolloverPending.length !== 1 ? "s" : ""} pending`}
+        title="Boxers"
+        subtitle={`${athletes.length} enrolled boxers · ${cashPending.length} cash pending · ${rolloverPending.length} rollover${rolloverPending.length !== 1 ? "s" : ""} pending`}
       />
 
       {/* Cash pending banner */}

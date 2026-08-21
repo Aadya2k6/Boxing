@@ -205,7 +205,7 @@ function PlatformReportsPage() {
 
         <div className="bento-card p-5">
           <div className="flex items-center justify-between text-muted-foreground mb-2">
-            <span className="text-xs font-semibold">Platform Collections</span>
+            <span className="text-xs font-semibold">Total Revenue</span>
             <CreditCard className="size-4 text-blue-600" />
           </div>
           <div className="text-3xl font-display font-bold text-foreground">

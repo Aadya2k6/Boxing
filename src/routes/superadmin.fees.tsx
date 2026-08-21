@@ -206,11 +206,6 @@ function SAFees() {
                         ? `${p.custom_duration_days} Days`
                         : cycleLabels[p.billing_cycle] ?? p.billing_cycle}
                     </Badge>
-                    {p.late_penalty_enabled && (
-                      <Badge tone="warning">
-                        <Zap className="size-2.5" /> Penalty on
-                      </Badge>
-                    )}
                   </div>
                   <div className="text-xs text-muted-foreground mt-1">
                     {p.academy_name} • {p.count} athlete{p.count !== 1 ? "s" : ""} assigned
@@ -270,49 +265,8 @@ function SAFees() {
                       </span>
                     </div>
                   </div>
-                  <div>
-                    <div className="label-micro mb-3">Penalty & grace</div>
-                    {p.late_penalty_enabled ? (
-                      <>
-                        <p className="text-sm">
-                          {p.penalty_type === "percentage"
-                            ? `${p.penalty_value}% of due amount`
-                            : `₹${p.penalty_value} flat`}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          {p.grace_period_days}-day grace period
-                        </p>
-                      </>
-                    ) : (
-                      <p className="text-muted-foreground text-xs">No penalty configured</p>
-                    )}
-                  </div>
-                  <div>
-                    <div className="label-micro mb-3">Reminders</div>
-                    <p className="text-xs text-muted-foreground">
-                      {p.reminder_days_before} days before · Follow-up:{" "}
-                      {Array.isArray(p.reminder_days_after)
-                        ? p.reminder_days_after.join(", ")
-                        : "—"}{" "}
-                      days after
-                    </p>
-                    {p.discount_types?.length > 0 && (
-                      <div className="flex flex-wrap gap-1 mt-2">
-                        {p.discount_types.map((t: string) => (
-                          <span
-                            key={t}
-                            className="px-2 py-0.5 rounded-full bg-primary/10 text-primary-dark text-[10px] capitalize"
-                          >
-                            {t}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    {p.discount_approval_required && (
-                      <p className="text-[10px] text-warning mt-1.5">
-                        ⚠ Superadmin approval required for discounts
-                      </p>
-                    )}
+                  <div className="md:col-span-2 text-xs text-muted-foreground pt-3 border-t border-border mt-3">
+                    Reminders and late penalties have been deprecated in the new billing system.
                   </div>
                 </div>
               )}
@@ -396,6 +350,17 @@ function SAFees() {
                       />
                     </div>
                   )}
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5">Center (leave blank for all centers)</label>
+                    <select
+                      value={form.academy_id}
+                      onChange={(e) => setF("academy_id", e.target.value)}
+                      className="input-premium"
+                    >
+                      <option value="">All Centers</option>
+                      {academies.map((a: any) => <option key={a.id} value={a.id}>{a.name}</option>)}
+                    </select>
+                  </div>
                 </div>
               </fieldset>
 
@@ -442,103 +407,6 @@ function SAFees() {
                     </span>
                   </label>
                 )}
-              </fieldset>
-
-              {/* Section 3: Penalty */}
-              <fieldset>
-                <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-                  Late payment penalty
-                </legend>
-                <label className="flex items-center gap-2.5 cursor-pointer mb-4">
-                  <span
-                    className={`size-5 rounded-md border-2 grid place-items-center transition-all ${form.late_penalty_enabled ? "bg-primary border-primary" : "border-border-strong"}`}
-                  >
-                    {form.late_penalty_enabled && (
-                      <Check className="size-3 text-primary-foreground" strokeWidth={3} />
-                    )}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={form.late_penalty_enabled}
-                    onChange={(e) => setF("late_penalty_enabled", e.target.checked)}
-                    className="sr-only"
-                  />
-                  <span className="text-xs font-medium">Enable late payment penalty</span>
-                </label>
-                {form.late_penalty_enabled && (
-                  <div className="grid md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-xs font-semibold mb-1.5">Penalty type</label>
-                      <select
-                        value={form.penalty_type}
-                        onChange={(e) => setF("penalty_type", e.target.value)}
-                        className="input-premium appearance-none"
-                      >
-                        <option value="percentage">Percentage of due</option>
-                        <option value="flat">Flat fee (₹)</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold mb-1.5">
-                        {form.penalty_type === "percentage" ? "Penalty %" : "Penalty ₹"}
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.penalty_value}
-                        onChange={(e) => setF("penalty_value", e.target.value)}
-                        className="input-premium"
-                        placeholder={form.penalty_type === "percentage" ? "5" : "500"}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs font-semibold mb-1.5">
-                        Grace period (days)
-                      </label>
-                      <input
-                        type="number"
-                        min="0"
-                        value={form.grace_period_days}
-                        onChange={(e) => setF("grace_period_days", e.target.value)}
-                        className="input-premium"
-                        placeholder="7"
-                      />
-                    </div>
-                  </div>
-                )}
-              </fieldset>
-
-              {/* Section 4: Reminders */}
-              <fieldset>
-                <legend className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
-                  Reminder schedule
-                </legend>
-                <div className="grid md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs font-semibold mb-1.5">
-                      Days before due date
-                    </label>
-                    <input
-                      type="number"
-                      min="0"
-                      value={form.reminder_days_before}
-                      onChange={(e) => setF("reminder_days_before", e.target.value)}
-                      className="input-premium"
-                      placeholder="5"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold mb-1.5">
-                      Follow-up days after due (comma separated)
-                    </label>
-                    <input
-                      value={form.reminder_days_after}
-                      onChange={(e) => setF("reminder_days_after", e.target.value)}
-                      className="input-premium font-mono"
-                      placeholder="1,3,7"
-                    />
-                  </div>
-                </div>
               </fieldset>
 
               <div className="flex items-center gap-3 pt-2">

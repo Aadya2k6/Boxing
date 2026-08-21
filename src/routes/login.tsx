@@ -18,6 +18,7 @@ function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPw, setShowPw] = useState(false);
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -34,13 +35,17 @@ function LoginPage() {
 
       const { data: profile } = await supabase
         .from("profiles")
-        .select("role")
+        .select("role, granted_permissions")
         .eq("id", user.id)
         .maybeSingle();
 
       const role = profile?.role;
+      const perms: any[] = profile?.granted_permissions ?? [];
+      const isFederation = perms.some((p: any) => p?.type === "federation");
+
       let dest = "/athlete";
-      if (role === "boxos_admin") dest = "/boxos-admin";
+      if (role === "boxos_admin" && isFederation) dest = "/federation";
+      else if (role === "boxos_admin") dest = "/boxos-admin";
       else if (role === "superadmin") dest = "/superadmin";
       else if (role === "admin") dest = "/admin";
       else if (role === "coach") dest = "/coach";
@@ -115,9 +120,23 @@ function LoginPage() {
               </div>
             </div>
 
+            <div className="flex items-start gap-2.5 mt-2">
+              <input
+                type="checkbox"
+                id="terms"
+                checked={termsAccepted}
+                onChange={e => setTermsAccepted(e.target.checked)}
+                className="mt-0.5 size-4 rounded bg-cinematic-base/50 border-cinematic-secondary/40 text-cinematic-red focus:ring-cinematic-red/30 transition-colors"
+                required
+              />
+              <label htmlFor="terms" className="text-xs text-cinematic-secondary leading-relaxed">
+                I accept the <a href="#" className="text-cinematic-primary hover:text-cinematic-red transition-colors underline underline-offset-2">terms and conditions</a> and agree to the privacy policy.
+              </label>
+            </div>
+
             <button
               type="submit"
-              disabled={loading || !email || !password}
+              disabled={loading || !email || !password || !termsAccepted}
               className="w-full flex items-center justify-center gap-2 bg-cinematic-red text-white py-3.5 rounded-xl text-sm font-bold hover:bg-cinematic-red-hover disabled:opacity-50 disabled:cursor-not-allowed transition-all mt-4"
             >
               {loading ? (

@@ -62,12 +62,17 @@ function AcademyDetailPage() {
   const [lifecycleEvents, setLifecycleEvents] = useState<AcademyLifecycleEvent[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Live aggregated stats
   const [stats, setStats] = useState({
     totalBoxers: 0,
     suspendedBoxers: 0,
     totalStaff: 0,
     monthlyRevenue: 0,
+    totalRevenueAllTime: 0,
+    verifiedBoxers: 0,
+    pendingBoxers: 0,
+    rejectedBoxers: 0,
+    boutsTraining: 0,
+    boutsTournament: 0,
   });
 
   // Detailed Data
@@ -81,6 +86,7 @@ function AcademyDetailPage() {
   const [showSuspendModal, setShowSuspendModal] = useState(false);
   const [showArchiveModal, setShowArchiveModal] = useState(false);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showEditModal, setShowEditModal] = useState(false);
 
   const [suspendReason, setSuspendReason] = useState("");
   const [archiveConfirmName, setArchiveConfirmName] = useState("");
@@ -163,7 +169,30 @@ function AcademyDetailPage() {
             })
             .reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
 
-          setStats({ totalBoxers: finalBoxers.length, suspendedBoxers, totalStaff, monthlyRevenue });
+          // Verification counts
+          const verifiedBoxers = finalBoxers.filter((b: any) => b.verification_status === "verified").length;
+          const pendingBoxers = finalBoxers.filter((b: any) => b.verification_status === "pending").length;
+          const rejectedBoxers = finalBoxers.filter((b: any) => b.verification_status === "rejected").length;
+
+          // Bout counts (fetch quickly)
+          const { data: bouts } = await supabase.from("bouts").select("bout_kind").eq("academy_id", academyId);
+          const boutsTraining = (bouts || []).filter((b: any) => b.bout_kind === "training").length;
+          const boutsTournament = (bouts || []).filter((b: any) => b.bout_kind === "tournament").length;
+
+          const totalRevenueAllTime = payments.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
+
+          setStats({
+            totalBoxers: finalBoxers.length,
+            suspendedBoxers,
+            totalStaff,
+            monthlyRevenue,
+            totalRevenueAllTime,
+            verifiedBoxers,
+            pendingBoxers,
+            rejectedBoxers,
+            boutsTraining,
+            boutsTournament,
+          });
         } catch (err) {
           console.error("Direct fetch failed:", err);
         }
@@ -397,6 +426,12 @@ function AcademyDetailPage() {
             <div className="flex items-center gap-2">
               <h1 className="font-display font-bold text-xl sm:text-2xl text-foreground">{academy.name}</h1>
               {statusBadge(academy.status)}
+              <button
+                onClick={() => setShowEditModal(true)}
+                className="px-2 py-1 text-xs font-semibold border border-border bg-surface rounded hover:bg-elevated transition cursor-pointer"
+              >
+                Edit
+              </button>
             </div>
             <p className="text-xs text-muted-foreground mt-0.5">
               Academy ID: <span className="font-mono">{academy.id}</span>
@@ -442,6 +477,14 @@ function AcademyDetailPage() {
           </div>
 
           <div>
+            <div className="text-[10px] font-bold text-muted-foreground uppercase">Total Revenue</div>
+            <div className="text-sm font-display font-bold text-foreground mt-0.5">
+              ₹{stats.totalRevenueAllTime.toLocaleString("en-IN")}
+            </div>
+            <div className="text-xs text-muted-foreground">All time payments</div>
+          </div>
+
+          <div>
             <div className="text-[10px] font-bold text-muted-foreground uppercase">Onboarded Date</div>
             <div className="text-sm font-semibold text-foreground mt-0.5">
               {new Date(academy.created_at).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}
@@ -462,6 +505,13 @@ function AcademyDetailPage() {
             <Users className="size-4 text-emerald-600" />
           </div>
           <div className="text-2xl font-display font-bold text-foreground">{stats.totalBoxers}</div>
+          <div className="flex items-center gap-2 mt-2 text-[10px] font-semibold">
+            <span className="text-emerald-500">{stats.verifiedBoxers} V</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-amber-500">{stats.pendingBoxers} P</span>
+            <span className="text-muted-foreground">·</span>
+            <span className="text-destructive">{stats.rejectedBoxers} R</span>
+          </div>
         </button>
 
         <button
@@ -496,6 +546,18 @@ function AcademyDetailPage() {
           </div>
           <div className="text-2xl font-display font-bold text-destructive">{stats.suspendedBoxers}</div>
         </button>
+      </div>
+
+      {/* Activity Section */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="bento-card p-4 border-indigo-500/20 bg-indigo-500/5">
+          <div className="text-xs font-bold text-muted-foreground uppercase mb-1">Training Bouts Organized</div>
+          <div className="text-2xl font-display font-bold text-indigo-600">{stats.boutsTraining}</div>
+        </div>
+        <div className="bento-card p-4 border-amber-500/20 bg-amber-500/5">
+          <div className="text-xs font-bold text-muted-foreground uppercase mb-1">Tournament Bouts Organized</div>
+          <div className="text-2xl font-display font-bold text-amber-600">{stats.boutsTournament}</div>
+        </div>
       </div>
 
       {/* Detailed Tab Content */}
@@ -609,6 +671,14 @@ function AcademyDetailPage() {
             ))}
           </div>
         )}
+      </SectionCard>
+
+      {/* Platform Controls */}
+      <SectionCard title="Platform Controls" subtitle="Enable or disable key platform features for this academy">
+        <PlatformControls
+          academy={academy}
+          onUpdate={loadAcademyData}
+        />
       </SectionCard>
 
       {/* Lifecycle History Log */}
@@ -875,11 +945,247 @@ function AcademyDetailPage() {
           </div>
         </div>
       )}
+
+      {/* Edit Academy Details Modal */}
+      {showEditModal && (
+        <EditAcademyModal
+          academy={academy}
+          onClose={() => setShowEditModal(false)}
+          onSuccess={() => {
+            setShowEditModal(false);
+            loadAcademyData();
+          }}
+        />
+      )}
     </div>
   );
 }
 
-// ── Invite Superadmin Modal ──
+// ─── Edit Academy Modal ───────────────────────────────────────────────────────
+
+function EditAcademyModal({ academy, onClose, onSuccess }: { academy: Academy, onClose: () => void, onSuccess: () => void }) {
+  const [form, setForm] = useState({
+    name: academy.name,
+    address: academy.address || "",
+    attendance_radius_meters: academy.attendance_radius_meters || 200,
+  });
+  const [loading, setLoading] = useState(false);
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      const { error } = await supabase
+        .from("academies")
+        .update({
+          name: form.name.trim(),
+          address: form.address.trim(),
+          attendance_radius_meters: Number(form.attendance_radius_meters),
+        })
+        .eq("id", academy.id);
+      
+      if (error) throw error;
+      toast.success("Academy details updated");
+      onSuccess();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update academy");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="bg-surface rounded-2xl shadow-modal w-full max-w-md animate-fade-up overflow-hidden">
+        <div className="p-5 border-b border-border flex items-center justify-between">
+          <div className="font-display font-bold text-base flex items-center gap-2">
+            <Building2 className="size-5 text-primary" /> Edit Academy Details
+          </div>
+          <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer">
+            <X className="size-4" />
+          </button>
+        </div>
+        <form onSubmit={handleSubmit} className="p-5 space-y-4">
+          <label className="block">
+            <span className="block text-xs font-semibold mb-1.5">Academy Name</span>
+            <input
+              type="text"
+              required
+              value={form.name}
+              onChange={e => setForm(f => ({ ...f, name: e.target.value }))}
+              className="input-premium"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-semibold mb-1.5">Address</span>
+            <input
+              type="text"
+              value={form.address}
+              onChange={e => setForm(f => ({ ...f, address: e.target.value }))}
+              className="input-premium"
+            />
+          </label>
+          <label className="block">
+            <span className="block text-xs font-semibold mb-1.5">Geofence Attendance Radius (meters)</span>
+            <input
+              type="number"
+              min={10}
+              required
+              value={form.attendance_radius_meters}
+              onChange={e => setForm(f => ({ ...f, attendance_radius_meters: parseInt(e.target.value) }))}
+              className="input-premium"
+            />
+          </label>
+          <div className="pt-2 flex justify-end gap-2">
+            <button type="button" onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-xl hover:bg-elevated cursor-pointer">Cancel</button>
+            <button type="submit" disabled={loading} className="px-4 py-2 text-sm bg-fuchsia-600 text-white rounded-xl font-semibold disabled:opacity-50 hover:bg-fuchsia-700 transition cursor-pointer flex items-center gap-1.5">
+              {loading ? <Loader2 className="size-4 animate-spin" /> : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
+// ─── Platform Controls ────────────────────────────────────────────────────────
+
+function PlatformControls({ academy, onUpdate }: { academy: Academy, onUpdate: () => void }) {
+  const [feeDisabled, setFeeDisabled] = useState(academy.fee_assignments_disabled ?? false);
+  const [adsEnabled, setAdsEnabled] = useState(academy.ads_enabled ?? false);
+  const [adsDays, setAdsDays] = useState(30);
+  const [loading, setLoading] = useState(false);
+
+  // Initialize state on load
+  useEffect(() => {
+    setFeeDisabled(academy.fee_assignments_disabled ?? false);
+    setAdsEnabled(academy.ads_enabled ?? false);
+  }, [academy]);
+
+  async function handleFeeToggle() {
+    setLoading(true);
+    const newValue = !feeDisabled;
+    try {
+      const { error } = await supabase
+        .from("academies")
+        .update({ fee_assignments_disabled: newValue })
+        .eq("id", academy.id);
+      if (error) throw error;
+      setFeeDisabled(newValue);
+      toast.success(newValue ? "Fee assignments disabled" : "Fee assignments enabled");
+      onUpdate();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update fee setting");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleAdsUpdate(enable: boolean) {
+    setLoading(true);
+    try {
+      let adsWindowEndsAt = null;
+      if (enable && adsDays > 0) {
+        const d = new Date();
+        d.setDate(d.getDate() + adsDays);
+        adsWindowEndsAt = d.toISOString();
+      }
+
+      const { error } = await supabase
+        .from("academies")
+        .update({
+          ads_enabled: enable,
+          ads_window_ends_at: adsWindowEndsAt,
+        })
+        .eq("id", academy.id);
+      
+      if (error) throw error;
+      setAdsEnabled(enable);
+      toast.success(enable ? `Ads enabled for ${adsDays} days` : "Ads disabled");
+      onUpdate();
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update ads setting");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Fee Assignments Toggle */}
+      <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-subtle/30">
+        <div>
+          <div className="font-semibold text-sm">Disable Fee Assignments</div>
+          <div className="text-xs text-muted-foreground mt-0.5 max-w-md">
+            For govt or no-fee academies. Blocks new fee plan/invoice creation and skips athlete payment wall.
+          </div>
+        </div>
+        <button
+          onClick={handleFeeToggle}
+          disabled={loading}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+            feeDisabled ? "bg-fuchsia-600" : "bg-muted"
+          }`}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            feeDisabled ? "translate-x-6" : "translate-x-1"
+          }`} />
+        </button>
+      </div>
+
+      {/* Enable Ads Toggle */}
+      <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-subtle/30">
+        <div className="flex-1">
+          <div className="font-semibold text-sm">Enable Notices & Ads</div>
+          <div className="text-xs text-muted-foreground mt-0.5 max-w-md mb-3">
+            Allow this academy to display notices and advertisements to their users.
+          </div>
+          
+          {/* If disabling, just a simple toggle off. If enabling, need duration input. */}
+          {adsEnabled ? (
+            <div className="flex items-center gap-3">
+              <span className="text-xs font-semibold text-success flex items-center gap-1">
+                <CheckCircle className="size-3.5" /> Active
+              </span>
+              {academy.ads_window_ends_at && (
+                <span className="text-xs text-muted-foreground">
+                  (Ends: {new Date(academy.ads_window_ends_at).toLocaleDateString("en-IN")})
+                </span>
+              )}
+            </div>
+          ) : (
+            <div className="flex items-center gap-3">
+              <label className="text-xs font-semibold flex items-center gap-2">
+                Duration (Days):
+                <input
+                  type="number"
+                  min="1"
+                  value={adsDays}
+                  onChange={e => setAdsDays(parseInt(e.target.value) || 0)}
+                  className="input-premium w-20 py-1"
+                />
+              </label>
+            </div>
+          )}
+        </div>
+
+        <button
+          onClick={() => handleAdsUpdate(!adsEnabled)}
+          disabled={loading || (!adsEnabled && adsDays <= 0)}
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none cursor-pointer ${
+            adsEnabled ? "bg-fuchsia-600" : "bg-muted"
+          }`}
+        >
+          <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+            adsEnabled ? "translate-x-6" : "translate-x-1"
+          }`} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ─── Invite Superadmin Modal ──────────────────────────────────────────────────
 function InviteSuperadminModal({
   academyId,
   academyName,

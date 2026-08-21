@@ -111,6 +111,9 @@ export interface Academy {
   payu_merchant_key: string | null;
   encrypted_payu_salt: string | null;
   active_gateway: "razorpay" | "payu";
+  fee_assignments_disabled: boolean;
+  ads_enabled: boolean;
+  ads_window_ends_at: string | null;
   status: AcademyStatus;
   suspended_reason: string | null;
   suspended_at: string | null;
@@ -155,6 +158,7 @@ export interface Profile {
   is_active?: boolean | null;
   academy_code_verified?: boolean | null;
   academy_code_deadline?: string | null;
+  granted_permissions?: any[] | null;  // JSONB — can be [{type:"federation",scope:"state",value:"...",...}] or plain string[]
   onboarding_complete?: boolean | null;
   judge_scope_tournament_id?: string | null;
   access_expires_at?: string | null;

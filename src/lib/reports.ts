@@ -10,6 +10,7 @@ export async function loadReportData() {
     { data: academies },
     { data: discounts },
     { data: feePlans },
+    { data: bouts },
   ] = await Promise.all([
     supabase.from("invoices").select("*").order("created_at", { ascending: true }),
     supabase.from("payments").select("*").order("created_at", { ascending: true }),
@@ -19,6 +20,7 @@ export async function loadReportData() {
     supabase.from("academies").select("id, name, city"),
     supabase.from("discount_schemes").select("*"),
     supabase.from("fee_plans").select("*"),
+    supabase.from("bouts").select("*"),
   ]);
 
   const normalizedInvoices = (invoices ?? []).map((i: any) => ({
@@ -36,6 +38,7 @@ export async function loadReportData() {
     discounts: discounts ?? [],
     refunds: [],
     feePlans: feePlans ?? [],
+    bouts: bouts ?? [],
   };
 }
 

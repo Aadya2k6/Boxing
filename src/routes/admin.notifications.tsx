@@ -50,6 +50,7 @@ function AdminNotifs() {
       .from("notifications")
       .select("*")
       .eq("recipient_id", user.id)
+      .neq("type", "admin_permissions")
       .order("created_at", { ascending: false })
       .limit(50);
     setNotifs(data ?? []);

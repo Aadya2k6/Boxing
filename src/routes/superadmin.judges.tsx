@@ -90,7 +90,7 @@ function InviteModal({ onClose, academies, tournaments, onInvite }: { onClose: (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
       <div className="bg-surface rounded-2xl shadow-modal w-full max-w-md border border-border">
         <div className="flex items-center justify-between p-5 border-b border-border">
-          <div className="font-display font-bold">Invite External Judge</div>
+          <div className="font-display font-bold">Invite Judge</div>
           <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer"><X className="size-4" /></button>
         </div>
         <form onSubmit={handleSubmit} className="p-5 space-y-4">
@@ -190,7 +190,7 @@ function SuperadminJudges() {
   return (
     <div className="animate-fade-up space-y-6">
       <PageHeader
-        title="External Judges"
+        title="Judges"
         subtitle="Platform-wide judge invitation management"
         actions={
           <button onClick={() => setShowInvite(true)} className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition shadow-card cursor-pointer">

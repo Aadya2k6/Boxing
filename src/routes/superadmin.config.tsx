@@ -28,6 +28,7 @@ function ConfigPage() {
   // Academy codes state
   const [codes, setCodes] = useState<any[]>([]);
   const [newCodeInput, setNewCodeInput] = useState("");
+  const [newCodeExpiry, setNewCodeExpiry] = useState("");
   const [codeLoading, setCodeLoading] = useState(false);
   const [codeError, setCodeError] = useState<string | null>(null);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
@@ -120,12 +121,14 @@ function ConfigPage() {
         code: formatted,
         created_by: user?.id || null,
         academy_id: academyId || null,
+        expires_at: newCodeExpiry ? new Date(newCodeExpiry).toISOString() : null,
         is_active: true,
       });
 
       if (error) throw new Error(error.message);
 
       setNewCodeInput("");
+      setNewCodeExpiry("");
       loadData();
     } catch (err: any) {
       setCodeError(err.message || "Failed to create academy code.");
@@ -195,7 +198,6 @@ function ConfigPage() {
           </p>
         </div>
 
-        {/* Create Code Form */}
         <form onSubmit={handleCreateCode} className="flex flex-wrap items-center gap-3">
           <div className="relative flex-1 min-w-[200px]">
             <input
@@ -205,6 +207,16 @@ function ConfigPage() {
               onChange={(e) => setNewCodeInput(e.target.value.toUpperCase())}
               disabled={codeLoading}
               className="w-full bg-subtle border border-border rounded-lg px-3.5 py-2 text-sm font-mono tracking-wider uppercase text-foreground placeholder:text-muted-foreground placeholder:normal-case placeholder:tracking-normal focus:outline-none focus:border-brand-primary transition"
+            />
+          </div>
+          <div className="relative w-48">
+            <input
+              type="date"
+              value={newCodeExpiry}
+              onChange={(e) => setNewCodeExpiry(e.target.value)}
+              disabled={codeLoading}
+              title="Expiry Date (optional)"
+              className="w-full bg-subtle border border-border rounded-lg px-3.5 py-2 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-brand-primary transition"
             />
           </div>
           <button
@@ -248,6 +260,11 @@ function ConfigPage() {
                     <td className="px-4 py-3 font-mono font-bold text-sm text-foreground">
                       <div className="flex items-center gap-2">
                         <span>{c.code}</span>
+                        {c.expires_at && (
+                          <span className="text-[10px] font-sans font-normal text-muted-foreground bg-elevated px-1.5 py-0.5 rounded">
+                            Exp: {new Date(c.expires_at).toLocaleDateString()}
+                          </span>
+                        )}
                         <button
                           type="button"
                           onClick={() => handleCopy(c.code)}

@@ -35,3 +35,4 @@ edge_functions.sql
 *.sln
 *.sw?
 Reference
+supabase/

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Badge } from "@/components/dashboard/DashboardLayout";
-import { Plus, MoreHorizontal, Search, Loader2, Shield, Key, X, Check, Eye, EyeOff } from "lucide-react";
+import { Plus, MoreHorizontal, Search, Loader2, Shield, Key, X, Check, Eye, EyeOff, Settings } from "lucide-react";
 import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -8,6 +8,17 @@ import { useAuth } from "@/lib/auth";
 export const Route = createFileRoute("/superadmin/admins")({ component: AdminsPage });
 
 const roleColors: Record<string, any> = { superadmin: "gold", admin: "info", coach: "neutral", athlete: undefined };
+
+const ADMIN_FEATURES = [
+  { id: "athletes", label: "Athletes" },
+  { id: "fees", label: "Fee Management" },
+  { id: "invoices", label: "Invoices" },
+  { id: "attendance", label: "Attendance & Leaves" },
+  { id: "scheduling", label: "Scheduling" },
+  { id: "bouts", label: "Bout Management" },
+  { id: "coaches", label: "Coaches" },
+  { id: "judges", label: "Judges" },
+];
 
 function AdminsPage() {
   const { user: currentUser, profile } = useAuth();
@@ -22,6 +33,11 @@ function AdminsPage() {
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [actionUserId, setActionUserId] = useState<string | null>(null);
+  const [inviteFeatures, setInviteFeatures] = useState<string[]>(ADMIN_FEATURES.map(f => f.id));
+
+  const [editFeaturesUser, setEditFeaturesUser] = useState<any>(null);
+  const [editFeatures, setEditFeatures] = useState<string[]>([]);
+  const [savingFeatures, setSavingFeatures] = useState(false);
 
   useEffect(() => { loadUsers(); }, []);
 
@@ -59,16 +75,20 @@ function AdminsPage() {
       });
       if (authError) throw authError;
       if (authData.user) {
-        // Upsert profile with correct role
+        // Upsert profile with correct role and features
+        const payloadFeatures = inviteFeatures.length === 0 ? ["NONE"] : inviteFeatures;
         await supabase.from("profiles").upsert({
           id: authData.user.id,
           email: inviteEmail,
           full_name: inviteName,
           role: "admin",
+          granted_permissions: payloadFeatures,
+          academy_id: profile?.academy_id,
         });
       }
       setShowInviteModal(false);
       setInviteEmail(""); setInviteName(""); setInvitePass("");
+      setInviteFeatures(ADMIN_FEATURES.map(f => f.id));
       loadUsers();
     } catch (err: any) {
       setSaveError(err.message);
@@ -82,6 +102,35 @@ function AdminsPage() {
     await supabase.from("profiles").update({ is_active: !currentActive }).eq("id", userId);
     setActionUserId(null);
     loadUsers();
+  }
+
+  function openEditFeatures(u: any) {
+    setEditFeaturesUser(u);
+    if (!u.granted_permissions || u.granted_permissions.length === 0) {
+      setEditFeatures(ADMIN_FEATURES.map(f => f.id)); // Legacy fallback
+    } else if (u.granted_permissions.includes("NONE")) {
+      setEditFeatures([]);
+    } else {
+      setEditFeatures(u.granted_permissions);
+    }
+  }
+
+  async function handleSaveFeatures(e: React.FormEvent) {
+    e.preventDefault();
+    setSavingFeatures(true);
+    setSaveError(null);
+    try {
+      const payload = editFeatures.length === 0 ? ["NONE"] : editFeatures;
+      const { error } = await supabase.from("profiles").update({ granted_permissions: payload }).eq("id", editFeaturesUser.id);
+      if (error) throw error;
+      setEditFeaturesUser(null);
+      loadUsers();
+    } catch (err: any) {
+      console.error("Save error:", err);
+      setSaveError(err.message);
+    } finally {
+      setSavingFeatures(false);
+    }
   }
 
   function relativeTime(ts: string) {
@@ -161,10 +210,16 @@ function AdminsPage() {
                   </td>
                   <td className="px-5 py-3.5 text-right">
                     {u.id !== currentUser?.id && (
-                      <button onClick={() => toggleActive(u.id, u.is_active !== false)} disabled={actionUserId === u.id}
-                        className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-border hover:bg-subtle transition text-muted-foreground">
-                        {actionUserId === u.id ? <Loader2 className="size-3 animate-spin" /> : u.is_active !== false ? "Deactivate" : "Activate"}
-                      </button>
+                      <div className="flex items-center justify-end gap-2">
+                        <button onClick={() => openEditFeatures(u)} 
+                          className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-border hover:bg-subtle transition text-muted-foreground flex items-center gap-1">
+                          <Settings className="size-3" /> Features
+                        </button>
+                        <button onClick={() => toggleActive(u.id, u.is_active !== false)} disabled={actionUserId === u.id}
+                          className="text-[11px] font-medium px-2.5 py-1 rounded-md border border-border hover:bg-subtle transition text-muted-foreground">
+                          {actionUserId === u.id ? <Loader2 className="size-3 animate-spin" /> : u.is_active !== false ? "Deactivate" : "Activate"}
+                        </button>
+                      </div>
                     )}
                   </td>
                 </tr>
@@ -200,12 +255,73 @@ function AdminsPage() {
                   </button>
                 </div>
               </div>
+              
+              <div>
+                <label className="block text-xs font-semibold mb-2 mt-4">Granted Features</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ADMIN_FEATURES.map(f => (
+                    <label key={f.id} className="flex items-center justify-between p-2.5 border border-border rounded-lg bg-background hover:bg-subtle cursor-pointer transition">
+                      <span className="text-xs font-medium">{f.label}</span>
+                      <input type="checkbox" checked={inviteFeatures.includes(f.id)} 
+                        onChange={(e) => {
+                          if (e.target.checked) setInviteFeatures(prev => [...prev, f.id]);
+                          else setInviteFeatures(prev => prev.filter(x => x !== f.id));
+                        }}
+                        className="accent-[#ef4444] size-3.5"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+
               {saveError && <p className="text-xs text-destructive">{saveError}</p>}
               <div className="flex gap-3 pt-1">
                 <button type="button" onClick={() => setShowInviteModal(false)} className="flex-1 px-4 py-2.5 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition">Cancel</button>
                 <button type="submit" disabled={saving} className="flex-1 px-4 py-2.5 text-sm font-semibold bg-[#ef4444] text-white rounded-xl hover:bg-[#dc2626] disabled:opacity-50 transition flex items-center justify-center gap-2 shadow-card">
                   {saving ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
                   {saving ? "Creating..." : "Create account"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Features Modal */}
+      {editFeaturesUser && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-md animate-fade-up overflow-hidden">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <div>
+                <h3 className="font-display font-semibold">Manage Features</h3>
+                <p className="text-xs text-muted-foreground">{editFeaturesUser.full_name}</p>
+              </div>
+              <button onClick={() => setEditFeaturesUser(null)} className="size-8 grid place-items-center rounded-md hover:bg-subtle text-muted-foreground"><X className="size-4" /></button>
+            </div>
+            <form onSubmit={handleSaveFeatures} className="p-6 space-y-4">
+              <div>
+                <label className="block text-xs font-semibold mb-2">Granted Features</label>
+                <div className="grid grid-cols-2 gap-2">
+                  {ADMIN_FEATURES.map(f => (
+                    <label key={f.id} className="flex items-center justify-between p-2.5 border border-border rounded-lg bg-background hover:bg-subtle cursor-pointer transition">
+                      <span className="text-xs font-medium">{f.label}</span>
+                      <input type="checkbox" checked={editFeatures.includes(f.id)} 
+                        onChange={(e) => {
+                          if (e.target.checked) setEditFeatures(prev => [...prev, f.id]);
+                          else setEditFeatures(prev => prev.filter(x => x !== f.id));
+                        }}
+                        className="accent-[#ef4444] size-3.5"
+                      />
+                    </label>
+                  ))}
+                </div>
+              </div>
+              {saveError && <p className="text-xs text-destructive">{saveError}</p>}
+              <div className="flex gap-3 pt-4">
+                <button type="button" onClick={() => setEditFeaturesUser(null)} className="flex-1 px-4 py-2.5 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition">Cancel</button>
+                <button type="submit" disabled={savingFeatures} className="flex-1 px-4 py-2.5 text-sm font-semibold bg-[#ef4444] text-white rounded-xl hover:bg-[#dc2626] disabled:opacity-50 transition flex items-center justify-center gap-2 shadow-card">
+                  {savingFeatures ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
+                  {savingFeatures ? "Saving..." : "Save changes"}
                 </button>
               </div>
             </form>

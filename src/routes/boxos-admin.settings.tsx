@@ -13,6 +13,9 @@ import {
   Loader2,
   CheckCircle2,
   AlertCircle,
+  KeyRound,
+  Eye,
+  EyeOff,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -148,6 +151,106 @@ function PlatformSettingsPage() {
           </div>
         </form>
       )}
+
+      {/* Admin Account Settings */}
+      <div className="pt-6 border-t border-border">
+        <ChangePasswordSection />
+      </div>
+    </div>
+  );
+}
+
+function ChangePasswordSection() {
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  async function handlePasswordChange(e: React.FormEvent) {
+    e.preventDefault();
+    if (newPassword !== confirmPassword) {
+      toast.error("Passwords do not match");
+      return;
+    }
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters long");
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword
+      });
+
+      if (error) throw error;
+      toast.success("Password updated successfully");
+      setNewPassword("");
+      setConfirmPassword("");
+    } catch (err: any) {
+      toast.error(err.message || "Failed to update password");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="max-w-2xl">
+      <SectionCard
+        title="Admin Security"
+        subtitle="Change the password for your BOXOS Admin account"
+      >
+        <form onSubmit={handlePasswordChange} className="space-y-4">
+          <div className="grid sm:grid-cols-2 gap-4">
+            <label className="block relative">
+              <span className="block text-xs font-semibold mb-1.5 flex items-center gap-1.5">
+                <KeyRound className="size-3.5 text-fuchsia-600" />
+                New Password
+              </span>
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                placeholder="••••••••"
+                className="input-premium w-full pr-10"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute bottom-2.5 right-3 text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                {showPassword ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+              </button>
+            </label>
+
+            <label className="block">
+              <span className="block text-xs font-semibold mb-1.5 flex items-center gap-1.5 opacity-0 sm:opacity-100">
+                Confirm
+              </span>
+              <input
+                type={showPassword ? "text" : "password"}
+                required
+                value={confirmPassword}
+                onChange={e => setConfirmPassword(e.target.value)}
+                placeholder="Confirm new password"
+                className="input-premium w-full"
+              />
+            </label>
+          </div>
+
+          <div className="flex justify-end pt-2">
+            <button
+              type="submit"
+              disabled={loading || !newPassword || !confirmPassword}
+              className="inline-flex items-center gap-2 bg-surface border border-border text-foreground px-5 py-2 rounded-xl text-sm font-semibold hover:bg-elevated disabled:opacity-50 transition cursor-pointer"
+            >
+              {loading ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              Update Password
+            </button>
+          </div>
+        </form>
+      </SectionCard>
     </div>
   );
 }
