@@ -1,417 +1,785 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { PageHeader, StatCard, Badge } from "@/components/dashboard/DashboardLayout";
-import { FileDown, FileText, Loader2, TrendingUp, Users, RotateCcw, Percent } from "lucide-react";
+import { PageHeader, StatCard } from "@/components/dashboard/DashboardLayout";
+import { FileDown, FileText, Loader2, TrendingUp, Users, MapPin, CalendarCheck, Percent, Download, X, CheckCircle, CreditCard, ExternalLink, Swords } from "lucide-react";
 import { useState, useEffect } from "react";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, CartesianGrid, Legend
+  PieChart, Pie, Cell, CartesianGrid, LineChart, Line, Legend,
+  AreaChart, Area,
 } from "recharts";
+import {
+  loadReportData, buildMonthlyData, buildPaymentMethodData,
+  buildStatusData, buildAttendanceData, buildAcademyRevenue, csvExport,
+} from "@/lib/reports";
+import { generateReceipt } from "@/lib/pdf-receipt";
 
-export const Route = createFileRoute("/admin/reports")({ component: ReportsPage });
+export const Route = createFileRoute("/admin/reports")({ component: AdminReports });
 
-const REPORT_TYPES = [
-  { k: "revenue",    label: "Monthly Revenue Summary" },
-  { k: "dues",       label: "Outstanding Dues Report" },
-  { k: "athlete",    label: "Payment History Per Athlete" },
-  { k: "discounts",  label: "Discount & Concession Summary" },
-  { k: "refunds",    label: "Refund Log" },
-  { k: "rate",       label: "Collection Rate" },
-];
+const COLORS = ["#6366F1", "#2E8F5A", "#C47C1A", "#DC2626", "#0EA5E9", "#8B5CF6", "#EC4899"];
+const fmt = (v: number) => `₹ ${v.toLocaleString("en-IN")}`;
+const fmtK = (v: number) => `₹${v >= 100000 ? (v / 100000).toFixed(1) + "L" : (v / 1000).toFixed(0) + "k"}`;
 
-const COLORS = { collected: "#10B981", outstanding: "#F59E0B", invoiced: "#3B82F6", overdue: "#EF4444" };
+function generateAcademyPaymentReportPdf(data: {
+  academyName: string;
+  totalInvoiced: number;
+  totalCollected: number;
+  totalOutstanding: number;
+  payments: any[];
+  invoices: any[];
+  boxerMap: Record<string, string>;
+}) {
+  const html = `<!DOCTYPE html>
+<html><head>
+<title>Payment History — ${data.academyName}</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', system-ui, sans-serif; background: #f5f5f5; padding: 30px; color: #1a1a1a; }
+  .report { max-width: 820px; margin: 0 auto; background: white; border-radius: 12px; border: 1px solid #e5e5e5; overflow: hidden; padding: 32px; }
+  .header { display: flex; justify-between: space-between; align-items: center; border-bottom: 2px solid #1a1a1a; padding-bottom: 20px; margin-bottom: 24px; }
+  .header h1 { font-size: 22px; font-weight: 700; }
+  .header .sub { font-size: 13px; color: #666; margin-top: 4px; }
+  .badge { font-size: 12px; background: #EF4444; color: #fff; padding: 6px 14px; border-radius: 20px; font-weight: 700; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 28px; }
+  .stat-card { background: #f9f9f9; border: 1px solid #eee; border-radius: 8px; padding: 16px; text-align: center; }
+  .stat-card .label { font-size: 11px; text-transform: uppercase; color: #666; font-weight: 600; }
+  .stat-card .val { font-size: 18px; font-weight: 700; margin-top: 6px; }
+  .section-title { font-size: 15px; font-weight: 700; margin: 24px 0 12px 0; padding-bottom: 6px; border-bottom: 1px solid #e5e5e5; color: #1a1a1a; }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; margin-bottom: 24px; }
+  th { text-align: left; background: #f3f3f3; padding: 8px 12px; font-weight: 600; color: #555; text-transform: uppercase; font-size: 10px; border-bottom: 1px solid #ddd; }
+  td { padding: 10px 12px; border-bottom: 1px solid #eee; }
+  tr:last-child td { border: none; }
+  .text-right { text-align: right; }
+  .text-success { color: #2E8F5A; font-weight: 600; }
+  .text-warning { color: #C47C1A; font-weight: 600; }
+  .footer { font-size: 11px; color: #888; text-align: center; margin-top: 32px; padding-top: 16px; border-top: 1px solid #eee; }
+  @media print { body { background: white; padding: 0; } .report { border: none; padding: 0; max-width: 100%; } }
+</style>
+</head><body>
+<div class="report">
+  <div class="header">
+    <div>
+      <h1>Boxos Academy — Payment History Statement</h1>
+      <div class="sub">Academy Location: <strong>${data.academyName}</strong></div>
+    </div>
+    <div class="badge">${data.academyName}</div>
+  </div>
 
-function ReportsPage() {
-  const [active, setActive] = useState("revenue");
-  const [invoices, setInvoices] = useState<any[]>([]);
-  const [athletes, setAthletes] = useState<any[]>([]);
-  const [discountsApplied, setDiscountsApplied] = useState<any[]>([]);
-  const [refunds, setRefunds] = useState<any[]>([]);
-  const [selectedAthlete, setSelectedAthlete] = useState("");
+  <div class="stats">
+    <div class="stat-card">
+      <div class="label">Total Invoiced</div>
+      <div class="val">${fmt(data.totalInvoiced)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Total Collected</div>
+      <div class="val text-success">${fmt(data.totalCollected)}</div>
+    </div>
+    <div class="stat-card">
+      <div class="label">Outstanding Dues</div>
+      <div class="val text-warning">${fmt(data.totalOutstanding)}</div>
+    </div>
+  </div>
+
+  <div class="section-title">Payment Transactions History (${data.payments.length})</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Date</th>
+        <th>Invoice #</th>
+        <th>Boxer Name</th>
+        <th>Mode</th>
+        <th>Ref / Txn ID</th>
+        <th class="text-right">Amount</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${data.payments.length === 0 ? '<tr><td colSpan="6" style="text-align:center;padding:20px;color:#888;">No payments recorded for this academy yet.</td></tr>' : data.payments.map((p: any) => `
+        <tr>
+          <td>${p.payment_date ? new Date(p.payment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : new Date(p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}</td>
+          <td style="font-family:monospace">${p.invoices?.invoice_number ?? p.invoice_id ?? "—"}</td>
+          <td>${data.boxerMap[p.boxer_profile_id] ?? p.invoices?.boxer_profiles?.full_name ?? "Boxer"}</td>
+          <td style="text-transform:capitalize">${p.payment_mode ?? "online"}</td>
+          <td style="font-family:monospace;font-size:11px">${p.transaction_reference || p.razorpay_payment_id || "—"}</td>
+          <td class="text-right text-success">${fmt(Number(p.amount ?? 0))}</td>
+        </tr>
+      `).join("")}
+    </tbody>
+  </table>
+
+  <div class="section-title">Invoice Records Breakdown (${data.invoices.length})</div>
+  <table>
+    <thead>
+      <tr>
+        <th>Invoice #</th>
+        <th>Boxer</th>
+        <th>Period</th>
+        <th>Due Date</th>
+        <th>Status</th>
+        <th class="text-right">Amount Due</th>
+        <th class="text-right">Collected</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${data.invoices.length === 0 ? '<tr><td colSpan="7" style="text-align:center;padding:20px;color:#888;">No invoices found.</td></tr>' : data.invoices.map((inv: any) => `
+        <tr>
+          <td style="font-family:monospace">${inv.invoice_number}</td>
+          <td>${data.boxerMap[inv.boxer_profile_id] ?? "Boxer"}</td>
+          <td>${inv.billing_period ?? "Standard"}</td>
+          <td>${inv.due_date ? new Date(inv.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}</td>
+          <td style="text-transform:capitalize;font-weight:600">${inv.status}</td>
+          <td class="text-right">${fmt(Number(inv.amount_due ?? 0))}</td>
+          <td class="text-right text-success">${fmt(Number(inv.amount_paid ?? 0))}</td>
+        </tr>
+      `).join("")}
+    </tbody>
+  </table>
+
+  <div class="footer">
+    Official Boxos Platform Statement — ${data.academyName}<br/>
+    Generated on ${new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })} at ${new Date().toLocaleTimeString("en-IN")}
+  </div>
+</div>
+<script>window.onload = function() { window.print(); }</script>
+</body></html>`;
+
+  const w = window.open("", "_blank");
+  if (w) { w.document.write(html); w.document.close(); }
+}
+
+function AdminReports() {
+  const { profile } = useAuth();
+  const [data, setData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [tab, setTab] = useState<"revenue" | "dues" | "discounts" | "bouts">("revenue");
+  const [selectedAcademy, setSelectedAcademy] = useState<any | null>(null);
+  const [modalTab, setModalTab] = useState<"history" | "invoices">("history");
 
-  useEffect(() => {
-    loadData();
+  useEffect(() => { loadReportData(profile?.academy_id ?? undefined).then(d => { setData(d); setLoading(false); }); }, [profile?.academy_id]);
+
+  if (loading || !data) return <div className="py-20 flex justify-center"><Loader2 className="size-8 animate-spin text-muted-foreground" /></div>;
+
+  const { invoices, payments, boxers, attendance, leaves, academies, discounts, refunds, bouts } = data;
+
+  // ── Metrics ──
+  const totalInvoiced = invoices.reduce((a: number, i: any) => a + Number(i.amount_due ?? 0), 0);
+  const totalCollected = invoices.reduce((a: number, i: any) => a + Number(i.amount_paid ?? 0), 0);
+  const totalOutstanding = invoices.filter((i: any) => i.status !== "paid").reduce((a: number, i: any) => a + Number(i.balance_outstanding ?? 0), 0);
+  const collectionRate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
+  const overdueCount = invoices.filter((i: any) => i.status === "overdue").length;
+  
+  const paymentPerBoxer = boxers.length > 0 ? totalCollected / boxers.length : 0;
+  const activeDiscounts = discounts.filter((d: any) => d.is_active).length;
+  const completedBouts = bouts?.filter((b: any) => b.status === "completed")?.length || 0;
+
+  // ── Chart data ──
+  const monthlyData = buildMonthlyData(invoices);
+  const payMethodData = buildPaymentMethodData(payments);
+  const statusData = buildStatusData(invoices);
+  const attendanceData = buildAttendanceData(attendance, leaves);
+  const academyRev = buildAcademyRevenue(invoices, boxers, academies);
+
+  // ── Outstanding dues ──
+  const overdueInvoices = invoices.filter((i: any) => i.status !== "paid").map((i: any) => {
+    const days = Math.max(0, Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86400000));
+    const boxer = boxers.find((a: any) => a.id === i.boxer_profile_id);
+    return { ...i, daysOverdue: days, boxerName: boxer?.full_name ?? "Unknown" };
+  }).sort((a: any, b: any) => b.daysOverdue - a.daysOverdue);
+
+  // ── Revenue trend (line) ──
+  const cumData = monthlyData.reduce((acc: any[], row) => {
+    const prev = acc.length > 0 ? acc[acc.length - 1] : { CumCollected: 0, CumInvoiced: 0 };
+    acc.push({ month: row.month, CumCollected: prev.CumCollected + row.Collected, CumInvoiced: prev.CumInvoiced + row.Invoiced });
+    return acc;
   }, []);
 
-  async function loadData() {
-    setLoading(true);
-    try {
-      const [
-        { data: invData },
-        { data: apData },
-        { data: discData },
-      ] = await Promise.all([
-        supabase.from("invoices").select("*, boxer_profiles(full_name, stance)").order("created_at", { ascending: true }),
-        supabase.from("boxer_profiles").select("id, full_name, stance").eq("onboarding_complete", true),
-        supabase.from("discount_applications").select("*, discount_schemes(name, discount_type, discount_value), boxer_profiles(full_name)").order("created_at", { ascending: false }),
-      ]);
-      const normalizedInvoices = (invData ?? []).map((i: any) => ({
-        ...i,
-        balance_outstanding: Math.max(0, Number(i.amount_due ?? 0) - Number(i.amount_paid ?? 0)),
-      }));
-      setInvoices(normalizedInvoices);
-      setAthletes(apData ?? []);
-      setDiscountsApplied(discData ?? []);
-      setRefunds([]);
-      if (apData?.[0]) setSelectedAthlete(apData[0].id);
-    } finally {
-      setLoading(false);
-    }
+  function handleCSV() {
+    const h = "Invoice,Date,Status,Invoiced,Collected,Outstanding,Boxer";
+    const rows = overdueInvoices.map((i: any) => `${i.invoice_number},${i.due_date},${i.status},${i.amount_due},${i.amount_paid},${i.balance_outstanding},${i.boxerName}`);
+    csvExport(`Boxos_Report_${new Date().toISOString().split("T")[0]}.csv`, h, rows);
   }
 
-  // ── Computed metrics ──────────────────────────────────────────────────
-  const totalInvoiced   = invoices.reduce((s, i) => s + Number(i.amount_due), 0);
-  const totalCollected  = invoices.reduce((s, i) => s + Number(i.amount_paid ?? 0), 0);
-  const totalOutstanding = invoices.filter(i => i.status !== "paid").reduce((s, i) => s + Number(i.balance_outstanding ?? 0), 0);
-  const collectionRate  = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 0;
-  const overdueCount    = invoices.filter(i => i.status === "overdue").length;
-
-  // Monthly grouping
-  const monthMap: Record<string, any> = {};
-  invoices.forEach(i => {
-    const d = new Date(i.created_at);
-    const key = `${d.toLocaleString("en-IN", { month: "short" })} ${d.getFullYear()}`;
-    if (!monthMap[key]) monthMap[key] = { month: key, Invoiced: 0, Collected: 0, Outstanding: 0 };
-    monthMap[key].Invoiced    += Number(i.amount_due);
-    monthMap[key].Collected   += Number(i.amount_paid ?? 0);
-    monthMap[key].Outstanding += Number(i.balance_outstanding ?? 0);
-  });
-  const monthlyData = Object.values(monthMap);
-
-  const pieData = [
-    { name: "Collected",    value: totalCollected,  color: COLORS.collected },
-    { name: "Outstanding",  value: totalOutstanding, color: COLORS.outstanding },
-  ].filter(d => d.value > 0);
-
-  // Athlete payment history
-  const athleteInvoices = invoices.filter(i => i.boxer_profile_id === selectedAthlete);
-
-  // CSV export generators
-  function downloadCSV(rows: string[][], filename: string) {
-    const csv = rows.map(r => r.join(",")).join("\n");
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url  = URL.createObjectURL(blob);
-    const a    = document.createElement("a");
-    a.href = url; a.download = filename; a.click();
-    URL.revokeObjectURL(url);
-  }
-
-  function exportCurrentCSV() {
-    if (active === "revenue") {
-      downloadCSV(
-        [["Month", "Invoiced", "Collected", "Outstanding", "Rate%"],
-         ...monthlyData.map(m => [m.month, m.Invoiced, m.Collected, m.Outstanding, m.Invoiced > 0 ? Math.round(m.Collected / m.Invoiced * 100) : 0])],
-        `Boxos_Revenue_${new Date().toISOString().split("T")[0]}.csv`
-      );
-    } else if (active === "dues") {
-      const dues = invoices.filter(i => i.status !== "paid");
-      downloadCSV(
-        [["Athlete", "Invoice", "Amount Due", "Outstanding", "Status", "Due Date", "Days Overdue"],
-         ...dues.map(i => {
-           const days = i.status === "overdue" && i.due_date ? Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86400000) : 0;
-           return [i.boxer_profiles?.full_name, i.invoice_number, i.amount_due, i.balance_outstanding, i.status, i.due_date, days];
-         })],
-        `Boxos_Dues_${new Date().toISOString().split("T")[0]}.csv`
-      );
-    } else if (active === "refunds") {
-      downloadCSV(
-        [["Athlete", "Amount", "Reason", "Status", "Requested By", "Reviewed At"],
-         ...refunds.map(r => [r.boxer_profiles?.full_name, r.amount, r.reason, r.status, r.profiles?.full_name, r.reviewed_at ?? ""])],
-        `Boxos_Refunds_${new Date().toISOString().split("T")[0]}.csv`
-      );
-    }
-  }
+  const tabs = [
+    { key: "revenue", label: "Revenue" },
+    { key: "dues", label: "Outstanding Dues" },
+    { key: "discounts", label: "Discounts & Refunds" },
+    { key: "bouts", label: "Bout Results" },
+  ] as const;
 
   return (
     <>
-      <style>{`
-        @media print {
-          body * { visibility: hidden; }
-          .printable-report, .printable-report * { visibility: visible; }
-          .printable-report { position: absolute; left: 0; top: 0; width: 100%; padding: 24px; }
-          .no-print { display: none !important; }
-        }
-      `}</style>
+      <style>{`@media print { body * { visibility: hidden; } .print-area, .print-area * { visibility: visible; } .print-area { position: absolute; left: 0; top: 0; width: 100%; padding: 20px; } .no-print { display: none !important; }}`}</style>
 
-      <PageHeader
-        title="Reports"
-        subtitle="Section 8 — Financial intelligence with real-time data"
-        actions={
-          <div className="flex gap-2 no-print">
-            <button onClick={exportCurrentCSV} className="inline-flex items-center gap-2 border border-border px-3 py-2 rounded-lg text-sm hover:bg-subtle transition">
-              <FileDown className="size-3.5" /> CSV
-            </button>
-            <button onClick={() => window.print()} className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-3 py-2 rounded-lg text-sm hover:bg-primary-light transition">
-              <FileText className="size-3.5" /> PDF
-            </button>
-          </div>
-        }
-      />
-
-      {loading ? (
-        <div className="py-20 flex justify-center"><Loader2 className="size-8 animate-spin text-muted-foreground" /></div>
-      ) : (
-        <div className="grid lg:grid-cols-12 gap-6 printable-report">
-          {/* Sidebar */}
-          <aside className="lg:col-span-3 no-print">
-            <div className="bg-surface border border-border rounded-xl p-2 space-y-0.5 sticky top-24">
-              <div className="label-micro px-3 py-2">Report type</div>
-              {REPORT_TYPES.map(r => (
-                <button key={r.k} onClick={() => setActive(r.k)}
-                  className={`w-full text-left px-3 py-2.5 rounded-lg text-sm transition ${active === r.k ? "bg-[#ef4444] text-white font-semibold" : "text-muted-foreground hover:bg-subtle hover:text-foreground"}`}>
-                  {r.label}
-                </button>
-              ))}
-            </div>
-          </aside>
-
-          {/* Main */}
-          <main className="lg:col-span-9 space-y-6">
-            {/* Print header */}
-            <div className="hidden print:block mb-4">
-              <h1 className="text-2xl font-display font-bold">Boxos Academy — {REPORT_TYPES.find(r => r.k === active)?.label}</h1>
-              <p className="text-sm text-muted-foreground">Generated on {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
-            </div>
-
-            {/* ── 1. MONTHLY REVENUE ── */}
-            {active === "revenue" && (
-              <>
-                <div className="grid sm:grid-cols-3 gap-4">
-                  <StatCard label="Total collected (YTD)" value={`₹ ${(totalCollected / 100000).toFixed(2)}L`} delta={`₹ ${totalCollected.toLocaleString("en-IN")}`} />
-                  <StatCard label="Total outstanding" value={`₹ ${(totalOutstanding / 100000).toFixed(2)}L`} deltaTone="warning" delta={`${overdueCount} overdue`} />
-                  <StatCard label="Collection rate" value={`${collectionRate}%`} delta="Invoiced vs paid" />
-                </div>
-                <div className="bento-card p-6">
-                  <h2 className="font-display font-semibold mb-1">Monthly Revenue</h2>
-                  <p className="text-xs text-muted-foreground mb-6">Invoiced vs collected per month</p>
-                  <div className="grid md:grid-cols-3 gap-6">
-                    <div className="md:col-span-2 h-64">
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={monthlyData}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
-                          <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} dy={8} />
-                          <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} dx={-8} tickFormatter={v => `₹${Math.round(v / 1000)}k`} />
-                          <Tooltip contentStyle={{ backgroundColor: "#0B0F17", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.1)", color: "#F8FAFC", fontSize: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }} itemStyle={{ color: "#F8FAFC" }} labelStyle={{ color: "#94A3B8" }} formatter={(v: number) => `₹ ${v.toLocaleString("en-IN")}`} />
-                          <Bar dataKey="Invoiced" fill={COLORS.invoiced} radius={[4, 4, 0, 0]} />
-                          <Bar dataKey="Collected" fill={COLORS.collected} radius={[4, 4, 0, 0]} />
-                          <Legend />
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </div>
-                    <div className="h-64 flex flex-col items-center justify-center">
-                      <div className="h-48 w-full">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <PieChart>
-                            <Pie data={pieData} cx="50%" cy="50%" innerRadius={50} outerRadius={70} paddingAngle={3} dataKey="value">
-                              {pieData.map((e, i) => <Cell key={i} fill={e.color} />)}
-                            </Pie>
-                            <Tooltip contentStyle={{ backgroundColor: "#0B0F17", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.1)", color: "#F8FAFC", fontSize: 12 }} itemStyle={{ color: "#F8FAFC" }} labelStyle={{ color: "#94A3B8" }} formatter={(v: number) => `₹ ${v.toLocaleString("en-IN")}`} />
-                          </PieChart>
-                        </ResponsiveContainer>
-                      </div>
-                      <div className="flex items-center gap-4 text-xs">
-                        <div className="flex items-center gap-1.5"><div className="size-2 rounded-full bg-success" /> Collected</div>
-                        <div className="flex items-center gap-1.5"><div className="size-2 rounded-full bg-warning" /> Outstanding</div>
-                      </div>
-                    </div>
-                  </div>
-                  <table className="w-full text-sm mt-6">
-                    <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                      <th className="text-left font-medium py-2">Month</th>
-                      <th className="text-right font-medium py-2">Invoiced</th>
-                      <th className="text-right font-medium py-2">Collected</th>
-                      <th className="text-right font-medium py-2">Outstanding</th>
-                      <th className="text-right font-medium py-2">Rate</th>
-                    </tr></thead>
-                    <tbody>
-                      {monthlyData.length === 0
-                        ? <tr><td colSpan={5} className="py-6 text-center text-muted-foreground text-sm">No financial data yet.</td></tr>
-                        : monthlyData.map(m => (
-                          <tr key={m.month} className="border-b border-border">
-                            <td className="py-3 font-medium">{m.month}</td>
-                            <td className="py-3 text-right tabular">₹ {m.Invoiced.toLocaleString("en-IN")}</td>
-                            <td className="py-3 text-right tabular text-success">₹ {m.Collected.toLocaleString("en-IN")}</td>
-                            <td className="py-3 text-right tabular text-warning">₹ {m.Outstanding.toLocaleString("en-IN")}</td>
-                            <td className="py-3 text-right font-semibold">{m.Invoiced > 0 ? Math.round(m.Collected / m.Invoiced * 100) : 0}%</td>
-                          </tr>
-                        ))
-                      }
-                    </tbody>
-                  </table>
-                </div>
-              </>
-            )}
-
-            {/* ── 2. OUTSTANDING DUES ── */}
-            {active === "dues" && (
-              <div className="bento-card p-6">
-                <h2 className="font-display font-semibold mb-1">Outstanding Dues Report</h2>
-                <p className="text-xs text-muted-foreground mb-5">All unpaid and partially paid invoices with overdue flags</p>
-                <table className="w-full text-sm">
-                  <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                    <th className="text-left font-medium py-2">Athlete</th>
-                    <th className="text-left font-medium py-2">Invoice</th>
-                    <th className="text-right font-medium py-2">Due</th>
-                    <th className="text-right font-medium py-2">Outstanding</th>
-                    <th className="text-left font-medium py-2 pl-4">Status</th>
-                    <th className="text-right font-medium py-2">Days overdue</th>
-                  </tr></thead>
-                  <tbody>
-                    {invoices.filter(i => i.status !== "paid").length === 0
-                      ? <tr><td colSpan={6} className="py-6 text-center text-muted-foreground">No outstanding dues 🎉</td></tr>
-                      : invoices.filter(i => i.status !== "paid").map(i => {
-                        const days = i.status === "overdue" && i.due_date ? Math.floor((Date.now() - new Date(i.due_date).getTime()) / 86400000) : 0;
-                        return (
-                          <tr key={i.id} className="border-b border-border">
-                            <td className="py-3 font-medium">{i.boxer_profiles?.full_name ?? "—"}</td>
-                            <td className="py-3 font-mono text-xs">{i.invoice_number}</td>
-                            <td className="py-3 text-right tabular">₹ {Number(i.amount_due).toLocaleString("en-IN")}</td>
-                            <td className="py-3 text-right tabular font-semibold">₹ {Number(i.balance_outstanding ?? 0).toLocaleString("en-IN")}</td>
-                            <td className="py-3 pl-4"><Badge tone={i.status === "overdue" ? "danger" : "warning"}>{i.status.replace("_", " ")}</Badge></td>
-                            <td className="py-3 text-right tabular">{days > 0 ? <span className="text-destructive font-semibold">{days}d</span> : "—"}</td>
-                          </tr>
-                        );
-                      })
-                    }
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* ── 3. PAYMENT HISTORY PER ATHLETE ── */}
-            {active === "athlete" && (
-              <div className="bento-card p-6">
-                <div className="flex items-center gap-4 mb-5">
-                  <h2 className="font-display font-semibold flex-1">Payment history per athlete</h2>
-                  <select value={selectedAthlete} onChange={e => setSelectedAthlete(e.target.value)} className="text-sm h-9 px-3 border border-border rounded-lg bg-elevated">
-                    {athletes.map(a => <option key={a.id} value={a.id}>{a.full_name}</option>)}
-                  </select>
-                </div>
-                {athleteInvoices.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground py-6">No invoices for this athlete.</p>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                      <th className="text-left font-medium py-2">Invoice</th>
-                      <th className="text-left font-medium py-2">Period</th>
-                      <th className="text-right font-medium py-2">Amount</th>
-                      <th className="text-right font-medium py-2">Paid</th>
-                      <th className="text-left font-medium py-2 pl-4">Status</th>
-                    </tr></thead>
-                    <tbody>
-                      {athleteInvoices.map(i => (
-                        <tr key={i.id} className="border-b border-border">
-                          <td className="py-3 font-mono text-xs">{i.invoice_number}</td>
-                          <td className="py-3 text-muted-foreground text-xs">{i.billing_period ?? "—"}</td>
-                          <td className="py-3 text-right tabular">₹ {Number(i.amount_due).toLocaleString("en-IN")}</td>
-                          <td className="py-3 text-right tabular text-success">₹ {Number(i.amount_paid ?? 0).toLocaleString("en-IN")}</td>
-                          <td className="py-3 pl-4">
-                            <Badge tone={i.status === "paid" ? "success" : i.status === "overdue" ? "danger" : "warning"}>
-                              {i.status.replace("_", " ")}
-                            </Badge>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {/* ── 4. DISCOUNTS ── */}
-            {active === "discounts" && (
-              <div className="bento-card p-6">
-                <h2 className="font-display font-semibold mb-1">Discount & Concession Summary</h2>
-                <p className="text-xs text-muted-foreground mb-5">All discounts applied by admins with reasons</p>
-                {discountsApplied.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground py-6">No discounts applied yet.</p>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                      <th className="text-left font-medium py-2">Athlete</th>
-                      <th className="text-left font-medium py-2">Discount</th>
-                      <th className="text-right font-medium py-2">Value</th>
-                      <th className="text-left font-medium py-2 pl-4">Reason</th>
-                      <th className="text-left font-medium py-2">Status</th>
-                    </tr></thead>
-                    <tbody>
-                      {discountsApplied.map(d => (
-                        <tr key={d.id} className="border-b border-border">
-                          <td className="py-3 font-medium">{d.boxer_profiles?.full_name}</td>
-                          <td className="py-3 text-xs text-muted-foreground">{d.discount_schemes?.name}</td>
-                          <td className="py-3 text-right font-semibold text-primary-dark">
-                            {d.discount_schemes?.value_type === "percentage" ? `${d.discount_schemes.value}%` : `₹ ${Number(d.discount_schemes?.value).toLocaleString("en-IN")}`}
-                          </td>
-                          <td className="py-3 pl-4 text-xs text-muted-foreground max-w-xs">{d.reason}</td>
-                          <td className="py-3"><Badge tone={d.approval_status === "approved" ? "success" : d.approval_status === "pending" ? "warning" : undefined}>{d.approval_status ?? "applied"}</Badge></td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {/* ── 5. REFUNDS ── */}
-            {active === "refunds" && (
-              <div className="bento-card p-6">
-                <h2 className="font-display font-semibold mb-1">Refund Log</h2>
-                <p className="text-xs text-muted-foreground mb-5">Complete audit trail of all refund requests and approvals</p>
-                {refunds.length === 0 ? (
-                  <p className="text-center text-sm text-muted-foreground py-6">No refunds recorded.</p>
-                ) : (
-                  <table className="w-full text-sm">
-                    <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
-                      <th className="text-left font-medium py-2">Athlete</th>
-                      <th className="text-right font-medium py-2">Amount</th>
-                      <th className="text-left font-medium py-2 pl-4">Reason</th>
-                      <th className="text-left font-medium py-2">Status</th>
-                      <th className="text-left font-medium py-2">Requested by</th>
-                    </tr></thead>
-                    <tbody>
-                      {refunds.map(r => (
-                        <tr key={r.id} className="border-b border-border">
-                          <td className="py-3 font-medium">{r.boxer_profiles?.full_name}</td>
-                          <td className="py-3 text-right tabular font-semibold">₹ {Number(r.amount).toLocaleString("en-IN")}</td>
-                          <td className="py-3 pl-4 text-xs text-muted-foreground max-w-xs">{r.reason}</td>
-                          <td className="py-3"><Badge tone={r.status === "approved" ? "success" : r.status === "rejected" ? "danger" : "warning"}>{r.status}</Badge></td>
-                          <td className="py-3 text-xs text-muted-foreground">{r.profiles?.full_name ?? "Admin"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                )}
-              </div>
-            )}
-
-            {/* ── 6. COLLECTION RATE ── */}
-            {active === "rate" && (
-              <>
-                <div className="grid sm:grid-cols-2 gap-4">
-                  <StatCard label="Overall collection rate" value={`${collectionRate}%`} delta="Invoiced vs paid" icon={Percent} />
-                  <StatCard label="Total athletes" value={String(athletes.length)} delta="Enrolled" icon={Users} />
-                </div>
-                <div className="bento-card p-6">
-                  <h2 className="font-display font-semibold mb-1">Collection Rate by Month</h2>
-                  <p className="text-xs text-muted-foreground mb-6">Percentage of invoiced amount collected per billing period</p>
-                  <div className="h-64">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={monthlyData.map(m => ({ ...m, Rate: m.Invoiced > 0 ? Math.round(m.Collected / m.Invoiced * 100) : 0 }))}>
-                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
-                        <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} dy={8} />
-                        <YAxis domain={[0, 100]} axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} tickFormatter={v => `${v}%`} />
-                        <Tooltip contentStyle={{ backgroundColor: "#0B0F17", borderRadius: "12px", border: "1px solid rgba(255, 255, 255, 0.1)", color: "#F8FAFC", fontSize: 12, boxShadow: "0 8px 32px rgba(0,0,0,0.5)" }} itemStyle={{ color: "#F8FAFC" }} labelStyle={{ color: "#94A3B8" }} formatter={(v: number) => `${v}%`} />
-                        <Bar dataKey="Rate" fill={COLORS.collected} radius={[4, 4, 0, 0]} />
-                      </BarChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              </>
-            )}
-          </main>
+      <PageHeader title="Platform Reports" subtitle="Cross-academy analytics & financial intelligence" actions={
+        <div className="flex gap-2 no-print">
+          <button onClick={handleCSV} className="inline-flex items-center gap-2 border border-border px-3 py-2 rounded-lg text-xs hover:bg-subtle transition"><FileDown className="size-3.5" /> CSV</button>
+          <button onClick={() => window.print()} className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-3 py-2 rounded-lg text-xs font-semibold hover:bg-[#dc2626] transition"><FileText className="size-3.5" /> Print PDF</button>
         </div>
-      )}
+      } />
+
+      <div className="print-area">
+        {/* Print header */}
+        <div className="mb-6 hidden print:block">
+          <h1 className="text-2xl font-display font-bold">Boxos Platform Report</h1>
+          <p className="text-sm text-muted-foreground">Generated {new Date().toLocaleDateString("en-IN", { day: "numeric", month: "long", year: "numeric" })}</p>
+        </div>
+
+        {/* Stat cards */}
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-6">
+          <MiniStat icon={TrendingUp} label="Revenue" value={fmtK(totalCollected)} sub={fmt(totalCollected)} color="text-success" />
+          <MiniStat icon={FileDown} label="Outstanding Dues" value={fmtK(totalOutstanding)} sub={`${overdueCount} overdue`} color="text-warning" />
+          <MiniStat icon={Users} label="Payment / Boxer" value={fmtK(paymentPerBoxer)} sub="Average" color="text-info" />
+          <MiniStat icon={Percent} label="Discounts" value={String(activeDiscounts)} sub="Active" color="text-primary" />
+          <MiniStat icon={FileText} label="Collection Rate" value={`${collectionRate}%`} sub="Platform-wide" color={collectionRate >= 80 ? "text-success" : "text-warning"} />
+          <MiniStat icon={Swords} label="Bout Results" value={String(completedBouts)} sub="Completed" color="text-foreground" />
+        </div>
+
+        {/* Tab bar */}
+        <div className="flex gap-1 bg-subtle rounded-lg p-1 mb-6 no-print">
+          {tabs.map(t => (
+            <button key={t.key} onClick={() => setTab(t.key)} className={`px-4 py-2 text-xs font-medium rounded-md transition ${tab === t.key ? "bg-surface shadow-card text-foreground" : "text-muted-foreground hover:text-foreground"}`}>{t.label}</button>
+          ))}
+        </div>
+
+        {/* Revenue tab */}
+        {(tab === "revenue" || typeof window === "undefined") && (
+          <div className="space-y-6 print:!block">
+            <ChartCard title="Monthly Revenue" sub="Invoiced vs Collected across all academies">
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={monthlyData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} tickFormatter={v => `₹${v / 1000}k`} />
+                    <Tooltip 
+                      formatter={(v: number) => fmt(v)} 
+                      contentStyle={{ 
+                        backgroundColor: "rgba(11, 15, 23, 0.95)", 
+                        borderRadius: 12, 
+                        border: "1px solid rgba(255, 255, 255, 0.15)", 
+                        fontSize: 12, 
+                        color: "#F8FAFC",
+                        boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+                      }}
+                      itemStyle={{ color: "#F8FAFC" }}
+                    />
+                    <Legend wrapperStyle={{ paddingTop: 10, fontSize: 12, color: "#94A3B8" }} />
+                    <Bar dataKey="Invoiced" fill="#EF4444" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                    <Bar dataKey="Collected" fill="#10B981" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                    <Bar dataKey="Outstanding" fill="#F59E0B" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </ChartCard>
+
+            <ChartCard title="Cumulative Revenue Trend" sub="Running total of invoiced vs collected">
+              <div className="h-64">
+                <ResponsiveContainer width="100%" height="100%">
+                  <AreaChart data={cumData} margin={{ top: 10, right: 10, left: -15, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="rgba(255, 255, 255, 0.08)" />
+                    <XAxis dataKey="month" axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 11, fill: "#94A3B8" }} tickFormatter={v => `₹${v / 1000}k`} />
+                    <Tooltip 
+                      formatter={(v: number) => fmt(v)} 
+                      contentStyle={{ 
+                        backgroundColor: "rgba(11, 15, 23, 0.95)", 
+                        borderRadius: 12, 
+                        border: "1px solid rgba(255, 255, 255, 0.15)", 
+                        fontSize: 12, 
+                        color: "#F8FAFC",
+                        boxShadow: "0 10px 30px rgba(0,0,0,0.5)"
+                      }} 
+                    />
+                    <Area type="monotone" dataKey="CumInvoiced" stroke="#EF4444" fill="#EF4444" fillOpacity={0.15} strokeWidth={2.5} name="Total Invoiced" />
+                    <Area type="monotone" dataKey="CumCollected" stroke="#10B981" fill="#10B981" fillOpacity={0.25} strokeWidth={2.5} name="Total Collected" />
+                    <Legend wrapperStyle={{ paddingTop: 10, fontSize: 12, color: "#94A3B8" }} />
+                  </AreaChart>
+                </ResponsiveContainer>
+              </div>
+            </ChartCard>
+
+            <div className="grid md:grid-cols-2 gap-6">
+              <ChartCard title="Payment Methods" sub="Revenue split by payment mode">
+                <div className="h-56 flex items-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={payMethodData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value" label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                        {payMethodData.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip formatter={(v: number) => fmt(v)} />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </ChartCard>
+
+              <ChartCard title="Invoice Status" sub="Distribution of all invoices by status">
+                <div className="h-56 flex items-center">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie data={statusData} cx="50%" cy="50%" innerRadius={55} outerRadius={80} paddingAngle={3} dataKey="value" label={({ name, value }) => `${name} (${value})`}>
+                        {statusData.map((e: any, i: number) => <Cell key={i} fill={e.color} />)}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+              </ChartCard>
+            </div>
+
+            <ChartCard title="Academy-wise Revenue" sub="Click any row to view & download detailed payment history & invoices">
+              <table className="w-full text-sm">
+                <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="text-left py-2 font-medium">Academy</th>
+                  <th className="text-right py-2 font-medium">Invoices</th>
+                  <th className="text-right py-2 font-medium">Invoiced</th>
+                  <th className="text-right py-2 font-medium">Collected</th>
+                  <th className="text-right py-2 font-medium">Rate</th>
+                </tr></thead>
+                <tbody>
+                  {academyRev.map((r: any) => {
+                    const rate = r.invoiced > 0 ? Math.round((r.collected / r.invoiced) * 100) : 0;
+                    return (
+                      <tr
+                        key={r.name}
+                        onClick={() => { setSelectedAcademy(r); setModalTab("history"); }}
+                        className="border-b border-border hover:bg-primary/5 cursor-pointer transition-colors"
+                      >
+                        <td className="py-3.5 font-medium">
+                          <div className="inline-flex items-center gap-2 text-primary-dark font-semibold">
+                            <MapPin className="size-3.5 text-primary shrink-0" />
+                            <span>{r.name}</span>
+                          </div>
+                        </td>
+                        <td className="py-3.5 text-right tabular font-medium">{r.count}</td>
+                        <td className="py-3.5 text-right tabular font-medium">{fmt(r.invoiced)}</td>
+                        <td className="py-3.5 text-right tabular text-success font-semibold">{fmt(r.collected)}</td>
+                        <td className="py-3.5 text-right font-semibold text-foreground">{rate}%</td>
+                      </tr>
+                    );
+                  })}
+                  {academyRev.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No data</td></tr>}
+                </tbody>
+              </table>
+            </ChartCard>
+          </div>
+        )}
+
+        {/* Removed attendance tab */}
+
+        {/* Outstanding dues tab */}
+        {tab === "dues" && (
+          <ChartCard title="Outstanding Dues" sub={`${overdueInvoices.length} unpaid invoices sorted by days overdue`}>
+            <table className="w-full text-sm">
+              <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="text-left py-2 font-medium">Boxer</th>
+                <th className="text-left py-2 font-medium">Invoice</th>
+                <th className="text-right py-2 font-medium">Amount Due</th>
+                <th className="text-right py-2 font-medium">Outstanding</th>
+                <th className="text-right py-2 font-medium">Due Date</th>
+                <th className="text-right py-2 font-medium">Days Overdue</th>
+                <th className="text-left py-2 font-medium">Status</th>
+              </tr></thead>
+              <tbody>
+                {overdueInvoices.slice(0, 50).map((inv: any) => (
+                  <tr key={inv.id} className="border-b border-border">
+                    <td className="py-3 font-medium">{inv.boxerName}</td>
+                    <td className="py-3 font-mono text-xs text-muted-foreground">{inv.invoice_number}</td>
+                    <td className="py-3 text-right tabular">{fmt(Number(inv.amount_due))}</td>
+                    <td className="py-3 text-right tabular text-warning font-semibold">{fmt(Number(inv.balance_outstanding ?? 0))}</td>
+                    <td className="py-3 text-right tabular text-muted-foreground">{new Date(inv.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}</td>
+                    <td className="py-3 text-right tabular"><span className={`font-semibold ${inv.daysOverdue > 30 ? "text-destructive" : inv.daysOverdue > 7 ? "text-warning" : ""}`}>{inv.daysOverdue}d</span></td>
+                    <td className="py-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${inv.status === "overdue" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"}`}>{inv.status}</span></td>
+                  </tr>
+                ))}
+                {overdueInvoices.length === 0 && <tr><td colSpan={7} className="py-8 text-center text-muted-foreground">No outstanding dues 🎉</td></tr>}
+              </tbody>
+            </table>
+          </ChartCard>
+        )}
+
+        {/* Discounts & Refunds tab */}
+        {tab === "discounts" && (
+          <div className="space-y-6">
+            <ChartCard title="Discount Schemes" sub="All configured discount types">
+              <table className="w-full text-sm">
+                <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="text-left py-2 font-medium">Name</th>
+                  <th className="text-left py-2 font-medium">Type</th>
+                  <th className="text-right py-2 font-medium">Value</th>
+                  <th className="text-left py-2 font-medium">Status</th>
+                </tr></thead>
+                <tbody>
+                  {discounts.map((d: any) => (
+                    <tr key={d.id} className="border-b border-border">
+                      <td className="py-3 font-medium">{d.scheme_name}</td>
+                      <td className="py-3 text-muted-foreground capitalize">{d.discount_type?.replace(/_/g, " ") ?? "—"}</td>
+                      <td className="py-3 text-right tabular">{d.value_type === "percentage" ? `${d.value}%` : fmt(Number(d.value ?? 0))}</td>
+                      <td className="py-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${d.is_active ? "bg-success/10 text-success" : "bg-muted text-muted-foreground"}`}>{d.is_active ? "Active" : "Inactive"}</span></td>
+                    </tr>
+                  ))}
+                  {discounts.length === 0 && <tr><td colSpan={4} className="py-6 text-center text-muted-foreground">No discount schemes configured</td></tr>}
+                </tbody>
+              </table>
+            </ChartCard>
+
+            <ChartCard title="Refund Log" sub="All refund requests with approval status">
+              <table className="w-full text-sm">
+                <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                  <th className="text-left py-2 font-medium">Boxer</th>
+                  <th className="text-right py-2 font-medium">Amount</th>
+                  <th className="text-left py-2 font-medium">Reason</th>
+                  <th className="text-left py-2 font-medium">Status</th>
+                  <th className="text-left py-2 font-medium">Date</th>
+                </tr></thead>
+                <tbody>
+                  {refunds.map((r: any) => (
+                    <tr key={r.id} className="border-b border-border">
+                      <td className="py-3 font-medium">{r.boxer_profiles?.full_name ?? "—"}</td>
+                      <td className="py-3 text-right tabular">{fmt(Number(r.refund_amount ?? 0))}</td>
+                      <td className="py-3 text-muted-foreground text-xs max-w-[200px] truncate">{r.reason ?? "—"}</td>
+                      <td className="py-3"><span className={`text-xs px-2 py-0.5 rounded-full font-medium ${r.status === "approved" ? "bg-success/10 text-success" : r.status === "rejected" ? "bg-destructive/10 text-destructive" : "bg-warning/10 text-warning"}`}>{r.status ?? "pending"}</span></td>
+                      <td className="py-3 text-muted-foreground text-xs">{r.created_at ? new Date(r.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "—"}</td>
+                    </tr>
+                  ))}
+                  {refunds.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No refund requests</td></tr>}
+                </tbody>
+              </table>
+            </ChartCard>
+          </div>
+        )}
+
+        {/* Bout Results tab */}
+        {tab === "bouts" && (
+          <ChartCard title="Bout Results" sub="Details of all completed and active bouts">
+            <table className="w-full text-sm">
+              <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="text-left py-2 font-medium">Bout #</th>
+                <th className="text-left py-2 font-medium">Type</th>
+                <th className="text-left py-2 font-medium">Red Corner</th>
+                <th className="text-left py-2 font-medium">Blue Corner</th>
+                <th className="text-right py-2 font-medium">Status</th>
+              </tr></thead>
+              <tbody>
+                {(bouts || []).map((b: any) => {
+                  const red = boxers.find((a: any) => a.id === b.boxer_red_id)?.full_name || "Unknown";
+                  const blue = boxers.find((a: any) => a.id === b.boxer_blue_id)?.full_name || "Unknown";
+                  return (
+                    <tr key={b.id} className="border-b border-border hover:bg-subtle/50 transition">
+                      <td className="py-3 font-medium">#{b.bout_number}</td>
+                      <td className="py-3 text-muted-foreground capitalize">{b.bout_type}</td>
+                      <td className="py-3 font-medium text-red-500">{red}</td>
+                      <td className="py-3 font-medium text-blue-500">{blue}</td>
+                      <td className="py-3 text-right">
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${b.status === "completed" ? "bg-success/10 text-success" : b.status === "active" ? "bg-primary/10 text-primary-dark" : "bg-muted text-muted-foreground"}`}>{b.status}</span>
+                      </td>
+                    </tr>
+                  )
+                })}
+                {(!bouts || bouts.length === 0) && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No bout results available</td></tr>}
+              </tbody>
+            </table>
+          </ChartCard>
+        )}
+
+        {/* Monthly summary table (always visible in print) */}
+        <div className="mt-6">
+          <ChartCard title="Monthly Summary Table" sub="Detailed period-wise breakdown">
+            <table className="w-full text-sm">
+              <thead><tr className="text-[10px] uppercase tracking-wider text-muted-foreground border-b border-border">
+                <th className="text-left py-2 font-medium">Period</th>
+                <th className="text-right py-2 font-medium">Invoiced</th>
+                <th className="text-right py-2 font-medium">Collected</th>
+                <th className="text-right py-2 font-medium">Outstanding</th>
+                <th className="text-right py-2 font-medium">Collection Rate</th>
+              </tr></thead>
+              <tbody>
+                {monthlyData.map(row => {
+                  const rate = row.Invoiced > 0 ? Math.round((row.Collected / row.Invoiced) * 100) : 0;
+                  return (
+                    <tr key={row.month} className="border-b border-border">
+                      <td className="py-3 font-medium">{row.month}</td>
+                      <td className="py-3 text-right tabular">{fmt(row.Invoiced)}</td>
+                      <td className="py-3 text-right tabular text-success">{fmt(row.Collected)}</td>
+                      <td className="py-3 text-right tabular text-warning">{fmt(row.Outstanding)}</td>
+                      <td className="py-3 text-right"><span className={`font-semibold ${rate >= 80 ? "text-success" : rate >= 50 ? "text-warning" : "text-destructive"}`}>{rate}%</span></td>
+                    </tr>
+                  );
+                })}
+                {monthlyData.length === 0 && <tr><td colSpan={5} className="py-6 text-center text-muted-foreground">No data yet</td></tr>}
+              </tbody>
+            </table>
+          </ChartCard>
+        </div>
+      </div>
+
+      {/* ── Academy Payment History & Invoices Popup Modal ── */}
+      {selectedAcademy && (() => {
+        const boxerMap = (boxers || []).reduce((acc: Record<string, string>, a: any) => {
+          acc[a.id] = a.full_name ?? "Boxer";
+          return acc;
+        }, {});
+
+        const boxerAcademy = (boxers || []).reduce((acc: Record<string, string>, a: any) => {
+          if (a.academy_id) acc[a.id] = a.academy_id;
+          return acc;
+        }, {});
+
+        const targetAcademyInvoices = invoices.filter((i: any) => {
+          if (selectedAcademy.id === "unassigned") {
+            return !i.academy_id && !boxerAcademy[i.boxer_profile_id];
+          }
+          return i.academy_id === selectedAcademy.id || boxerAcademy[i.boxer_profile_id] === selectedAcademy.id;
+        });
+
+        const targetAcademyPayments = payments.filter((p: any) => {
+          const inv = invoices.find((i: any) => i.id === p.invoice_id);
+          const aId = inv?.academy_id ?? boxerAcademy[p.boxer_profile_id] ?? "unassigned";
+          if (selectedAcademy.id === "unassigned") return aId === "unassigned";
+          return aId === selectedAcademy.id;
+        });
+
+        const modalInvoiced = targetAcademyInvoices.reduce((a: number, i: any) => a + Number(i.amount_due ?? 0), 0);
+        const modalCollected = targetAcademyPayments.reduce((a: number, p: any) => a + Number(p.amount ?? 0), 0);
+        const modalOutstanding = targetAcademyInvoices.filter((i: any) => i.status !== "paid").reduce((a: number, i: any) => a + Number(i.balance_outstanding ?? 0), 0);
+        const modalRate = modalInvoiced > 0 ? Math.round((modalCollected / modalInvoiced) * 100) : 0;
+
+        return (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm no-print">
+            <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-4xl max-h-[90vh] flex flex-col animate-fade-up overflow-hidden">
+              {/* Modal Header */}
+              <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-surface z-10">
+                <div className="flex items-center gap-3">
+                  <div className="size-10 rounded-xl bg-primary/10 grid place-items-center shrink-0">
+                    <MapPin className="size-5 text-primary-dark" />
+                  </div>
+                  <div>
+                    <h3 className="font-display font-semibold text-lg">{selectedAcademy.name}</h3>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Cross-platform billing, invoices & payment history
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => generateAcademyPaymentReportPdf({
+                      academyName: selectedAcademy.name,
+                      totalInvoiced: modalInvoiced,
+                      totalCollected: modalCollected,
+                      totalOutstanding: modalOutstanding,
+                      payments: targetAcademyPayments,
+                      invoices: targetAcademyInvoices,
+                      boxerMap,
+                    })}
+                    className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-3 py-2 rounded-xl text-xs font-semibold hover:bg-[#dc2626] transition shadow-card cursor-pointer"
+                  >
+                    <Download className="size-3.5" /> Download PDF
+                  </button>
+                  <button
+                    onClick={() => setSelectedAcademy(null)}
+                    className="size-8 grid place-items-center rounded-md hover:bg-subtle text-muted-foreground transition cursor-pointer"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Modal Content */}
+              <div className="p-6 overflow-y-auto space-y-6 flex-1">
+                {/* Quick summary stats */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                  <div className="p-3.5 rounded-xl bg-subtle/50 border border-border text-center">
+                    <div className="text-[10px] uppercase font-semibold text-muted-foreground">Invoiced</div>
+                    <div className="text-base font-bold font-display mt-1">{fmt(modalInvoiced)}</div>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-success/5 border border-success/20 text-center">
+                    <div className="text-[10px] uppercase font-semibold text-success">Collected</div>
+                    <div className="text-base font-bold font-display text-success mt-1">{fmt(modalCollected)}</div>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-warning/5 border border-warning/20 text-center">
+                    <div className="text-[10px] uppercase font-semibold text-warning">Outstanding</div>
+                    <div className="text-base font-bold font-display text-warning mt-1">{fmt(modalOutstanding)}</div>
+                  </div>
+                  <div className="p-3.5 rounded-xl bg-subtle/50 border border-border text-center">
+                    <div className="text-[10px] uppercase font-semibold text-muted-foreground">Collection Rate</div>
+                    <div className="text-base font-bold font-display mt-1">{modalRate}%</div>
+                  </div>
+                </div>
+
+                {/* Modal Tab Controls */}
+                <div className="flex items-center justify-between border-b border-border pb-2">
+                  <div className="flex items-center gap-2 bg-subtle rounded-lg p-1">
+                    <button
+                      onClick={() => setModalTab("history")}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition cursor-pointer ${modalTab === "history" ? "bg-surface shadow-card text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      Payment History ({targetAcademyPayments.length})
+                    </button>
+                    <button
+                      onClick={() => setModalTab("invoices")}
+                      className={`px-3 py-1.5 text-xs font-semibold rounded-md transition cursor-pointer ${modalTab === "invoices" ? "bg-surface shadow-card text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                    >
+                      Invoices ({targetAcademyInvoices.length})
+                    </button>
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    Showing records for <strong>{selectedAcademy.name}</strong>
+                  </span>
+                </div>
+
+                {/* Payment History View */}
+                {modalTab === "history" && (
+                  <div className="border border-border rounded-xl overflow-hidden bg-surface">
+                    <table className="w-full text-sm">
+                      <thead className="bg-elevated">
+                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          <th className="text-left font-medium px-4 py-3">Date</th>
+                          <th className="text-left font-medium px-4 py-3">Invoice #</th>
+                          <th className="text-left font-medium px-4 py-3">Boxer</th>
+                          <th className="text-left font-medium px-4 py-3">Mode</th>
+                          <th className="text-left font-medium px-4 py-3">Reference</th>
+                          <th className="text-right font-medium px-4 py-3">Amount</th>
+                          <th className="text-right font-medium px-4 py-3">Receipt</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {targetAcademyPayments.length === 0 ? (
+                          <tr>
+                            <td colSpan={7} className="py-10 text-center text-xs text-muted-foreground">
+                              No payment history recorded for this academy.
+                            </td>
+                          </tr>
+                        ) : (
+                          targetAcademyPayments.map((p: any) => {
+                            const inv = invoices.find((i: any) => i.id === p.invoice_id);
+                            const athName = boxerMap[p.boxer_profile_id] ?? inv?.boxer_profiles?.full_name ?? "Boxer";
+                            return (
+                              <tr key={p.id} className="border-t border-border hover:bg-subtle transition">
+                                <td className="px-4 py-3 text-xs text-muted-foreground tabular">
+                                  {p.payment_date
+                                    ? new Date(p.payment_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })
+                                    : new Date(p.created_at).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                </td>
+                                <td className="px-4 py-3 font-mono text-xs font-medium">
+                                  {inv?.invoice_number ?? p.invoice_id ?? "—"}
+                                </td>
+                                <td className="px-4 py-3 font-medium text-xs">
+                                  {athName}
+                                </td>
+                                <td className="px-4 py-3 text-xs capitalize text-muted-foreground">
+                                  {p.payment_mode ?? "online"}
+                                </td>
+                                <td className="px-4 py-3 text-xs font-mono text-muted-foreground break-all">
+                                  {p.transaction_reference || p.razorpay_payment_id || "—"}
+                                </td>
+                                <td className="px-4 py-3 text-right tabular font-bold text-success text-xs">
+                                  {fmt(Number(p.amount ?? 0))}
+                                </td>
+                                <td className="px-4 py-3 text-right">
+                                  <button
+                                    onClick={() => generateReceipt({
+                                      invoiceNumber: inv?.invoice_number ?? "PAYMENT",
+                                      athleteName: athName,
+                                      amount: Number(p.amount ?? 0),
+                                      paymentDate: p.payment_date ?? p.created_at,
+                                      paymentMode: p.payment_mode ?? "online",
+                                      transactionRef: p.transaction_reference ?? p.razorpay_payment_id ?? undefined,
+                                      academyName: selectedAcademy.name,
+                                    })}
+                                    className="text-xs text-primary-dark font-semibold inline-flex items-center gap-1 hover:underline cursor-pointer"
+                                  >
+                                    <Download className="size-3" /> Receipt
+                                  </button>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+
+                {/* Invoices View */}
+                {modalTab === "invoices" && (
+                  <div className="border border-border rounded-xl overflow-hidden bg-surface">
+                    <table className="w-full text-sm">
+                      <thead className="bg-elevated">
+                        <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
+                          <th className="text-left font-medium px-4 py-3">Invoice #</th>
+                          <th className="text-left font-medium px-4 py-3">Boxer</th>
+                          <th className="text-left font-medium px-4 py-3">Period</th>
+                          <th className="text-right font-medium px-4 py-3">Amount Due</th>
+                          <th className="text-right font-medium px-4 py-3">Paid</th>
+                          <th className="text-right font-medium px-4 py-3">Balance</th>
+                          <th className="text-left font-medium px-4 py-3">Due Date</th>
+                          <th className="text-left font-medium px-4 py-3">Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {targetAcademyInvoices.length === 0 ? (
+                          <tr>
+                            <td colSpan={8} className="py-10 text-center text-xs text-muted-foreground">
+                              No invoices found for this academy.
+                            </td>
+                          </tr>
+                        ) : (
+                          targetAcademyInvoices.map((inv: any) => {
+                            const athName = boxerMap[inv.boxer_profile_id] ?? "Boxer";
+                            return (
+                              <tr key={inv.id} className="border-t border-border hover:bg-subtle transition">
+                                <td className="px-4 py-3 font-mono text-xs font-medium">{inv.invoice_number}</td>
+                                <td className="px-4 py-3 font-medium text-xs">{athName}</td>
+                                <td className="px-4 py-3 text-xs text-muted-foreground">{inv.billing_period ?? "Standard"}</td>
+                                <td className="px-4 py-3 text-right tabular text-xs font-medium">{fmt(Number(inv.amount_due ?? 0))}</td>
+                                <td className="px-4 py-3 text-right tabular text-xs text-success">{fmt(Number(inv.amount_paid ?? 0))}</td>
+                                <td className="px-4 py-3 text-right tabular text-xs text-warning font-medium">{fmt(Number(inv.balance_outstanding ?? 0))}</td>
+                                <td className="px-4 py-3 text-xs text-muted-foreground tabular">
+                                  {inv.due_date ? new Date(inv.due_date).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—"}
+                                </td>
+                                <td className="px-4 py-3">
+                                  <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full capitalize ${
+                                    inv.status === "paid" ? "bg-success/10 text-success" :
+                                    inv.status === "overdue" ? "bg-destructive/10 text-destructive" :
+                                    "bg-warning/10 text-warning"
+                                  }`}>
+                                    {inv.status}
+                                  </span>
+                                </td>
+                              </tr>
+                            );
+                          })
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
     </>
+  );
+}
+
+function ChartCard({ title, sub, children }: { title: string; sub?: string; children: React.ReactNode }) {
+  return (
+    <div className="bg-surface border border-border rounded-xl p-6">
+      <h3 className="font-display font-semibold">{title}</h3>
+      {sub && <p className="text-xs text-muted-foreground mt-0.5 mb-5">{sub}</p>}
+      {children}
+    </div>
+  );
+}
+
+function MiniStat({ icon: Icon, label, value, sub, color }: { icon: any; label: string; value: string; sub: string; color: string }) {
+  return (
+    <div className="bg-surface border border-border rounded-xl p-4">
+      <div className="flex items-center gap-2 mb-2">
+        <div className={`size-7 rounded-lg bg-elevated grid place-items-center ${color}`}><Icon className="size-3.5" /></div>
+        <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">{label}</span>
+      </div>
+      <div className="text-lg font-display font-bold">{value}</div>
+      <div className="text-[11px] text-muted-foreground mt-0.5">{sub}</div>
+    </div>
   );
 }

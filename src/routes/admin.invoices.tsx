@@ -120,7 +120,7 @@ function InvoicesPage() {
     }
   }
 
-  async function handleApproveCash(assignmentId: string, athleteProfileId: string) {
+  async function handleApproveCash(assignmentId: string, boxerProfileId: string) {
     const assignment = cashPending.find(a => a.id === assignmentId);
     const pMode = assignment?.payment_mode || "cash";
     const approvedStatus = pMode === "cash" ? "cash_approved" : "online_paid";
@@ -130,16 +130,16 @@ function InvoicesPage() {
       .update({ assignment_status: approvedStatus, cash_approved_by: user?.id, cash_approved_at: new Date().toISOString() })
       .eq("id", assignmentId);
 
-    // 2. Find the athlete's invoice and mark it paid
-    const athleteInvoice = invoices.find(i => i.boxer_profile_id === athleteProfileId && i.status !== "paid")
+    // 2. Find the boxer's invoice and mark it paid
+    const boxerInvoice = invoices.find(i => i.boxer_profile_id === boxerProfileId && i.status !== "paid")
       ?? await ensureInvoiceForAssignment(assignment, null);
 
-    if (athleteInvoice) {
-      const payAmount = Number(athleteInvoice.balance_outstanding ?? athleteInvoice.amount_due ?? 0);
+    if (boxerInvoice) {
+      const payAmount = Number(boxerInvoice.balance_outstanding ?? boxerInvoice.amount_due ?? 0);
       if (payAmount > 0) {
         await supabase.from("payments").insert({
-          invoice_id: athleteInvoice.id,
-          boxer_profile_id: athleteProfileId,
+          invoice_id: boxerInvoice.id,
+          boxer_profile_id: boxerProfileId,
           amount: payAmount,
           payment_mode: pMode,
           recorded_by: user?.id,
@@ -149,16 +149,16 @@ function InvoicesPage() {
       await supabase.from("invoices")
         .update({
           status: "paid",
-          amount_paid: Number(athleteInvoice.amount_due ?? 0),
+          amount_paid: Number(boxerInvoice.amount_due ?? 0),
           balance_outstanding: 0,
           is_overdue: false,
           updated_at: new Date().toISOString(),
         })
-        .eq("id", athleteInvoice.id);
+        .eq("id", boxerInvoice.id);
 
     }
 
-    // 3. Notify athlete
+    // 3. Notify boxer
     if (assignment?.boxer_profiles?.user_id) {
       await supabase.from("notifications").insert({
         recipient_id: assignment.boxer_profiles.user_id,
@@ -296,7 +296,7 @@ function InvoicesPage() {
           <thead className="bg-elevated">
             <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
               <th className="text-left font-medium px-5 py-3">Invoice</th>
-              <th className="text-left font-medium py-3">Athlete</th>
+              <th className="text-left font-medium py-3">Boxer</th>
               <th className="text-right font-medium py-3">Amount</th>
               <th className="text-right font-medium py-3">Paid</th>
               <th className="text-right font-medium py-3">Outstanding</th>

@@ -22,8 +22,8 @@ function AdminAttendancePage() {
   const [dateFilter, setDateFilter] = useState(new Date().toISOString().split("T")[0]);
   const [q, setQ] = useState("");
   const [processing, setProcessing] = useState<string | null>(null);
-  const [expandedAthlete, setExpandedAthlete] = useState<string | null>(null);
-  const [athleteHistory, setAthleteHistory] = useState<any[]>([]);
+  const [expandedBoxer, setExpandedBoxer] = useState<string | null>(null);
+  const [boxerHistory, setBoxerHistory] = useState<any[]>([]);
   const [todayPollSent, setTodayPollSent] = useState(false);
   const [todayPollId, setTodayPollId] = useState<string | null>(null);
   const [pollResponses, setPollResponses] = useState<any[]>([]);
@@ -128,7 +128,7 @@ function AdminAttendancePage() {
       alert("An attendance poll has already been sent today. You can only send one poll per day.");
       return;
     }
-    if (!confirm(`Send an attendance poll to all ${summaries.length} athletes? They will be asked to confirm attendance or provide a reason for absence.`)) return;
+    if (!confirm(`Send an attendance poll to all ${summaries.length} boxers? They will be asked to confirm attendance or provide a reason for absence.`)) return;
 
     setSendingPoll(true);
     try {
@@ -168,7 +168,7 @@ function AdminAttendancePage() {
 
       setTodayPollSent(true);
       setTodayPollId(poll.id);
-      alert(`✓ Attendance poll sent to ${notifInserts.length} athletes.`);
+      alert(`✓ Attendance poll sent to ${notifInserts.length} boxers.`);
       loadAll();
     } catch (e: any) {
       alert(e.message || "Failed to send attendance poll.");
@@ -191,16 +191,16 @@ function AdminAttendancePage() {
     setDailyRecords(data ?? []);
   }
 
-  async function expandAthlete(athleteId: string) {
-    if (expandedAthlete === athleteId) { setExpandedAthlete(null); return; }
-    setExpandedAthlete(athleteId);
+  async function expandBoxer(boxerId: string) {
+    if (expandedBoxer === boxerId) { setExpandedBoxer(null); return; }
+    setExpandedBoxer(boxerId);
     const { data } = await supabase
       .from("attendance")
       .select("*")
-      .eq("boxer_profile_id", athleteId)
+      .eq("boxer_profile_id", boxerId)
       .order("session_date", { ascending: false })
       .limit(30);
-    setAthleteHistory(data ?? []);
+    setBoxerHistory(data ?? []);
   }
 
   async function handleLeave(id: string, action: "approved" | "rejected", reason?: string) {
@@ -283,7 +283,7 @@ function AdminAttendancePage() {
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
         {[
-          { label: "Athletes tracked", value: summaries.length, icon: Users, tone: "" },
+          { label: "Boxers tracked", value: summaries.length, icon: Users, tone: "" },
           { label: "Total present (all time)", value: summaries.reduce((a, s) => a + s.total_present, 0), icon: CheckCircle, tone: "text-success" },
           { label: "Total absent (all time)", value: summaries.reduce((a, s) => a + s.total_absent, 0), icon: XCircle, tone: "text-destructive" },
           { label: "Pending leave requests", value: pendingLeaves.length, icon: Clock, tone: pendingLeaves.length > 0 ? "text-warning" : "" },
@@ -316,7 +316,7 @@ function AdminAttendancePage() {
       {/* Search */}
       <div className="flex items-center gap-2 px-3 h-9 rounded-lg border border-border bg-surface mb-4 max-w-sm">
         <Search className="size-4 text-muted-foreground shrink-0" />
-        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search athlete…" className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search boxer…" className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
       </div>
 
       {loading ? (
@@ -329,7 +329,7 @@ function AdminAttendancePage() {
               <table className="w-full text-sm">
                 <thead className="bg-elevated">
                   <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                    <th className="text-left font-medium px-5 py-3">Athlete</th>
+                    <th className="text-left font-medium px-5 py-3">Boxer</th>
                     <th className="text-right font-medium px-4 py-3">Present</th>
                     <th className="text-right font-medium px-4 py-3">Absent</th>
                     <th className="text-right font-medium px-4 py-3">Leave</th>
@@ -355,21 +355,21 @@ function AdminAttendancePage() {
                           {s.last_marked_date ? new Date(s.last_marked_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : "Never"}
                         </td>
                         <td className="px-5 py-3.5 text-right">
-                          <button onClick={() => expandAthlete(s.boxer_profile_id)}
+                          <button onClick={() => expandBoxer(s.boxer_profile_id)}
                             className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1 transition">
-                            {expandedAthlete === s.boxer_profile_id ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                            {expandedBoxer === s.boxer_profile_id ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
                             History
                           </button>
                         </td>
                       </tr>
-                      {expandedAthlete === s.boxer_profile_id && (
+                      {expandedBoxer === s.boxer_profile_id && (
                         <tr key={`${s.boxer_profile_id}-hist`} className="border-t border-border bg-subtle/40">
                           <td colSpan={7} className="px-5 py-4">
                             <p className="text-xs font-semibold text-muted-foreground mb-3">Last 30 records</p>
                             <div className="flex flex-wrap gap-1.5">
-                              {athleteHistory.length === 0
+                              {boxerHistory.length === 0
                                 ? <span className="text-xs text-muted-foreground">No records.</span>
-                                : athleteHistory.map(a => (
+                                : boxerHistory.map(a => (
                                   <span key={a.id} title={`${a.status}${a.distance_meters ? ` · ${a.distance_meters}m` : ""}`}
                                     className={`px-2 py-1 rounded-md text-[11px] font-medium border ${a.status === "present" ? "bg-success/10 border-success/20 text-success" : "bg-destructive/10 border-destructive/20 text-destructive"}`}>
                                     {new Date(a.session_date).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
@@ -382,7 +382,7 @@ function AdminAttendancePage() {
                     </>
                   ))}
                   {filteredSummaries.length === 0 && (
-                    <tr><td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">No athletes found.</td></tr>
+                    <tr><td colSpan={7} className="text-center py-10 text-sm text-muted-foreground">No boxers found.</td></tr>
                   )}
                 </tbody>
               </table>
@@ -400,7 +400,7 @@ function AdminAttendancePage() {
                 <table className="w-full text-sm">
                   <thead className="bg-elevated">
                     <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                      <th className="text-left font-medium px-5 py-3">Athlete</th>
+                      <th className="text-left font-medium px-5 py-3">Boxer</th>
                       <th className="text-left font-medium px-4 py-3">Status</th>
                       <th className="text-left font-medium px-4 py-3">Marked at</th>
                       <th className="text-right font-medium px-5 py-3">Distance</th>
@@ -496,7 +496,7 @@ function AdminAttendancePage() {
                 <div className="bg-surface border border-border rounded-xl p-10 text-center">
                   <Bell className="size-8 text-muted-foreground mx-auto mb-3" />
                   <p className="text-sm font-semibold">No poll sent today</p>
-                  <p className="text-xs text-muted-foreground mt-1">Use the "Send attendance poll" button to notify athletes.</p>
+                  <p className="text-xs text-muted-foreground mt-1">Use the "Send attendance poll" button to notify boxers.</p>
                 </div>
               ) : (
                 <>
@@ -520,7 +520,7 @@ function AdminAttendancePage() {
                     <table className="w-full text-sm">
                       <thead className="bg-elevated">
                         <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                          <th className="text-left font-medium px-5 py-3">Athlete</th>
+                          <th className="text-left font-medium px-5 py-3">Boxer</th>
                           <th className="text-left font-medium px-4 py-3">Response</th>
                           <th className="text-left font-medium px-4 py-3">Reason (if not attending)</th>
                           <th className="text-right font-medium px-5 py-3">Responded at</th>
@@ -545,7 +545,7 @@ function AdminAttendancePage() {
                         ))}
                         {pollResponses.length === 0 && (
                           <tr><td colSpan={4} className="text-center py-10 text-sm text-muted-foreground">
-                            No responses yet. Athletes have been notified.
+                            No responses yet. Boxers have been notified.
                           </td></tr>
                         )}
                       </tbody>

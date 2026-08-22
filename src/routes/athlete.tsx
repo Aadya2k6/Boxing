@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { Home, User, CreditCard, Calendar, FileText, Bell, Settings, MapPin, Swords } from "lucide-react";
+import { Home, User, CreditCard, Calendar, Bell, Settings, MapPin, Swords, Heart } from "lucide-react";
 import { useRequireAthlete } from "@/lib/guards";
 import { useState, useEffect, createContext, useContext, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -19,31 +19,28 @@ function AthleteLayout() {
   const { session, profile, loading: authLoading } = useRequireAthlete();
   const { user: authUser } = useAuth();
   const [status, setStatus] = useState("pending_assignment");
+  const [gender, setGender] = useState<string | null>(null);
   const name = profile?.full_name || "Athlete";
 
   // ── Reliable access check — single query, JS-side logic ────────────────
-  // Fetches the athlete's fee_assignment and checks status in JavaScript.
-  // If status is 'cash_approved' or 'online_paid' → unlock.
-  // Also checks if all invoices are paid as a fallback.
   const checkAccess = useCallback(async () => {
     if (!authUser?.id) return;
     try {
       const { data: ap } = await supabase
         .from("boxer_profiles")
-        .select("id")
+        .select("id, gender")
         .eq("user_id", authUser.id)
         .maybeSingle();
 
-      // No boxer_profile — athlete has not completed onboarding yet.
-      // Never auto-create one here; that bypasses the onboarding academy-code gate.
       if (!ap?.id) {
-        console.log("[ACCESS] → pending_assignment (no boxer profile — onboarding incomplete)");
         setStatus("pending_assignment");
         return;
       }
 
-      // 2. Fetch the fee assignment (single query — no filter on status)
-      const { data: assignment, error: faErr } = await supabase
+      // Store gender for conditional nav
+      if (ap.gender) setGender(ap.gender);
+
+      const { data: assignment } = await supabase
         .from("fee_assignments")
         .select("id, assignment_status")
         .eq("boxer_profile_id", ap.id)
@@ -51,45 +48,16 @@ function AthleteLayout() {
         .limit(1)
         .maybeSingle();
 
-      console.log("[ACCESS] fee_assignment:", assignment, "error:", faErr);
+      if (!assignment) { setStatus("pending_assignment"); return; }
 
-      // No assignment at all → awaiting admin
-      if (!assignment) {
-        console.log("[ACCESS] → pending_assignment (no fee assignment)");
-        setStatus("pending_assignment");
-        return;
-      }
-
-      // Check assignment status in JavaScript (no PostgREST filter dependency)
       const st = assignment.assignment_status;
 
-      if (st === "cash_approved" || st === "online_paid") {
-        console.log("[ACCESS] → unlocked (assignment_status:", st, ")");
-        setStatus("unlocked");
-        return;
-      }
+      if (st === "cash_approved" || st === "online_paid") { setStatus("unlocked"); return; }
+      if (st === "rollover_approved") { setStatus("unlocked"); return; }
+      if (st === "rollover_pending") { setStatus("rollover_pending"); return; }
+      if (st === "cash_pending") { setStatus("payment_required"); return; }
 
-      // Rollover approved → dashboard is accessible, amount shows in payments page
-      if (st === "rollover_approved") {
-        console.log("[ACCESS] → unlocked (rollover approved — payment deferred)");
-        setStatus("unlocked");
-        return;
-      }
-
-      // Rollover pending → dashboard stays locked until superadmin approves
-      if (st === "rollover_pending") {
-        console.log("[ACCESS] → rollover_pending (awaiting superadmin approval)");
-        setStatus("rollover_pending");
-        return;
-      }
-
-      if (st === "cash_pending") {
-        console.log("[ACCESS] → payment_required (cash_pending — awaiting admin)");
-        setStatus("payment_required");
-        return;
-      }
-
-      // 3. Fallback: check if all invoices are paid (covers edge cases)
+      // Fallback: check if all invoices are paid
       const { data: unpaidInvoices } = await supabase
         .from("invoices")
         .select("id, status")
@@ -98,29 +66,16 @@ function AthleteLayout() {
         .limit(1);
 
       if (unpaidInvoices && unpaidInvoices.length === 0) {
-        // All invoices paid — check if there are any invoices at all
         const { count } = await supabase
           .from("invoices")
           .select("*", { count: "exact", head: true })
           .eq("boxer_profile_id", ap.id);
-
-        if (count && count > 0) {
-          console.log("[ACCESS] → unlocked (all invoices paid)");
-          setStatus("unlocked");
-          return;
-        }
+        if (count && count > 0) { setStatus("unlocked"); return; }
       }
 
-      // Check for overdue invoices specifically
       const hasOverdue = unpaidInvoices?.some(i => i.status === "overdue");
-      if (hasOverdue) {
-        console.log("[ACCESS] → overdue");
-        setStatus("overdue");
-        return;
-      }
+      if (hasOverdue) { setStatus("overdue"); return; }
 
-      // Has fee assignment, not approved → athlete needs to choose payment method
-      console.log("[ACCESS] → payment_required (assignment_status:", st, ")");
       setStatus("payment_required");
 
     } catch (e) {
@@ -167,6 +122,7 @@ function AthleteLayout() {
 
   const isUnlocked = status === "unlocked";
   const isRolloverPending = status === "rollover_pending";
+  const isFemale = gender?.toLowerCase() === "female";
 
   if (authLoading || !session || !profile) {
     return (
@@ -174,6 +130,20 @@ function AthleteLayout() {
         <span className="size-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
       </div>
     );
+  }
+
+  const workspaceItems: any[] = [
+    { to: "", label: "Home", icon: Home },
+    { to: "schedule", label: "Schedule", icon: Calendar },
+    { to: "attendance", label: "Attendance", icon: MapPin },
+    { to: "payments", label: "Payments", icon: CreditCard },
+    { to: "bouts", label: "My Bouts", icon: Swords },
+    { to: "profile", label: "Profile", icon: User },
+  ];
+
+  // Insert Declaration after Payments (index 3) only for female athletes
+  if (isFemale) {
+    workspaceItems.splice(4, 0, { to: "declaration", label: "Declaration", icon: Heart });
   }
 
   return (
@@ -191,20 +161,13 @@ function AthleteLayout() {
         navSections={[
           {
             label: "Workspace",
-            items: [
-              { to: "", label: "Dashboard", icon: Home },
-              { to: "profile", label: "My Profile", icon: User },
-              { to: "payments", label: "Fee & Payments", icon: CreditCard },
-              { to: "attendance", label: "Attendance", icon: MapPin },
-              { to: "schedule", label: "Training Schedule", icon: Calendar },
-              { to: "bouts", label: "My Bouts", icon: Swords },
-            ],
+            items: workspaceItems,
           },
           {
             label: "Account",
             items: [
               { to: "notifications", label: "Notifications", icon: Bell },
-              { to: "settings", label: "Settings", icon: Settings },
+              { to: "settings", label: "Manage Account", icon: Settings },
             ],
           },
         ]}
@@ -212,3 +175,4 @@ function AthleteLayout() {
     </AthleteAccessContext.Provider>
   );
 }
+

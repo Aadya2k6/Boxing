@@ -85,7 +85,7 @@ export const supabase: SupabaseClient = isBrowser
 export { getOrCreateClient as getSupabaseClient };
 
 // ── TypeScript types ───────────────────────────────────────────────────
-export type UserRole = "boxos_admin" | "superadmin" | "admin" | "coach" | "athlete" | "external_judge";
+export type UserRole = "boxos_admin" | "superadmin" | "admin" | "coach" | "athlete" | "external_judge" | "state_federation_admin" | "national_federation_admin" | "custom_federation_admin";
 export type VerificationStatus = "pending" | "approved" | "flagged" | "manual_review";
 export type InvoiceStatus = "unpaid" | "partially_paid" | "paid" | "overdue";
 export type AcademyStatus = "active" | "suspended" | "archived" | "deleted";
@@ -165,6 +165,9 @@ export interface Profile {
   invited_by?: string | null;
   terms_accepted_at?: string | null;
   terms_version?: string | null;
+  federation_scope_type?: string | null;
+  federation_scope_states?: string[] | null;
+  federation_scope_cities?: string[] | null;
   created_at: string;
   updated_at: string;
 }

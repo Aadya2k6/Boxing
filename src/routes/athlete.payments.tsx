@@ -138,30 +138,25 @@ function PaymentsPage() {
       
       const { data: c } = await supabase
         .from("centers")
-        .select("is_active, id")
+        .select("is_active, id, active_gateway, razorpay_key_id, payu_merchant_key, encrypted_payu_salt")
         .eq("id", ap.center_id)
         .maybeSingle();
 
       if (c) {
         setAthleteAcademy(c);
         
-        // Fetch specific gateway config for this academy
-        const { data: gwData } = await supabase
-          .from("academies")
-          .select("active_gateway, razorpay_key_id, payu_merchant_key, encrypted_payu_salt")
-          .eq("id", ap.academy_id)
-          .maybeSingle();
-
+        // Gateway config is stored per-center
         const gws = [];
-        if (gwData?.razorpay_key_id) gws.push("razorpay");
-        if (gwData?.payu_merchant_key && gwData?.encrypted_payu_salt) gws.push("payu");
-        if (gws.length === 0) gws.push(gwData?.active_gateway || "razorpay");
+        if (c.razorpay_key_id) gws.push("razorpay");
+        if (c.payu_merchant_key && c.encrypted_payu_salt) gws.push("payu");
+        if (gws.length === 0) gws.push(c.active_gateway || "razorpay");
         
         setAvailableGateways(gws);
-        setSelectedGateway(gws.includes(gwData?.active_gateway) ? gwData?.active_gateway : gws[0]);
+        setSelectedGateway(gws.includes(c.active_gateway) ? c.active_gateway : gws[0]);
         setLoading(false);
         return;
       }
+
     }
 
     // Fallback: Check active_gateway from centers table if we must, or just fallback

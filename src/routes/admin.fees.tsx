@@ -12,12 +12,12 @@ function FeesPage() {
   const [tab, setTab] = useState<"plans" | "assignments">("plans");
   const [plans, setPlans] = useState<any[]>([]);
   const [assignments, setAssignments] = useState<any[]>([]);
-  const [athletes, setAthletes] = useState<any[]>([]);
+  const [boxers, setBoxers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   // Modal State
   const [showModal, setShowModal] = useState(false);
-  const [athleteId, setAthleteId] = useState("");
+  const [boxerId, setBoxerId] = useState("");
   const [planId, setPlanId] = useState("");
   const [discountValue, setDiscountValue] = useState("0");
   const [discountReason, setDiscountReason] = useState("");
@@ -30,32 +30,22 @@ function FeesPage() {
   async function loadData() {
     setLoading(true);
     const academyId = profile?.academy_id;
-    if (!academyId) return;
-
-    const { data: assignment } = await supabase
-      .from("admin_center_assignments")
-      .select("center_id")
-      .eq("profile_id", user?.id)
-      .limit(1)
-      .single();
-    
-    const centerId = assignment?.center_id;
-    if (!centerId) {
+    if (!academyId) {
       setLoading(false);
       return;
     }
 
-    // Pass centerId for the insert later
-    (window as any)._adminCenterId = centerId;
+    // Pass academyId for the insert later
+    (window as any)._adminAcademyId = academyId;
 
     const [
       { data: pData },
       { data: aData },
       { data: athData }
     ] = await Promise.all([
-      supabase.from("fee_plans").select("*").eq("center_id", centerId).order("created_at"),
-      supabase.from("fee_assignments").select("*, fee_plans(*), boxer_profiles(full_name)").eq("center_id", centerId),
-      supabase.from("boxer_profiles").select("id, full_name").eq("onboarding_complete", true).eq("center_id", centerId)
+      supabase.from("fee_plans").select("*").eq("academy_id", academyId).order("created_at"),
+      supabase.from("fee_assignments").select("*, fee_plans(*), boxer_profiles(full_name)").eq("academy_id", academyId),
+      supabase.from("boxer_profiles").select("id, full_name, center_id").eq("onboarding_complete", true).eq("academy_id", academyId)
     ]);
 
     if (pData) {
@@ -78,26 +68,28 @@ function FeesPage() {
         billing_cycle: a.fee_plans.cycle ?? a.fee_plans.billing_cycle ?? "monthly",
       } : null,
     })));
-    setAthletes(athData || []);
+    setBoxers(athData || []);
     setLoading(false);
   }
 
   async function handleAssign(e: React.FormEvent) {
     e.preventDefault();
-    if (!athleteId || !planId) return;
+    if (!boxerId || !planId) return;
     setSaving(true);
     const selectedPlan = plans.find(p => p.id === planId);
+    const selectedBoxer = boxers.find((b: any) => b.id === boxerId);
+    
     const { error } = await supabase.from("fee_assignments").insert({
-      boxer_profile_id: athleteId,
+      boxer_profile_id: boxerId,
       fee_plan_id: planId,
-      academy_id: selectedPlan?.academy_id || profile?.academy_id,
-      center_id: (window as any)._adminCenterId,
+      academy_id: selectedPlan?.academy_id || profile?.academy_id || (window as any)._adminAcademyId,
+      center_id: selectedBoxer?.center_id,
       assigned_by: user?.id,
       status: "active",
     });
     if (!error) {
       setShowModal(false);
-      setAthleteId(""); setPlanId(""); setDiscountValue("0"); setDiscountReason("");
+      setBoxerId(""); setPlanId(""); setDiscountValue("0"); setDiscountReason("");
       loadData();
     } else {
       console.error(error);
@@ -106,7 +98,7 @@ function FeesPage() {
   }
   return (
     <>
-      <PageHeader title="Fee management" subtitle="Plans, billing cycles, and per-athlete assignments" actions={
+      <PageHeader title="Fee management" subtitle="Plans, billing cycles, and per-boxer assignments" actions={
         <button onClick={() => { setTab("assignments"); setShowModal(true); }} className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2 rounded-md text-sm hover:bg-[#dc2626]"><Plus className="size-3.5" /> Assign Plan</button>
       } />
       <div className="flex items-center gap-1 bg-subtle rounded-md p-1 w-fit mb-6">
@@ -132,7 +124,7 @@ function FeesPage() {
                 </div>
                 <div className="text-stat tabular mt-4">₹ {Number(p.amount).toLocaleString("en-IN")}<span className="text-sm text-muted-foreground font-sans font-normal ml-1">/{p.billing_cycle === "custom" && p.custom_duration_days ? `${p.custom_duration_days} days` : p.billing_cycle.toLowerCase()}</span></div>
                 <div className="mt-4 flex items-center justify-between text-xs text-muted-foreground">
-                  <span className="inline-flex items-center gap-1.5"><Users className="size-3" /> {p.count} athletes</span>
+                  <span className="inline-flex items-center gap-1.5"><Users className="size-3" /> {p.count} boxers</span>
                   <Badge tone="success">Active</Badge>
                 </div>
               </div>
@@ -144,7 +136,7 @@ function FeesPage() {
           <table className="w-full text-sm">
             <thead className="bg-elevated">
               <tr className="text-[10px] uppercase tracking-wider text-muted-foreground">
-                <th className="text-left font-medium px-5 py-3">Athlete</th>
+                <th className="text-left font-medium px-5 py-3">Boxer</th>
                 <th className="text-left font-medium py-3">Plan</th>
                 <th className="text-right font-medium py-3">Base</th>
                 <th className="text-right font-medium py-3">Discount</th>
@@ -159,7 +151,7 @@ function FeesPage() {
                 </tr>
               ) : assignments.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">No athletes assigned to plans yet.</td>
+                  <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">No boxers assigned to plans yet.</td>
                 </tr>
               ) : (
                 assignments.map((a) => {
@@ -196,10 +188,10 @@ function FeesPage() {
             </div>
             <form onSubmit={handleAssign} className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-semibold mb-1.5">Athlete</label>
-                <select required value={athleteId} onChange={e => setAthleteId(e.target.value)} className="w-full text-sm px-3 py-2 border border-border rounded-md bg-transparent outline-none focus:border-primary">
-                  <option value="">Select athlete...</option>
-                  {athletes.map(ath => <option key={ath.id} value={ath.id}>{ath.full_name}</option>)}
+                <label className="block text-xs font-semibold mb-1.5">Boxer</label>
+                <select required value={boxerId} onChange={e => setBoxerId(e.target.value)} className="w-full text-sm px-3 py-2 border border-border rounded-md bg-transparent outline-none focus:border-primary">
+                  <option value="">Select boxer...</option>
+                  {boxers.map(ath => <option key={ath.id} value={ath.id}>{ath.full_name}</option>)}
                 </select>
               </div>
               <div>
@@ -223,7 +215,7 @@ function FeesPage() {
               )}
               <div className="pt-4 flex items-center gap-3">
                 <button type="button" onClick={() => setShowModal(false)} className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-lg hover:bg-subtle transition-colors">Cancel</button>
-                <button type="submit" disabled={saving || !athleteId || !planId} className="flex-1 px-4 py-2 text-sm font-semibold bg-[#ef4444] text-white rounded-lg hover:bg-[#dc2626] disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
+                <button type="submit" disabled={saving || !boxerId || !planId} className="flex-1 px-4 py-2 text-sm font-semibold bg-[#ef4444] text-white rounded-lg hover:bg-[#dc2626] disabled:opacity-50 transition-colors flex items-center justify-center gap-2">
                   {saving ? <Loader2 className="size-4 animate-spin" /> : "Assign Plan"}
                 </button>
               </div>

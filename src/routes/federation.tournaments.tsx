@@ -8,6 +8,7 @@ import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toast } from "sonner";
+import { useFederationFilters } from "@/lib/federation";
 
 export const Route = createFileRoute("/federation/tournaments")({
   component: FederationTournaments,
@@ -47,21 +48,11 @@ function statusBadge(status: string) {
   return <span className="badge badge-neutral">Scheduled</span>;
 }
 
-function useFederationFilters() {
-  const { profile } = useAuth();
-  const perms: any[] = profile?.granted_permissions ?? [];
-  const fedPerm = perms.find((p: any) => p?.type === "federation");
-  return {
-    scope: (fedPerm?.scope ?? "national") as "national" | "state" | "custom",
-    value: fedPerm?.value ?? null,
-  };
-}
-
 // ─── Main Component ───────────────────────────────────────────────────────────
 
 function FederationTournaments() {
   const { user } = useAuth();
-  const { scope, value } = useFederationFilters();
+  const { scope, states, cities } = useFederationFilters();
   const [tournaments, setTournaments] = useState<Tournament[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -189,7 +180,8 @@ function FederationTournaments() {
         <DraftAthletesModal
           tournament={showDraftModal}
           scope={scope}
-          scopeValue={value}
+          scopeStates={states}
+          scopeCities={cities}
           actorId={user?.id ?? null}
           onClose={() => setShowDraftModal(null)}
         />
@@ -282,10 +274,11 @@ function CreateTournamentModal({ actorId, onClose, onSuccess }: {
 
 // ─── Draft Athletes Modal ─────────────────────────────────────────────────────
 
-function DraftAthletesModal({ tournament, scope, scopeValue, actorId, onClose }: {
+function DraftAthletesModal({ tournament, scope, scopeStates, scopeCities, actorId, onClose }: {
   tournament: Tournament;
   scope: "national" | "state" | "custom";
-  scopeValue: any;
+  scopeStates: string[];
+  scopeCities: string[];
   actorId: string | null;
   onClose: () => void;
 }) {
@@ -299,23 +292,63 @@ function DraftAthletesModal({ tournament, scope, scopeValue, actorId, onClose }:
     async function load() {
       setLoading(true);
       try {
-        let q = supabase
-          .from("boxer_profiles")
-          .select(`
-            id, full_name, gender, state, city,
-            age_category:age_category_id(name),
-            weight_category:weight_category_id(weight_class),
-            academy:academy_id(name)
-          `)
-          .eq("is_suspended", false)
-          .order("full_name");
+        const [profRes, bpRes, acRes, centerRes] = await Promise.all([
+          supabase.from("profiles").select("*").in("role", ["boxer", "athlete"]),
+          supabase.from("boxer_profiles").select("*").eq("is_suspended", false),
+          supabase.from("academies").select("*"),
+          supabase.from("centers").select("*"),
+        ]);
+        
+        const bps = bpRes.data || [];
+        const profs = profRes.data || [];
+        const acs = acRes.data || [];
+        const centers = centerRes.data || [];
 
-        if (scope === "state" && scopeValue) q = q.eq("state", scopeValue as string);
-        else if (scope === "custom" && Array.isArray(scopeValue)) q = q.in("city", scopeValue as string[]);
+        let allAthletes: any[] = [];
+        const seenIds = new Set<string>();
 
-        const { data, error } = await q;
-        if (error) throw error;
-        setAthletes((data ?? []) as unknown as Athlete[]);
+        for (const bp of bps) {
+          const userProf = profs.find(p => p.id === bp.user_id);
+          const centerId = bp.center_id || bp.preferred_center_id;
+          const center = centers.find(c => c.id === centerId);
+          const academyId = bp.academy_id || userProf?.academy_id || center?.academy_id;
+          const academy = acs.find(a => a.id === academyId);
+
+          const st = bp.state || center?.state || academy?.state || "";
+          const ct = bp.city || center?.city || academy?.city || "";
+
+          seenIds.add(bp.id);
+          if (bp.user_id) seenIds.add(bp.user_id);
+          allAthletes.push({
+            ...bp,
+            computed_state: st,
+            computed_city: ct,
+          });
+        }
+
+        for (const p of profs) {
+          if (!seenIds.has(p.id)) {
+            const academy = acs.find(a => a.id === p.academy_id);
+            allAthletes.push({
+              ...p,
+              computed_state: academy?.state || "",
+              computed_city: academy?.city || "",
+            });
+          }
+        }
+        
+        let fetchedAthletes = allAthletes;
+        if (scope === "state" && scopeStates.length > 0) {
+          fetchedAthletes = fetchedAthletes.filter(a => 
+            scopeStates.some(s => a.computed_state && a.computed_state.toLowerCase().trim().includes(s.toLowerCase().trim()))
+          );
+        } else if (scope === "custom" && scopeCities.length > 0) {
+          fetchedAthletes = fetchedAthletes.filter(a => 
+            scopeCities.some(c => a.computed_city && a.computed_city.toLowerCase().trim().includes(c.toLowerCase().trim()))
+          );
+        }
+
+        setAthletes((fetchedAthletes as unknown as Athlete[]) || []);
       } catch (err: any) {
         toast.error(err.message);
       } finally {
@@ -323,7 +356,7 @@ function DraftAthletesModal({ tournament, scope, scopeValue, actorId, onClose }:
       }
     }
     load();
-  }, [scope, scopeValue]);
+  }, [scope, scopeStates, scopeCities]);
 
   const filtered = athletes.filter(a =>
     !search ||

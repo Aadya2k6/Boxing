@@ -13,8 +13,8 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { generateReceipt } from "@/lib/pdf-receipt";
 
-export const Route = createFileRoute("/admin/athletes")({
-  component: AdminAthletesPage,
+export const Route = createFileRoute("/admin/boxers")({
+  component: AdminBoxersPage,
 });
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
@@ -75,8 +75,8 @@ function StatusPill({ status }: { status: string }) {
 
 // ── FULL PAGE ATHLETE DETAIL VIEW ────────────────────────────────────────────
 
-function FullAthleteDetailView({
-  athleteId,
+function FullBoxerDetailView({
+  boxerId,
   onBack,
   onOpenSendModal,
   onOpenReassignAcademy,
@@ -84,7 +84,7 @@ function FullAthleteDetailView({
   onApproveRollover,
   onRejectRollover,
 }: {
-  athleteId: string;
+  boxerId: string;
   onBack: () => void;
   onOpenSendModal: (ap: any) => void;
   onOpenReassignAcademy: (ap: any) => void;
@@ -130,7 +130,7 @@ function FullAthleteDetailView({
         reinstated_by: !suspendForm.is_suspended && data.ap.is_suspended ? user?.id : (data.ap.is_suspended ? data.ap.reinstated_by : null),
         reinstated_at: !suspendForm.is_suspended && data.ap.is_suspended ? new Date().toISOString() : (data.ap.is_suspended ? data.ap.reinstated_at : null),
       };
-      const { error } = await supabase.from("boxer_profiles").update(payload).eq("id", athleteId);
+      const { error } = await supabase.from("boxer_profiles").update(payload).eq("id", boxerId);
       if (error) throw error;
       setShowSuspensionModal(false);
     } catch (e: any) {
@@ -179,21 +179,21 @@ function FullAthleteDetailView({
       let { data: ap, error: apErr } = await supabase
         .from("boxer_profiles")
         .select("*")
-        .or(`id.eq.${athleteId},user_id.eq.${athleteId}`)
+        .or(`id.eq.${boxerId},user_id.eq.${boxerId}`)
         .maybeSingle();
 
       if (!ap) {
         const { data: userP } = await supabase
           .from("profiles")
           .select("*")
-          .eq("id", athleteId)
+          .eq("id", boxerId)
           .maybeSingle();
 
         if (userP) {
           ap = {
             id: userP.id,
             user_id: userP.id,
-            full_name: userP.full_name || userP.email?.split("@")[0] || "Athlete",
+            full_name: userP.full_name || userP.email?.split("@")[0] || "Boxer",
             email: userP.email,
             phone: userP.phone,
             academy_id: userP.academy_id,
@@ -204,7 +204,7 @@ function FullAthleteDetailView({
       }
 
       if (!ap) {
-        console.error("Error fetching athlete profile:", apErr);
+        console.error("Error fetching boxer profile:", apErr);
         setData(null);
         return;
       }
@@ -226,39 +226,39 @@ function FullAthleteDetailView({
         ap.user_id
           ? supabase.from("profiles").select("email, role, updated_at").eq("id", ap.user_id).maybeSingle()
           : Promise.resolve({ data: null }),
-        supabase.from("guardian_details").select("*").eq("boxer_profile_id", athleteId).maybeSingle(),
+        supabase.from("guardian_details").select("*").eq("boxer_profile_id", boxerId).maybeSingle(),
         supabase
           .from("fee_assignments")
           .select("*, fee_plans(*)")
-          .eq("boxer_profile_id", athleteId)
+          .eq("boxer_profile_id", boxerId)
           .order("created_at", { ascending: false })
           .limit(1)
           .maybeSingle(),
         supabase
           .from("invoices")
           .select("*")
-          .eq("boxer_profile_id", athleteId)
+          .eq("boxer_profile_id", boxerId)
           .order("created_at", { ascending: false }),
         supabase
           .from("payments")
           .select("*")
-          .eq("boxer_profile_id", athleteId)
+          .eq("boxer_profile_id", boxerId)
           .order("created_at", { ascending: false }),
         supabase
           .from("attendance")
           .select("*")
-          .eq("boxer_profile_id", athleteId)
+          .eq("boxer_profile_id", boxerId)
           .order("session_date", { ascending: false })
           .limit(100),
         supabase
           .from("leave_applications")
           .select("*")
-          .eq("boxer_profile_id", athleteId)
+          .eq("boxer_profile_id", boxerId)
           .order("created_at", { ascending: false }),
         supabase
           .from("discount_applications")
           .select("*, discount_schemes(name, discount_type, discount_value)")
-          .eq("boxer_profile_id", athleteId)
+          .eq("boxer_profile_id", boxerId)
           .order("created_at", { ascending: false }),
       ]);
 
@@ -279,17 +279,17 @@ function FullAthleteDetailView({
         discounts: discounts ?? [],
       });
     } catch (err) {
-      console.error("Exception loading athlete detail page:", err);
+      console.error("Exception loading boxer detail page:", err);
       setData(null);
     } finally {
       setLoading(false);
     }
-  }, [athleteId]);
+  }, [boxerId]);
 
   useEffect(() => {
     loadDetails();
     const channel = supabase
-      .channel(`athlete-detail-${athleteId}`)
+      .channel(`boxer-detail-${boxerId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "boxer_profiles" }, loadDetails)
       .on("postgres_changes", { event: "*", schema: "public", table: "fee_assignments" }, loadDetails)
       .on("postgres_changes", { event: "*", schema: "public", table: "invoices" }, loadDetails)
@@ -298,13 +298,13 @@ function FullAthleteDetailView({
       .on("postgres_changes", { event: "*", schema: "public", table: "leave_applications" }, loadDetails)
       .subscribe();
     return () => { supabase.removeChannel(channel); };
-  }, [athleteId, loadDetails]);
+  }, [boxerId, loadDetails]);
 
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[500px] gap-3">
         <Loader2 className="size-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground font-medium">Loading athlete profile...</p>
+        <p className="text-sm text-muted-foreground font-medium">Loading boxer profile...</p>
       </div>
     );
   }
@@ -313,10 +313,10 @@ function FullAthleteDetailView({
     return (
       <div className="bg-surface border border-border rounded-2xl p-12 text-center max-w-lg mx-auto mt-10">
         <AlertCircle className="size-10 text-destructive mx-auto mb-3" />
-        <h3 className="font-display font-semibold text-lg">Athlete not found</h3>
-        <p className="text-sm text-muted-foreground mt-1 mb-6">Could not load the requested athlete record.</p>
+        <h3 className="font-display font-semibold text-lg">Boxer not found</h3>
+        <p className="text-sm text-muted-foreground mt-1 mb-6">Could not load the requested boxer record.</p>
         <button onClick={onBack} className="inline-flex items-center gap-2 px-4 py-2 bg-subtle hover:bg-elevated rounded-xl text-sm font-medium transition">
-          <ArrowLeft className="size-4" /> Back to Athletes
+          <ArrowLeft className="size-4" /> Back to Boxers
         </button>
       </div>
     );
@@ -352,7 +352,7 @@ function FullAthleteDetailView({
           onClick={onBack}
           className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-border bg-surface hover:bg-elevated text-xs font-semibold text-muted-foreground hover:text-foreground transition shadow-sm"
         >
-          <ArrowLeft className="size-4" /> Back to all athletes
+          <ArrowLeft className="size-4" /> Back to all boxers
         </button>
 
         <div className="flex items-center gap-2 flex-wrap">
@@ -569,7 +569,7 @@ function FullAthleteDetailView({
           <SectionCard title="Discounts & Fee Schemes" icon={Star}>
             {discounts.length === 0 ? (
               <div className="py-6 text-center text-xs text-muted-foreground">
-                No active discounts or subsidy schemes applied to this athlete.
+                No active discounts or subsidy schemes applied to this boxer.
               </div>
             ) : (
               <div className="space-y-3">
@@ -618,7 +618,7 @@ function FullAthleteDetailView({
               </div>
             ) : (
               <div className="py-6 text-center space-y-3">
-                <p className="text-sm text-muted-foreground">No fee package currently assigned to this athlete.</p>
+                <p className="text-sm text-muted-foreground">No fee package currently assigned to this boxer.</p>
                 <button
                   onClick={() => onOpenSendModal(ap)}
                   className="px-4 py-2 bg-primary text-primary-foreground text-xs font-semibold rounded-xl hover:bg-primary/90 transition shadow-sm inline-flex items-center gap-2"
@@ -633,7 +633,7 @@ function FullAthleteDetailView({
           <SectionCard title="Invoices & Billing History" icon={Receipt}>
             {invoices.length === 0 ? (
               <div className="py-8 text-center text-xs text-muted-foreground">
-                No invoices generated yet for this athlete.
+                No invoices generated yet for this boxer.
               </div>
             ) : (
               <div className="divide-y divide-border/60">
@@ -720,7 +720,7 @@ function FullAthleteDetailView({
         <SectionCard title="Attendance Log" icon={CalendarDays}>
           {attendance.length === 0 ? (
             <div className="py-12 text-center text-xs text-muted-foreground">
-              No attendance records found for this athlete.
+              No attendance records found for this boxer.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -760,7 +760,7 @@ function FullAthleteDetailView({
         <SectionCard title="Leave Applications" icon={Clock}>
           {leaves.length === 0 ? (
             <div className="py-12 text-center text-xs text-muted-foreground">
-              No leave applications submitted by this athlete.
+              No leave applications submitted by this boxer.
             </div>
           ) : (
             <div className="space-y-4">
@@ -842,7 +842,7 @@ function FullAthleteDetailView({
                   onChange={e => setSuspendForm(f => ({ ...f, is_suspended: e.target.checked }))}
                   className="size-4 rounded border-border text-destructive focus:ring-destructive"
                 />
-                <span className="text-sm font-semibold text-destructive">Suspend Athlete</span>
+                <span className="text-sm font-semibold text-destructive">Suspend Boxer</span>
               </label>
 
               {suspendForm.is_suspended && (
@@ -892,9 +892,9 @@ function FullAthleteDetailView({
 
 // ── MAIN ADMIN ATHLETES PAGE ───────────────────────────────────────────────
 
-function AdminAthletesPage() {
+function AdminBoxersPage() {
   const { user, profile } = useAuth();
-  const [athletes, setAthletes]     = useState<any[]>([]);
+  const [boxers, setBoxers]     = useState<any[]>([]);
   const [feePlans, setFeePlans]     = useState<any[]>([]);
   const [academies, setAcademies]   = useState<any[]>([]);
   const [loading, setLoading]       = useState(true);
@@ -902,16 +902,16 @@ function AdminAthletesPage() {
   const [statusFilter, setStatusFilter] = useState("all");
   const [academyFilter, setAcademyFilter] = useState("all");
 
-  // Selected athlete for full-page detail view
-  const [selectedAthleteId, setSelectedAthleteId] = useState<string | null>(() => {
+  // Selected boxer for full-page detail view
+  const [selectedBoxerId, setSelectedBoxerId] = useState<string | null>(() => {
     if (typeof window !== "undefined") {
       return new URLSearchParams(window.location.search).get("id");
     }
     return null;
   });
 
-  const navigateAthleteDetail = (id: string | null) => {
-    setSelectedAthleteId(id);
+  const navigateBoxerDetail = (id: string | null) => {
+    setSelectedBoxerId(id);
     if (typeof window !== "undefined") {
       const url = new URL(window.location.href);
       if (id) url.searchParams.set("id", id);
@@ -921,7 +921,7 @@ function AdminAthletesPage() {
   };
 
   // Modals & Action States
-  const [selectedAthleteForModal, setSelectedAthleteForModal] = useState<any | null>(null);
+  const [selectedBoxerForModal, setSelectedBoxerForModal] = useState<any | null>(null);
   const [showSendModal, setShowSendModal]         = useState(false);
   const [sendPlanId, setSendPlanId]               = useState("");
   const [sendAcademyId, setSendAcademyId]         = useState("");
@@ -941,7 +941,7 @@ function AdminAthletesPage() {
   useEffect(() => {
     loadData();
     const channel = supabase
-      .channel("admin-athletes-watch-full")
+      .channel("admin-boxers-watch-full")
       .on("postgres_changes", { event: "*", schema: "public", table: "profiles" }, loadData)
       .on("postgres_changes", { event: "*", schema: "public", table: "fee_assignments" }, loadData)
       .on("postgres_changes", { event: "*", schema: "public", table: "boxer_profiles" }, loadData)
@@ -954,7 +954,7 @@ function AdminAthletesPage() {
     try {
       const targetAcademyId = profile?.academy_id;
 
-      let profQuery = supabase.from("profiles").select("*").eq("role", "athlete").order("created_at", { ascending: false });
+      let profQuery = supabase.from("profiles").select("*").eq("role", "boxer").order("created_at", { ascending: false });
       let bpQuery = supabase.from("boxer_profiles").select("*").order("created_at", { ascending: false });
       let plansQuery = supabase.from("fee_plans").select("id,name,amount,cycle").eq("is_active", true);
       let assignsQuery = supabase.from("fee_assignments").select("id,boxer_profile_id,fee_plan_id,status,assignment_status,payment_mode,rollover_requested,fee_plans(name,amount,cycle)");
@@ -975,7 +975,7 @@ function AdminAthletesPage() {
         acsQuery,
       ]);
 
-      if (profilesRes.error) console.error("Error fetching athlete profiles:", profilesRes.error);
+      if (profilesRes.error) console.error("Error fetching boxer profiles:", profilesRes.error);
       if (boxerProfilesRes.error) console.error("Error fetching boxer_profiles:", boxerProfilesRes.error);
       if (plansRes.error) console.error("Error fetching fee_plans:", plansRes.error);
       if (assignsRes.error) console.error("Error fetching fee_assignments:", assignsRes.error);
@@ -990,18 +990,18 @@ function AdminAthletesPage() {
       setFeePlans(normalizedPlans);
       setAcademies(acsRes.data ?? []);
 
-      const athleteProfiles = profilesRes.data ?? [];
+      const userProfiles = profilesRes.data ?? [];
       const boxerProfiles = boxerProfilesRes.data ?? [];
       const acs = acsRes.data ?? [];
       const assigns = assignsRes.data ?? [];
       const invs = invsRes.data ?? [];
 
       const seenIds = new Set<string>();
-      const combinedAthletes: any[] = [];
+      const combinedBoxers: any[] = [];
 
       // 1. Add from boxer_profiles
       for (const bp of boxerProfiles) {
-        const userProf = athleteProfiles.find(p => p.id === bp.user_id);
+        const userProf = userProfiles.find(p => p.id === bp.user_id);
         const academyId = bp.academy_id || userProf?.academy_id;
         const academy = acs.find(ac => ac.id === academyId);
         const assignment = assigns.find(a => a.boxer_profile_id === bp.id || (bp.user_id && a.boxer_profile_id === bp.user_id));
@@ -1024,9 +1024,9 @@ function AdminAthletesPage() {
         seenIds.add(bp.id);
         if (bp.user_id) seenIds.add(bp.user_id);
 
-        combinedAthletes.push({
+        combinedBoxers.push({
           ...bp,
-          full_name: bp.full_name || userProf?.full_name || bp.email?.split("@")[0] || "Athlete",
+          full_name: bp.full_name || userProf?.full_name || bp.email?.split("@")[0] || "Boxer",
           email: bp.email || userProf?.email,
           phone: bp.phone || userProf?.phone,
           academy_id: academyId,
@@ -1037,8 +1037,8 @@ function AdminAthletesPage() {
         });
       }
 
-      // 2. Add from profiles where role === 'athlete' if not already in boxer_profiles
-      for (const p of athleteProfiles) {
+      // 2. Add from profiles where role === 'boxer' if not already in boxer_profiles
+      for (const p of userProfiles) {
         if (!seenIds.has(p.id)) {
           const academy = acs.find(ac => ac.id === p.academy_id);
           const assignment = assigns.find(a => a.boxer_profile_id === p.id);
@@ -1058,10 +1058,10 @@ function AdminAthletesPage() {
             else                                     payStatus = "awaiting_invoice";
           }
 
-          combinedAthletes.push({
+          combinedBoxers.push({
             id: p.id,
             user_id: p.id,
-            full_name: p.full_name || p.email?.split("@")[0] || "Athlete",
+            full_name: p.full_name || p.email?.split("@")[0] || "Boxer",
             email: p.email,
             phone: p.phone,
             academy_id: p.academy_id,
@@ -1074,7 +1074,7 @@ function AdminAthletesPage() {
         }
       }
 
-      setAthletes(combinedAthletes);
+      setBoxers(combinedBoxers);
     } catch (e) {
       console.error("loadData caught exception:", e);
     } finally {
@@ -1084,24 +1084,24 @@ function AdminAthletesPage() {
 
   async function handleSendPackage(e: React.FormEvent) {
     e.preventDefault();
-    if (!selectedAthleteForModal || !sendPlanId) return;
+    if (!selectedBoxerForModal || !sendPlanId) return;
     setSending(true);
     setSendError(null);
     try {
       const plan = feePlans.find(p => p.id === sendPlanId);
       if (!plan) throw new Error("Selected fee plan not found");
 
-      const targetUserId = selectedAthleteForModal.user_id || selectedAthleteForModal.id;
-      const targetAcademyId = sendAcademyId || selectedAthleteForModal.academy_id || profile?.academy_id || academies[0]?.id;
+      const targetUserId = selectedBoxerForModal.user_id || selectedBoxerForModal.id;
+      const targetAcademyId = sendAcademyId || selectedBoxerForModal.academy_id || profile?.academy_id || academies[0]?.id;
 
-      if (!targetAcademyId) throw new Error("Please select an academy location for this athlete.");
+      if (!targetAcademyId) throw new Error("Please select an academy location for this boxer.");
 
       // 1. Ensure boxer_profiles record exists
-      let boxerProfileId = selectedAthleteForModal.id;
+      let boxerProfileId = selectedBoxerForModal.id;
       const { data: existingBp } = await supabase
         .from("boxer_profiles")
         .select("id")
-        .or(`id.eq.${selectedAthleteForModal.id},user_id.eq.${targetUserId}`)
+        .or(`id.eq.${selectedBoxerForModal.id},user_id.eq.${targetUserId}`)
         .maybeSingle();
 
       if (existingBp) {
@@ -1115,11 +1115,11 @@ function AdminAthletesPage() {
           .upsert({
             user_id: targetUserId,
             academy_id: targetAcademyId,
-            full_name: selectedAthleteForModal.full_name || "Athlete",
-            email: selectedAthleteForModal.email || null,
-            phone: selectedAthleteForModal.phone || null,
-            date_of_birth: selectedAthleteForModal.date_of_birth || "2000-01-01",
-            gender: selectedAthleteForModal.gender || "Male",
+            full_name: selectedBoxerForModal.full_name || "Boxer",
+            email: selectedBoxerForModal.email || null,
+            phone: selectedBoxerForModal.phone || null,
+            date_of_birth: selectedBoxerForModal.date_of_birth || "2000-01-01",
+            gender: selectedBoxerForModal.gender || "Male",
             verification_status: "pending",
             onboarding_complete: true,
             updated_at: new Date().toISOString(),
@@ -1155,6 +1155,7 @@ function AdminAthletesPage() {
           boxer_profile_id: boxerProfileId,
           fee_plan_id: sendPlanId,
           academy_id: targetAcademyId,
+          center_id: selectedBoxerForModal?.center_id,
           assigned_by: user?.id,
           status: "active",
         }).select("id").single();
@@ -1235,17 +1236,17 @@ function AdminAthletesPage() {
     }
   }
 
-  async function handleToggleSuspension(athleteId: string, currentlySuspended: boolean) {
-    setSuspendActionId(athleteId);
+  async function handleToggleSuspension(boxerId: string, currentlySuspended: boolean) {
+    setSuspendActionId(boxerId);
     try {
       await supabase.from("boxer_profiles")
         .update({ is_suspended: !currentlySuspended })
-        .eq("id", athleteId);
+        .eq("id", boxerId);
       
-      const athlete = athletes.find(a => a.id === athleteId);
-      if (athlete?.user_id) {
+      const boxer = boxers.find(a => a.id === boxerId);
+      if (boxer?.user_id) {
         await supabase.from("notifications").insert({
-          recipient_id: athlete.user_id,
+          recipient_id: boxer.user_id,
           type: "status_changed",
           title: !currentlySuspended ? "Account Suspended" : "Account Reinstated",
           body: !currentlySuspended 
@@ -1264,11 +1265,11 @@ function AdminAthletesPage() {
     setReassigning(true);
     try {
       await supabase.from("boxer_profiles").update({ academy_id: reassignAcademy }).eq("id", reassignId);
-      const athlete = athletes.find(a => a.id === reassignId);
+      const boxer = boxers.find(a => a.id === reassignId);
       const academy = academies.find(a => a.id === reassignAcademy);
-      if (athlete?.user_id && academy) {
+      if (boxer?.user_id && academy) {
         await supabase.from("notifications").insert({
-          recipient_id: athlete.user_id, type: "academy_changed",
+          recipient_id: boxer.user_id, type: "academy_changed",
           title: "Academy location updated",
           body: `Your assigned academy has been updated to ${academy.name}.`,
         });
@@ -1277,24 +1278,24 @@ function AdminAthletesPage() {
     } finally { setReassigning(false); }
   }
 
-  async function handleApproveCash(athleteId: string) {
+  async function handleApproveCash(boxerId: string) {
     setApproving(true);
     try {
-      const athlete = athletes.find(a => a.id === athleteId);
-      const invoice  = athlete?.invoice;
+      const boxer = boxers.find(a => a.id === boxerId);
+      const invoice  = boxer?.invoice;
       const pMode    = "cash";
 
       // 1. Update fee assignment status
-      if (athlete?.assignment?.id) {
+      if (boxer?.assignment?.id) {
         await supabase.from("fee_assignments").update({
           assignment_status: "cash_approved",
           status: "active",
-        }).eq("id", athlete.assignment.id);
+        }).eq("id", boxer.assignment.id);
       } else {
         await supabase.from("fee_assignments").update({
           assignment_status: "cash_approved",
           status: "active",
-        }).eq("boxer_profile_id", athleteId).in("assignment_status", ["cash_pending"]);
+        }).eq("boxer_profile_id", boxerId).in("assignment_status", ["cash_pending"]);
       }
 
       if (invoice?.id) {
@@ -1302,7 +1303,7 @@ function AdminAthletesPage() {
         if (unpaid > 0) {
           await supabase.from("payments").insert({
             invoice_id: invoice.id,
-            boxer_profile_id: athlete.boxer_profile_id || athlete.id,
+            boxer_profile_id: boxer.boxer_profile_id || boxer.id,
             amount: unpaid,
             payment_mode: pMode,
             recorded_by: user?.id,
@@ -1316,9 +1317,9 @@ function AdminAthletesPage() {
         }).eq("id", invoice.id);
       }
 
-      if (athlete?.user_id) {
+      if (boxer?.user_id) {
         await supabase.from("notifications").insert({
-          recipient_id: athlete.user_id,
+          recipient_id: boxer.user_id,
           type: "cash_approved",
           title: "Payment confirmed ✓",
           body: `Your cash payment has been confirmed by your admin. Your dashboard is now unlocked!`,
@@ -1330,27 +1331,27 @@ function AdminAthletesPage() {
     finally { setApproving(false); }
   }
 
-  async function handleApproveRollover(athleteId: string) {
+  async function handleApproveRollover(boxerId: string) {
     setRolloverActioning(true);
     try {
-      const athlete = athletes.find(a => a.id === athleteId);
+      const boxer = boxers.find(a => a.id === boxerId);
       
       // Update fee assignment status
-      if (athlete?.assignment?.id) {
+      if (boxer?.assignment?.id) {
         await supabase.from("fee_assignments").update({
           assignment_status: "rollover_approved",
           status: "active",
-        }).eq("id", athlete.assignment.id);
+        }).eq("id", boxer.assignment.id);
       } else {
         await supabase.from("fee_assignments").update({
           assignment_status: "rollover_approved",
           status: "active",
-        }).eq("boxer_profile_id", athleteId).in("assignment_status", ["rollover_pending"]);
+        }).eq("boxer_profile_id", boxerId).in("assignment_status", ["rollover_pending"]);
       }
 
-      if (athlete?.user_id) {
+      if (boxer?.user_id) {
         await supabase.from("notifications").insert({
-          recipient_id: athlete.user_id,
+          recipient_id: boxer.user_id,
           type: "rollover_approved",
           title: "Payment rollover approved ✓",
           body: "Your payment rollover has been approved. Your dashboard is now unlocked!",
@@ -1362,29 +1363,29 @@ function AdminAthletesPage() {
     finally { setRolloverActioning(false); }
   }
 
-  async function handleRejectRollover(athleteId: string) {
+  async function handleRejectRollover(boxerId: string) {
     setRolloverActioning(true);
     try {
-      const athlete = athletes.find(a => a.id === athleteId);
+      const boxer = boxers.find(a => a.id === boxerId);
       
-      // Revert fee assignment status so athlete can pay again
-      if (athlete?.assignment?.id) {
+      // Revert fee assignment status so boxer can pay again
+      if (boxer?.assignment?.id) {
         await supabase.from("fee_assignments").update({
           assignment_status: null,
           payment_mode: null,
           rollover_requested: false,
-        }).eq("id", athlete.assignment.id);
+        }).eq("id", boxer.assignment.id);
       } else {
         await supabase.from("fee_assignments").update({
           assignment_status: null,
           payment_mode: null,
           rollover_requested: false,
-        }).eq("boxer_profile_id", athleteId).in("assignment_status", ["rollover_pending"]);
+        }).eq("boxer_profile_id", boxerId).in("assignment_status", ["rollover_pending"]);
       }
 
-      if (athlete?.user_id) {
+      if (boxer?.user_id) {
         await supabase.from("notifications").insert({
-          recipient_id: athlete.user_id,
+          recipient_id: boxer.user_id,
           type: "rollover_rejected",
           title: "Payment rollover rejected",
           body: "Your payment rollover request was declined. Please complete your payment to unlock your dashboard.",
@@ -1409,23 +1410,23 @@ function AdminAthletesPage() {
     overdue: "Overdue", paid: "Paid",
   };
 
-  const filtered = athletes.filter(a => {
+  const filtered = boxers.filter(a => {
     const matchQ = !q || a.full_name?.toLowerCase().includes(q.toLowerCase()) || (a.email && a.email.toLowerCase().includes(q.toLowerCase())) || (a.phone && a.phone.includes(q)) || a.primary_discipline?.toLowerCase().includes(q.toLowerCase());
     const matchS = statusFilter === "all" || a.payStatus === statusFilter;
     const matchA = academyFilter === "all" || a.academy_id === academyFilter;
     return matchQ && matchS && matchA;
   });
-  const cashPending     = athletes.filter(a => a.payStatus === "cash_pending");
-  const rolloverPending = athletes.filter(a => a.payStatus === "rollover_pending");
+  const cashPending     = boxers.filter(a => a.payStatus === "cash_pending");
+  const rolloverPending = boxers.filter(a => a.payStatus === "rollover_pending");
 
   // IF AN ATHLETE IS SELECTED -> RENDER THE FULL ATHLETE DETAIL PAGE
-  if (selectedAthleteId) {
+  if (selectedBoxerId) {
     return (
-      <FullAthleteDetailView
-        athleteId={selectedAthleteId}
-        onBack={() => navigateAthleteDetail(null)}
+      <FullBoxerDetailView
+        boxerId={selectedBoxerId}
+        onBack={() => navigateBoxerDetail(null)}
         onOpenSendModal={(ap) => {
-          setSelectedAthleteForModal(ap);
+          setSelectedBoxerForModal(ap);
           setSendPlanId(ap.assignment?.fee_plan_id || feePlans[0]?.id || "");
           setSendAcademyId(ap.academy_id || academies[0]?.id || "");
           setShowSendModal(true);
@@ -1445,8 +1446,8 @@ function AdminAthletesPage() {
   return (
     <div className="space-y-6 animate-fade-up">
       <PageHeader
-        title="Athletes Management"
-        subtitle={`${athletes.length} enrolled athletes · ${cashPending.length} cash pending · ${rolloverPending.length} rollover${rolloverPending.length !== 1 ? "s" : ""} pending`}
+        title="Boxers Management"
+        subtitle={`${boxers.length} enrolled boxers · ${cashPending.length} cash pending · ${rolloverPending.length} rollover${rolloverPending.length !== 1 ? "s" : ""} pending`}
       />
 
       {/* Cash pending banner */}
@@ -1454,7 +1455,7 @@ function AdminAthletesPage() {
         <div className="bg-warning/8 border border-warning/25 rounded-xl p-4 flex items-center justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-warning">Cash payment approvals needed</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{cashPending.length} athlete{cashPending.length > 1 ? "s" : ""} — confirm receipt to unlock access.</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{cashPending.length} boxer{cashPending.length > 1 ? "s" : ""} — confirm receipt to unlock access.</div>
           </div>
           <div className="flex flex-wrap gap-2">
             {cashPending.map(a => (
@@ -1472,7 +1473,7 @@ function AdminAthletesPage() {
         <div className="bg-info/8 border border-info/25 rounded-xl p-4 flex items-center justify-between gap-4">
           <div>
             <div className="text-sm font-semibold text-info">Payment rollover approvals needed</div>
-            <div className="text-xs text-muted-foreground mt-0.5">{rolloverPending.length} athlete{rolloverPending.length > 1 ? "s" : ""} requested a rollover.</div>
+            <div className="text-xs text-muted-foreground mt-0.5">{rolloverPending.length} boxer{rolloverPending.length > 1 ? "s" : ""} requested a rollover.</div>
           </div>
           <div className="flex flex-wrap gap-2">
             {rolloverPending.map(a => (
@@ -1493,7 +1494,7 @@ function AdminAthletesPage() {
             <Search className="size-4 text-muted-foreground shrink-0" />
             <input
               value={q} onChange={e => setQ(e.target.value)}
-              placeholder="Search athletes by name, email, phone…"
+              placeholder="Search boxers by name, email, phone…"
               className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
             {q && <button onClick={() => setQ("")}><X className="size-4 text-muted-foreground" /></button>}
@@ -1512,7 +1513,7 @@ function AdminAthletesPage() {
           <div className="flex items-center gap-2">
             <span className="text-xs font-semibold text-muted-foreground">Filter status:</span>
             <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="text-sm h-10 px-3.5 border border-border rounded-xl bg-surface font-medium shadow-sm">
-              <option value="all">All Statuses ({athletes.length})</option>
+              <option value="all">All Statuses ({boxers.length})</option>
               <option value="unassigned">Unassigned</option>
               <option value="cash_pending">Cash pending</option>
               <option value="rollover_pending">Rollover pending</option>
@@ -1524,12 +1525,12 @@ function AdminAthletesPage() {
           </div>
         </div>
 
-        {/* Athletes Table */}
+        {/* Boxers Table */}
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-elevated/70 border-b border-border">
               <tr className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-                <th className="text-left py-3.5 px-6">Athlete Name</th>
+                <th className="text-left py-3.5 px-6">Boxer Name</th>
                 <th className="text-left py-3.5 px-4">Discipline</th>
                 <th className="text-left py-3.5 px-4">Assigned Academy</th>
                 <th className="text-left py-3.5 px-4">Fee Package</th>
@@ -1542,11 +1543,11 @@ function AdminAthletesPage() {
               {loading ? (
                 <tr><td colSpan={7} className="py-16 text-center"><Loader2 className="size-6 animate-spin mx-auto text-primary" /></td></tr>
               ) : filtered.length === 0 ? (
-                <tr><td colSpan={7} className="py-16 text-center text-sm text-muted-foreground">No matching athletes found.</td></tr>
+                <tr><td colSpan={7} className="py-16 text-center text-sm text-muted-foreground">No matching boxers found.</td></tr>
               ) : filtered.map(a => (
                 <tr
                   key={a.id}
-                  onClick={() => navigateAthleteDetail(a.id)}
+                  onClick={() => navigateBoxerDetail(a.id)}
                   className="hover:bg-primary/5 transition cursor-pointer group"
                 >
                   <td className="py-4 px-6">
@@ -1646,7 +1647,7 @@ function AdminAthletesPage() {
 
                       <button
                         onClick={() => {
-                          setSelectedAthleteForModal(a);
+                          setSelectedBoxerForModal(a);
                           setSendPlanId(a.assignment?.fee_plan_id || feePlans[0]?.id || "");
                           setSendAcademyId(a.academy_id || academies[0]?.id || "");
                           setShowSendModal(true);
@@ -1665,21 +1666,21 @@ function AdminAthletesPage() {
         </div>
 
         <div className="px-6 py-4 border-t border-border bg-elevated/40 flex justify-between items-center text-xs text-muted-foreground">
-          <span>Displaying <strong>{filtered.length}</strong> of <strong>{athletes.length}</strong> enrolled athletes</span>
-          <span>Click any athlete row to view full detailed profile, billing history & attendance</span>
+          <span>Displaying <strong>{filtered.length}</strong> of <strong>{boxers.length}</strong> enrolled boxers</span>
+          <span>Click any boxer row to view full detailed profile, billing history & attendance</span>
         </div>
       </div>
 
       {/* ── MODALS ── */}
 
       {/* Send / Reassign Fee Package Modal */}
-      {showSendModal && selectedAthleteForModal && (
+      {showSendModal && selectedBoxerForModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm" onClick={e => e.target === e.currentTarget && setShowSendModal(false)}>
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-md animate-fade-up overflow-hidden max-h-[90vh] overflow-y-auto">
             <div className="px-6 py-4 border-b border-border flex items-center justify-between sticky top-0 bg-surface z-10">
               <div>
                 <h3 className="font-display font-semibold">Assign Fee Plan Package</h3>
-                <p className="text-xs text-muted-foreground mt-0.5">for {selectedAthleteForModal.full_name}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">for {selectedBoxerForModal.full_name}</p>
               </div>
               <button onClick={() => setShowSendModal(false)} className="size-8 grid place-items-center rounded-md hover:bg-subtle text-muted-foreground transition cursor-pointer"><X className="size-4" /></button>
             </div>
@@ -1722,7 +1723,7 @@ function AdminAthletesPage() {
 
               <div>
                 <label className="block text-xs font-semibold mb-2">Notes (optional)</label>
-                <textarea rows={2} value={sendNotes} onChange={e => setSendNotes(e.target.value)} placeholder="Notes for athlete…" className="input-premium resize-none" />
+                <textarea rows={2} value={sendNotes} onChange={e => setSendNotes(e.target.value)} placeholder="Notes for boxer…" className="input-premium resize-none" />
               </div>
 
               {sendError && <div className="text-xs text-destructive bg-destructive/8 border border-destructive/20 rounded-lg p-3">{sendError}</div>}
@@ -1745,7 +1746,7 @@ function AdminAthletesPage() {
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-sm p-6 animate-fade-up text-center">
             <div className="size-12 rounded-full bg-info/10 grid place-items-center mx-auto mb-4"><RotateCcw className="size-5 text-info" /></div>
             <h3 className="font-semibold text-base">Approve Payment Rollover?</h3>
-            <p className="text-sm text-muted-foreground mt-1 mb-5">This will defer payment for <strong>{athletes.find(a => a.id === rolloverApproveId)?.full_name}</strong> and unlock their dashboard.</p>
+            <p className="text-sm text-muted-foreground mt-1 mb-5">This will defer payment for <strong>{boxers.find(a => a.id === rolloverApproveId)?.full_name}</strong> and unlock their dashboard.</p>
             <div className="flex gap-3">
               <button onClick={() => setRolloverApproveId(null)} className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition cursor-pointer">Cancel</button>
               <button onClick={() => handleApproveRollover(rolloverApproveId)} disabled={rolloverActioning} className="flex-1 px-4 py-2 text-sm font-semibold bg-info text-white rounded-xl hover:bg-info/90 transition flex items-center justify-center gap-2 cursor-pointer">
@@ -1762,7 +1763,7 @@ function AdminAthletesPage() {
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-sm p-6 animate-fade-up text-center">
             <div className="size-12 rounded-full bg-destructive/10 grid place-items-center mx-auto mb-4"><X className="size-5 text-destructive" /></div>
             <h3 className="font-semibold text-base">Reject Rollover Request?</h3>
-            <p className="text-sm text-muted-foreground mt-1 mb-5"><strong>{athletes.find(a => a.id === rolloverRejectId)?.full_name}</strong>'s rollover will be rejected.</p>
+            <p className="text-sm text-muted-foreground mt-1 mb-5"><strong>{boxers.find(a => a.id === rolloverRejectId)?.full_name}</strong>'s rollover will be rejected.</p>
             <div className="flex gap-3">
               <button onClick={() => setRolloverRejectId(null)} className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition cursor-pointer">Cancel</button>
               <button onClick={() => handleRejectRollover(rolloverRejectId)} disabled={rolloverActioning} className="flex-1 px-4 py-2 text-sm font-semibold bg-destructive text-white rounded-xl hover:bg-destructive/90 transition flex items-center justify-center gap-2 cursor-pointer">
@@ -1779,7 +1780,7 @@ function AdminAthletesPage() {
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-sm p-6 animate-fade-up text-center">
             <div className="size-12 rounded-full bg-success/10 grid place-items-center mx-auto mb-4"><Banknote className="size-5 text-success" /></div>
             <h3 className="font-semibold text-base">Confirm Cash Received</h3>
-            <p className="text-sm text-muted-foreground mt-1 mb-5">Confirm you have received cash payment from <strong>{athletes.find(a => a.id === cashApproveId)?.full_name}</strong>. Their dashboard will unlock immediately.</p>
+            <p className="text-sm text-muted-foreground mt-1 mb-5">Confirm you have received cash payment from <strong>{boxers.find(a => a.id === cashApproveId)?.full_name}</strong>. Their dashboard will unlock immediately.</p>
             <div className="flex gap-3">
               <button onClick={() => setCashApproveId(null)} className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition cursor-pointer">Cancel</button>
               <button onClick={() => handleApproveCash(cashApproveId)} disabled={approving} className="flex-1 px-4 py-2 text-sm font-semibold bg-success text-white rounded-xl hover:bg-success/90 transition flex items-center justify-center gap-2 cursor-pointer">
@@ -1798,14 +1799,14 @@ function AdminAthletesPage() {
               <div className="size-10 rounded-xl bg-info/10 grid place-items-center shrink-0"><MapPin className="size-4 text-info" /></div>
               <div>
                 <h3 className="font-semibold">Reassign Academy Location</h3>
-                <p className="text-xs text-muted-foreground">{athletes.find(a => a.id === reassignId)?.full_name}</p>
+                <p className="text-xs text-muted-foreground">{boxers.find(a => a.id === reassignId)?.full_name}</p>
               </div>
             </div>
             <select value={reassignAcademy} onChange={e => setReassignAcademy(e.target.value)} className="input-premium mb-3">
               <option value="">Select new academy…</option>
               {academies.map(a => (<option key={a.id} value={a.id}>{a.name}{a.city ? ` — ${a.city}` : ""}</option>))}
             </select>
-            <p className="text-[11px] text-muted-foreground mb-5">Athlete's attendance geo-fence will update immediately.</p>
+            <p className="text-[11px] text-muted-foreground mb-5">Boxer's attendance geo-fence will update immediately.</p>
             <div className="flex gap-3">
               <button onClick={() => { setReassignId(null); setReassignAcademy(""); }} className="flex-1 px-4 py-2 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition cursor-pointer">Cancel</button>
               <button onClick={handleReassignAcademy} disabled={reassigning || !reassignAcademy} className="flex-1 px-4 py-2 text-sm font-semibold bg-info text-white rounded-xl hover:bg-info/90 disabled:opacity-50 transition flex items-center justify-center gap-2 cursor-pointer">

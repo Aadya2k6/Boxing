@@ -1,6 +1,6 @@
 import { createFileRoute, useLocation } from "@tanstack/react-router";
 import { DashboardLayout } from "@/components/dashboard/DashboardLayout";
-import { LayoutGrid, Users, Wallet, Receipt, Bell, Settings, CalendarCheck, Swords, Gavel } from "lucide-react";
+import { LayoutGrid, Users, Wallet, Receipt, Bell, Settings, CalendarCheck, Swords, Gavel, FileText } from "lucide-react";
 import { useRequireAuth } from "@/lib/guards";
 
 export const Route = createFileRoute("/admin")({ component: AdminLayout });
@@ -46,11 +46,13 @@ function AdminLayout() {
           label: "Workspace",
           items: [
             { to: "", label: "Overview", icon: LayoutGrid },
-            hasFeature("boxers") && { to: "athletes", label: "Boxers", icon: Users },
+            hasFeature("boxers") && { to: "boxers", label: "Boxers", icon: Users },
+            hasFeature("scheduling") && { to: "scheduling", label: "Scheduling", icon: CalendarCheck },
+            hasFeature("judges") && { to: "judges", label: "Judges", icon: Gavel },
             hasFeature("fees") && { to: "fees", label: "Fee Management", icon: Wallet },
             hasFeature("fees") && { to: "invoices", label: "Invoices", icon: Receipt },
-            hasFeature("attendance") && { to: "attendance", label: "Attendance & Leaves", icon: CalendarCheck },
-            hasFeature("coaches") && { to: "coaches", label: "Coaches", icon: Users },
+            hasFeature("attendance") && { to: "attendance", label: "Attendance", icon: CalendarCheck },
+            hasFeature("reports") && { to: "reports", label: "Reports", icon: FileText },
           ].filter(Boolean) as any,
         },
         {

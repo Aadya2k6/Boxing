@@ -60,7 +60,7 @@ function AcademiesPage() {
       const [ { data: acs }, { data: athletes } ] = await Promise.all([
         supabase
           .from("centers")
-          .select("id, name, city, state, address, latitude, longitude, attendance_radius_meters, is_active, created_at, updated_at")
+          .select("id, name, city, state, address, latitude, longitude, attendance_radius_meters, is_active, active_gateway, razorpay_key_id, payu_merchant_key, encrypted_payu_salt, created_at, updated_at")
           .eq("academy_id", profile?.academy_id)
           .order("created_at"),
         supabase
@@ -70,31 +70,14 @@ function AcademiesPage() {
       ]);
 
       const centers = acs ?? [];
-      
-      // Fetch academy gateway config
-      const { data: academyConfig } = await supabase
-        .from("academies")
-        .select("active_gateway, razorpay_key_id, payu_merchant_key, encrypted_payu_salt")
-        .eq("id", profile?.academy_id)
-        .maybeSingle();
-
-      const gwMap = centers.reduce((acc, curr) => {
-        acc[curr.id] = {
-          id: curr.id,
-          payment_gateway: academyConfig?.active_gateway || "razorpay",
-          has_razorpay_key: !!academyConfig?.razorpay_key_id,
-          has_payu_key: !!(academyConfig?.payu_merchant_key && academyConfig?.encrypted_payu_salt)
-        };
-        return acc;
-      }, {} as Record<string, any>);
 
       setAcademies(
         centers.map((a) => ({
           ...a,
           athlete_count: athletes?.filter((ap) => ap.center_id === a.id).length ?? 0,
-          active_gateway: gwMap[a.id]?.payment_gateway ?? "razorpay",
-          has_razorpay_key: gwMap[a.id]?.has_razorpay_key ?? false,
-          has_payu_key: gwMap[a.id]?.has_payu_key ?? false,
+          active_gateway: a.active_gateway ?? "razorpay",
+          has_razorpay_key: !!a.razorpay_key_id,
+          has_payu_key: !!(a.payu_merchant_key && a.encrypted_payu_salt),
         })),
       );
     } catch (e) {
@@ -195,23 +178,35 @@ function AcademiesPage() {
         }
       }
 
-      // Save gateway keys using the academies table (academy-wide config)
-      if (form.razorpay_key_id || form.payu_merchant_key || form.payment_gateway) {
-        const academyPayload = {
+      // Save gateway config to the center row (keys stored per-center, not academy-wide).
+      // Only overwrite key fields when user explicitly typed a new value.
+      // Leaving blank while editing = keep existing DB value.
+      if (centerId) {
+        const centerGwPayload: Record<string, any> = {
           active_gateway: form.payment_gateway,
-          razorpay_key_id: form.razorpay_key_id || null,
-          payu_merchant_key: form.payu_merchant_key || null,
-          encrypted_payu_salt: form.payu_merchant_salt ? await encryptSecret(form.payu_merchant_salt) : null
         };
+
+        if (form.razorpay_key_id.trim()) {
+          centerGwPayload.razorpay_key_id = form.razorpay_key_id.trim();
+        }
+        if (form.payu_merchant_key.trim()) {
+          centerGwPayload.payu_merchant_key = form.payu_merchant_key.trim();
+        }
+        if (form.payu_merchant_salt.trim()) {
+          centerGwPayload.encrypted_payu_salt = await encryptSecret(form.payu_merchant_salt.trim());
+        }
+
         const { error: gwError } = await supabase
-          .from("academies")
-          .update(academyPayload)
-          .eq("id", profile?.academy_id);
-        
+          .from("centers")
+          .update(centerGwPayload)
+          .eq("id", centerId);
+
         if (gwError) {
-          console.warn("Could not save payment keys to academy:", gwError);
+          console.warn("Could not save payment config to center:", gwError);
+          alert("Warning: Payment gateway config could not be saved. " + gwError.message);
         }
       }
+
 
       setShowModal(false);
       loadAcademies();

@@ -3,7 +3,7 @@ import { PageHeader } from "@/components/dashboard/DashboardLayout";
 import {
   Plus, X, Loader2, Check, ClipboardList, Pencil, Trash2,
   ChevronLeft, ChevronRight, Search, Clock, Users, Bell,
-  AlertTriangle, MapPin, Sparkles, CalendarDays, Navigation,
+  AlertTriangle, MapPin, Sparkles, CalendarDays, Navigation, Swords
 } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
@@ -44,6 +44,12 @@ function calculateEstimatedSessions(validFrom: string, validTo: string, daysOfWe
 }
 
 // ── Types ───────────────────────────────────────────────────────────────
+interface Academy {
+  id: string;
+  name: string;
+  city?: string;
+}
+
 interface Ring {
   id: string;
   name: string;
@@ -52,8 +58,10 @@ interface Ring {
   locationName?: string;
   latitude?: number | string;
   longitude?: number | string;
+  age_category_id?: string | null;
+  weight_category_id?: string | null;
   assignedBoxerIds: string[];
-  rsvps?: { [athleteId: string]: { status: "attending" | "not_attending"; reason?: string } };
+  rsvps?: { [boxerId: string]: { status: "attending" | "not_attending"; reason?: string } };
 }
 
 interface Schedule {
@@ -74,6 +82,37 @@ interface Boxer {
   user_id: string;
   academy_id?: string;
   is_suspended?: boolean;
+  age_category_id?: string | null;
+  weight_category_id?: string | null;
+}
+
+interface AgeCategory {
+  id: string;
+  name: string;
+  min_age: number;
+  max_age?: number;
+}
+
+interface WeightCategory {
+  id: string;
+  name: string;
+  age_category_id: string;
+  min_kg: number;
+  max_kg?: number;
+}
+
+interface Bout {
+  id: string;
+  bout_number: number;
+  status: string;
+  current_round: number;
+  round_count: number;
+  boxer_red_id: string;
+  boxer_blue_id: string;
+  ring_instance_id: string;
+  age_category_id?: string;
+  weight_category_id?: string;
+  bout_type?: string;
 }
 
 // ── Helpers ─────────────────────────────────────────────────────────────
@@ -111,7 +150,9 @@ function formatTime(t: string) {
 // ── Main component ──────────────────────────────────────────────────────
 function AdminSchedulingPage() {
   const { user, profile } = useAuth();
-  const academyId = profile?.academy_id ?? "";
+  
+  const [academies, setAcademies] = useState<Academy[]>([]);
+  const [selectedAcademyFilter, setSelectedAcademyFilter] = useState("all");
 
   const [schedules, setSchedules] = useState<Schedule[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,6 +161,28 @@ function AdminSchedulingPage() {
   const [dbRingOverrides, setDbRingOverrides] = useState<any[]>([]);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [leaveApplications, setLeaveApplications] = useState<any[]>([]);
+
+  // New Categories and Bouts State
+  const [ageCategories, setAgeCategories] = useState<AgeCategory[]>([]);
+  const [weightCategories, setWeightCategories] = useState<WeightCategory[]>([]);
+  const [bouts, setBouts] = useState<Bout[]>([]);
+  const [coaches, setCoaches] = useState<{id: string; email: string}[]>([]);
+
+  // Bout Modal
+  const [showBoutModal, setShowBoutModal] = useState(false);
+  const [savingBout, setSavingBout] = useState(false);
+  const [boutForm, setBoutForm] = useState({
+    bout_type: "training",
+    age_category_id: "",
+    weight_category_id: "",
+    boxer_red_id: "",
+    boxer_blue_id: "",
+    round_count: 3,
+    round_duration_sec: 180,
+    rest_time_sec: 60,
+    judge_count: 3,
+    coach_id: "",
+  });
 
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [cancellingAllDay, setCancellingAllDay] = useState(false);
@@ -151,6 +214,7 @@ function AdminSchedulingPage() {
 
   // Schedule draft
   const [sName, setSName] = useState("");
+  const [sAcademyId, setSAcademyId] = useState("");
   const [sIsTournament, setSIsTournament] = useState(false);
   const [sDaysOfWeek, setSDaysOfWeek] = useState<number[]>([]);
   const [sValidFrom, setSValidFrom] = useState("");
@@ -163,6 +227,7 @@ function AdminSchedulingPage() {
   const [ringForm, setRingForm] = useState<Omit<Ring, "id" | "rsvps">>({
     name: "", fromTime: "06:00", toTime: "08:00",
     locationName: "", latitude: "", longitude: "",
+    age_category_id: "", weight_category_id: "",
     assignedBoxerIds: [],
   });
   const [overlapWarning, setOverlapWarning] = useState<(() => void) | null>(null);
@@ -170,7 +235,7 @@ function AdminSchedulingPage() {
 
   // Day modal
   const [activeDateModal, setActiveDateModal] = useState<{ dateKey: string; schedule: Schedule } | null>(null);
-  const [modalTab, setModalTab] = useState<"attending" | "not_attending" | "present" | "boxers" | "location" | "cancel">("attending");
+  const [modalTab, setModalTab] = useState<"attending" | "not_attending" | "present" | "boxers" | "location" | "bouts" | "cancel" | "notify">("attending");
   const [overrideLocation, setOverrideLocation] = useState<{ [ringId: string]: string }>({});
   const [overrideLat, setOverrideLat] = useState<{ [ringId: string]: string | number }>({});
   const [overrideLng, setOverrideLng] = useState<{ [ringId: string]: string | number }>({});
@@ -195,10 +260,9 @@ function AdminSchedulingPage() {
 
   // ── Load data ──────────────────────────────────────────────────────────
   useEffect(() => {
-    if (!academyId) return;
     loadData();
 
-    const ch = supabase.channel("admin-scheduling-realtime")
+    const ch = supabase.channel("sa-class-assigning-realtime")
       .on("postgres_changes", { event: "*", schema: "public", table: "ring_schedule_templates" }, () => loadData(true))
       .on("postgres_changes", { event: "*", schema: "public", table: "ring_sessions" }, () => loadData(true))
       .on("postgres_changes", { event: "*", schema: "public", table: "ring_instances" }, () => loadData(true))
@@ -208,29 +272,45 @@ function AdminSchedulingPage() {
       .subscribe();
 
     return () => { supabase.removeChannel(ch); };
-  }, [academyId]);
+  }, []);
 
   async function loadData(isSilent = false) {
-    if (!academyId) return;
     if (!isSilent) setLoading(true);
     try {
-      const [boxersRes, templatesRes, ringsRes, instancesRes, overridesRes, pollsRes, attendanceRes, leavesRes] = await Promise.all([
-        supabase.from("boxer_profiles").select("id, full_name, user_id, academy_id, is_suspended")
-          .eq("academy_id", academyId).order("full_name"),
-        supabase.from("ring_schedule_templates").select("*")
-          .eq("academy_id", academyId).eq("is_active", true),
+      const targetAcademyId = profile?.academy_id;
+
+      let bpQuery = supabase.from("boxer_profiles").select("id, full_name, user_id, academy_id, is_suspended, age_category_id, weight_category_id").order("full_name");
+      let tQuery = supabase.from("ring_schedule_templates").select("*").eq("is_active", true);
+      let acsQuery = supabase.from("academies").select("id, name, city").order("name");
+
+      if (targetAcademyId) {
+        bpQuery = bpQuery.eq("academy_id", targetAcademyId);
+        tQuery = tQuery.eq("academy_id", targetAcademyId);
+        acsQuery = acsQuery.eq("id", targetAcademyId);
+      }
+
+      const [boxersRes, templatesRes, ringsRes, instancesRes, overridesRes, pollsRes, attendanceRes, leavesRes, academiesRes, ageRes, weightRes, boutsRes, coachesRes] = await Promise.all([
+        bpQuery,
+        tQuery,
         supabase.from("ring_sessions").select("*"),
-        supabase.from("ring_instances").select("*").eq("academy_id", academyId),
+        supabase.from("ring_instances").select("*"),
         supabase.from("ring_instance_overrides").select("*"),
         supabase.from("ring_assignment_polls").select("id, ring_instance_id"),
         supabase.from("attendance").select("*").order("session_date", { ascending: false }),
         supabase.from("leave_applications").select("*, boxer_profiles(full_name)").order("start_date", { ascending: false }),
+        acsQuery,
+        supabase.from("age_categories").select("*").order("min_age"),
+        supabase.from("weight_categories").select("*").order("min_kg"),
+        supabase.from("bouts").select("*"),
+        supabase.from("profiles").select("id, email").eq("role", "coach")
       ]);
 
-      if (boxersRes.error) console.error("boxers:", boxersRes.error.message);
-      if (templatesRes.error) console.error("templates:", templatesRes.error.message);
+      if (academiesRes.data) setAcademies(academiesRes.data);
+      if (ageRes.data) setAgeCategories(ageRes.data);
+      if (weightRes.data) setWeightCategories(weightRes.data);
+      if (boutsRes.data) setBouts(boutsRes.data);
+      if (coachesRes.data) setCoaches(coachesRes.data);
 
-      // We map poll responses by instance (day) for RSVP count
       const pollIds = (pollsRes.data ?? []).map((p: any) => p.id);
       const responsesByInstance = new Map<string, Record<string, { status: "attending" | "not_attending"; reason?: string }>>();
       if (pollIds.length > 0) {
@@ -248,7 +328,6 @@ function AdminSchedulingPage() {
         });
       }
 
-      // Map templates → Schedule[]
       const dbSchedules: Schedule[] = (templatesRes.data ?? []).map((t: any) => {
         const rawDays = parseArray(t.days_of_week ?? t.daysOfWeek);
         const daysOfWeek = rawDays.map((d: any) => Number(d)).filter((n: number) => !isNaN(n));
@@ -263,12 +342,12 @@ function AdminSchedulingPage() {
             latitude: r.custom_lat ?? "",
             longitude: r.custom_lng ?? "",
             assignedBoxerIds: parseArray(r.assigned_boxer_ids),
-            rsvps: {}, // Set dynamically per day
+            rsvps: {}, 
           }));
         return {
           id: t.id,
           name: t.name,
-          academy_id: t.academy_id ?? academyId,
+          academy_id: t.academy_id ?? "",
           daysOfWeek,
           validFrom: String(t.valid_from ?? "").split("T")[0],
           validTo: String(t.valid_to ?? "").split("T")[0],
@@ -288,6 +367,22 @@ function AdminSchedulingPage() {
       if (!isSilent) setLoading(false);
     }
   }
+
+  // ── Superadmin Filtering ────────────────────────────────────────────────
+  const filteredSchedules = useMemo(() => {
+    if (selectedAcademyFilter === "all") return schedules;
+    return schedules.filter(s => String(s.academy_id) === String(selectedAcademyFilter));
+  }, [schedules, selectedAcademyFilter]);
+
+  const selectedSchedule = schedules.find(s => s.id === selectedScheduleId);
+  const targetAcademyId = showScheduleModal ? sAcademyId : selectedSchedule?.academy_id;
+  const activeDateModalInstance = activeDateModal ? dbInstances.find((i: any) => String(i.template_id) === String(activeDateModal.schedule.id) && String(i.date).substring(0, 10) === activeDateModal.dateKey) : null;
+
+  const activeBoxers = useMemo(() => {
+    const active = boxers.filter(b => !b.is_suspended);
+    if (!targetAcademyId) return active;
+    return active.filter(b => b.academy_id === targetAcademyId);
+  }, [boxers, targetAcademyId]);
 
   // ── Day modal open ─────────────────────────────────────────────────────
   async function openDateModal(s: Schedule, dateKey: string) {
@@ -359,7 +454,7 @@ function AdminSchedulingPage() {
         ids.forEach((id: string) => assignedIds.add(id));
       });
 
-      setModalDetails({ loading: false, attending, notAttending, present, totalAssigned: assignedIds.size || boxers.length });
+      setModalDetails({ loading: false, attending, notAttending, present, totalAssigned: assignedIds.size || boxers.filter(b => b.academy_id === s.academy_id).length });
     } catch (err) {
       console.error(err);
       setModalDetails({ loading: false, attending: [], notAttending: [], present: [], totalAssigned: 0 });
@@ -375,7 +470,7 @@ function AdminSchedulingPage() {
       let instId = dbInstances.find(i => String(i.template_id) === String(schedule.id) && String(i.date).substring(0, 10) === dateKey)?.id;
       if (!instId) {
         const { data: newInst, error } = await supabase.from("ring_instances").insert({
-          template_id: schedule.id, academy_id: academyId, date: dateKey, is_cancelled: false,
+          template_id: schedule.id, academy_id: schedule.academy_id, date: dateKey, is_cancelled: false,
         }).select("id").single();
         if (error) throw error;
         instId = newInst.id;
@@ -389,7 +484,6 @@ function AdminSchedulingPage() {
         } else {
           await supabase.from("ring_instance_overrides").insert({ ring_instance_id: instId, ring_session_id: ring.id, assigned_boxer_ids: bObj.assignedBoxerIds, edited_by: user?.id });
         }
-        // Notify assigned boxers
         const allIds = bObj.assignedBoxerIds;
         const recipients = Array.from(new Set(allIds.map(id => boxers.find(b => b.id === id)?.user_id).filter(Boolean))) as string[];
         if (recipients.length > 0) {
@@ -415,7 +509,7 @@ function AdminSchedulingPage() {
       let instId = dbInstances.find(i => String(i.template_id) === String(schedule.id) && String(i.date).substring(0, 10) === dateKey)?.id;
       if (!instId) {
         const { data: newInst, error } = await supabase.from("ring_instances").insert({
-          template_id: schedule.id, academy_id: academyId, date: dateKey, is_cancelled: false,
+          template_id: schedule.id, academy_id: schedule.academy_id, date: dateKey, is_cancelled: false,
         }).select("id").single();
         if (error) throw error;
         instId = newInst.id;
@@ -458,9 +552,8 @@ function AdminSchedulingPage() {
       if (existing) {
         await supabase.from("ring_instances").update({ is_cancelled: true, cancel_reason: "Cancelled by Admin" }).eq("id", existing.id);
       } else {
-        await supabase.from("ring_instances").insert({ template_id: schedule.id, academy_id: academyId, date: dateKey, is_cancelled: true, cancel_reason: "Cancelled by Admin" });
+        await supabase.from("ring_instances").insert({ template_id: schedule.id, academy_id: schedule.academy_id, date: dateKey, is_cancelled: true, cancel_reason: "Cancelled by Admin" });
       }
-      // Notify all assigned boxers
       const assignedIds = new Set<string>();
       (schedule.rings ?? []).forEach(r => r.assignedBoxerIds.forEach(id => assignedIds.add(id)));
       const recipients = Array.from(new Set(
@@ -485,18 +578,20 @@ function AdminSchedulingPage() {
     if (cancel && !confirm(`Cancel ALL ring sessions on ${dateKey}?`)) return;
     setCancellingAllDay(true);
     try {
-      const activeSchedules = schedules.filter(s => isScheduleDay(s, dateKey));
+      const activeSchedules = filteredSchedules.filter(s => isScheduleDay(s, dateKey));
       for (const s of activeSchedules) {
         const existing = dbInstances.find(i => String(i.template_id) === String(s.id) && String(i.date).substring(0, 10) === dateKey);
         if (existing) {
           await supabase.from("ring_instances").update({ is_cancelled: cancel, cancel_reason: cancel ? "Cancelled by Admin" : null }).eq("id", existing.id);
         } else {
-          await supabase.from("ring_instances").insert({ template_id: s.id, academy_id: academyId, date: dateKey, is_cancelled: cancel, cancel_reason: cancel ? "Cancelled by Admin" : null });
+          await supabase.from("ring_instances").insert({ template_id: s.id, academy_id: s.academy_id, date: dateKey, is_cancelled: cancel, cancel_reason: cancel ? "Cancelled by Admin" : null });
         }
       }
       if (cancel) {
         const uidSet = new Set<string>();
-        boxers.forEach(b => { if (b.user_id) uidSet.add(b.user_id); });
+        boxers.forEach(b => { 
+          if (b.user_id && (selectedAcademyFilter === "all" || b.academy_id === selectedAcademyFilter)) uidSet.add(b.user_id); 
+        });
         if (uidSet.size > 0) {
           await supabase.from("notifications").insert(Array.from(uidSet).map(uid => ({
             recipient_id: uid, type: "class_cancelled", title: "All Ring Sessions Cancelled",
@@ -513,7 +608,7 @@ function AdminSchedulingPage() {
   // ── Schedule CRUD ──────────────────────────────────────────────────────
   function openCreateSchedule() {
     setEditingScheduleId(null);
-    setSName(""); setSIsTournament(false); setSDaysOfWeek([]); setSValidFrom(""); setSValidTo("");
+    setSName(""); setSAcademyId(""); setSIsTournament(false); setSDaysOfWeek([]); setSValidFrom(""); setSValidTo("");
     setDraftRings([]);
     setScheduleModalStep(1);
     setShowScheduleModal(true);
@@ -521,7 +616,7 @@ function AdminSchedulingPage() {
 
   function openEditSchedule(s: Schedule) {
     setEditingScheduleId(s.id);
-    setSName(s.name); setSIsTournament(s.isTournament);
+    setSName(s.name); setSAcademyId(s.academy_id); setSIsTournament(s.isTournament);
     setSDaysOfWeek(s.daysOfWeek ?? []);
     setSValidFrom(s.validFrom ?? ""); setSValidTo(s.validTo ?? "");
     setDraftRings(s.rings ?? []);
@@ -529,7 +624,7 @@ function AdminSchedulingPage() {
     setShowScheduleModal(true);
   }
 
-  const step1Valid = Boolean(sName.trim() && sDaysOfWeek.length > 0 && sValidFrom && sValidTo && sValidFrom <= sValidTo);
+  const step1Valid = Boolean(sName.trim() && sAcademyId && sDaysOfWeek.length > 0 && sValidFrom && sValidTo && sValidFrom <= sValidTo);
 
   async function handleFinalCreateSchedule() {
     if (!step1Valid) return;
@@ -538,6 +633,7 @@ function AdminSchedulingPage() {
       if (editingScheduleId) {
         const { error: tErr } = await supabase.from("ring_schedule_templates").update({
           name: sName.trim(),
+          academy_id: sAcademyId,
           template_type: sIsTournament ? "tournament" : "training",
           days_of_week: sDaysOfWeek,
           valid_from: sValidFrom,
@@ -557,6 +653,8 @@ function AdminSchedulingPage() {
               custom_location: r.locationName || null,
               custom_lat: r.latitude ? Number(r.latitude) : null,
               custom_lng: r.longitude ? Number(r.longitude) : null,
+              age_category_id: r.age_category_id || null,
+              weight_category_id: r.weight_category_id || null,
               assigned_boxer_ids: r.assignedBoxerIds ?? [],
             }))
           );
@@ -567,7 +665,7 @@ function AdminSchedulingPage() {
         const { error: tErr } = await supabase.from("ring_schedule_templates").insert({
           id: newId,
           name: sName.trim(),
-          academy_id: academyId,
+          academy_id: sAcademyId,
           template_type: sIsTournament ? "tournament" : "training",
           days_of_week: sDaysOfWeek,
           valid_from: sValidFrom,
@@ -587,6 +685,8 @@ function AdminSchedulingPage() {
               custom_location: r.locationName || null,
               custom_lat: r.latitude ? Number(r.latitude) : null,
               custom_lng: r.longitude ? Number(r.longitude) : null,
+              age_category_id: r.age_category_id || null,
+              weight_category_id: r.weight_category_id || null,
               assigned_boxer_ids: r.assignedBoxerIds ?? [],
             }))
           );
@@ -613,13 +713,13 @@ function AdminSchedulingPage() {
   // ── Ring actions ───────────────────────────────────────────────────────
   function openCreateRing() {
     setEditingRingId(null);
-    setRingForm({ name: "", fromTime: "06:00", toTime: "08:00", locationName: "", latitude: "", longitude: "", assignedBoxerIds: [] });
+    setRingForm({ name: "", fromTime: "06:00", toTime: "08:00", locationName: "", latitude: "", longitude: "", age_category_id: "", weight_category_id: "", assignedBoxerIds: [] });
     setShowRingModal(true);
   }
 
   function openEditRing(ring: Ring) {
     setEditingRingId(ring.id);
-    setRingForm({ name: ring.name, fromTime: ring.fromTime, toTime: ring.toTime, locationName: ring.locationName ?? "", latitude: ring.latitude ?? "", longitude: ring.longitude ?? "", assignedBoxerIds: ring.assignedBoxerIds });
+    setRingForm({ name: ring.name, fromTime: ring.fromTime, toTime: ring.toTime, locationName: ring.locationName ?? "", latitude: ring.latitude ?? "", longitude: ring.longitude ?? "", age_category_id: ring.age_category_id ?? "", weight_category_id: ring.weight_category_id ?? "", assignedBoxerIds: ring.assignedBoxerIds });
     setShowRingModal(true);
   }
 
@@ -642,6 +742,8 @@ function AdminSchedulingPage() {
           custom_location: ringForm.locationName || null,
           custom_lat: ringForm.latitude ? Number(ringForm.latitude) : null,
           custom_lng: ringForm.longitude ? Number(ringForm.longitude) : null,
+          age_category_id: ringForm.age_category_id || null,
+          weight_category_id: ringForm.weight_category_id || null,
           assigned_boxer_ids: ringForm.assignedBoxerIds,
         }).eq("id", editingRingId);
         if (error) throw error;
@@ -652,6 +754,8 @@ function AdminSchedulingPage() {
           custom_location: ringForm.locationName || null,
           custom_lat: ringForm.latitude ? Number(ringForm.latitude) : null,
           custom_lng: ringForm.longitude ? Number(ringForm.longitude) : null,
+          age_category_id: ringForm.age_category_id || null,
+          weight_category_id: ringForm.weight_category_id || null,
           assigned_boxer_ids: ringForm.assignedBoxerIds,
         });
         if (error) throw error;
@@ -666,7 +770,7 @@ function AdminSchedulingPage() {
   function handleSaveRingAttempt(e: React.FormEvent) {
     e.preventDefault();
     const curName = ringForm.name.trim().toLowerCase();
-    const listToCheck = showScheduleModal ? draftRings : (schedules.find(s => s.id === selectedScheduleId)?.rings ?? []);
+    const listToCheck = showScheduleModal ? draftRings : (filteredSchedules.find(s => s.id === selectedScheduleId)?.rings ?? []);
     let hasOverlap = false;
     for (const r of listToCheck) {
       if (editingRingId && r.id === editingRingId) continue;
@@ -685,14 +789,13 @@ function AdminSchedulingPage() {
   }
 
   async function handleNotifyRing(ring: Ring, schedule: Schedule) {
-    // Notify via poll mechanism for the day (instance)
     setNotifyingRingId(ring.id);
     try {
       const todayDateStr = new Date().toISOString().split("T")[0];
       let instId = dbInstances.find(i => String(i.template_id) === String(schedule.id) && String(i.date).substring(0, 10) === todayDateStr)?.id;
       if (!instId) {
         const { data: newInst, error: iErr } = await supabase.from("ring_instances").insert({
-          template_id: schedule.id, academy_id: academyId, date: todayDateStr, is_cancelled: false,
+          template_id: schedule.id, academy_id: schedule.academy_id, date: todayDateStr, is_cancelled: false,
         }).select("id").single();
         if (iErr) { alert("Failed to generate day instance for notifications"); return; }
         instId = newInst.id;
@@ -734,11 +837,14 @@ function AdminSchedulingPage() {
     const daysInCal = getDaysInMonth(calYear, calMonth);
     for (let d = 1; d <= daysInCal; d++) {
       const dk = formatDateKey(calYear, calMonth, d);
-      if (schedules.some(s => isScheduleDay(s, dk))) keys.add(dk);
+      if (filteredSchedules.some(s => isScheduleDay(s, dk))) keys.add(dk);
     }
-    (attendanceRecords ?? []).forEach((a: any) => { if (a.session_date) keys.add(String(a.session_date).substring(0, 10)); });
+    (attendanceRecords ?? []).forEach((a: any) => { 
+      if (a.session_date && (selectedAcademyFilter === "all" || a.academy_id === selectedAcademyFilter)) 
+        keys.add(String(a.session_date).substring(0, 10)); 
+    });
     return keys;
-  }, [calYear, calMonth, schedules, attendanceRecords]);
+  }, [calYear, calMonth, filteredSchedules, attendanceRecords, selectedAcademyFilter]);
 
   const boxerMapById = useMemo(() => {
     const m = new Map<string, Boxer>();
@@ -748,21 +854,53 @@ function AdminSchedulingPage() {
 
   const selectedDaySchedules = useMemo(() => {
     if (!selectedDateKey) return [];
-    return schedules.filter(s => isScheduleDay(s, selectedDateKey)).map(s => ({
+    return filteredSchedules.filter(s => isScheduleDay(s, selectedDateKey)).map(s => ({
       id: s.id, title: s.name, daysLabel: s.daysOfWeek.sort().map(d => WEEKDAY_NAMES[d]).join(", "), scheduleRef: s,
       totalAssigned: s.rings.reduce((acc, r) => acc + r.assignedBoxerIds.length, 0),
     }));
-  }, [selectedDateKey, schedules]);
+  }, [selectedDateKey, filteredSchedules]);
 
   const selectedDateLeaves = useMemo(() => {
     if (!selectedDateKey) return [];
-    return leaveApplications.filter(l => l.start_date && String(l.start_date).substring(0, 10) <= selectedDateKey && String(l.end_date).substring(0, 10) >= selectedDateKey && String(l.status).toLowerCase() === "approved");
-  }, [selectedDateKey, leaveApplications]);
+    return leaveApplications.filter(l => l.start_date && String(l.start_date).substring(0, 10) <= selectedDateKey && String(l.end_date).substring(0, 10) >= selectedDateKey && String(l.status).toLowerCase() === "approved" && (selectedAcademyFilter === "all" || l.academy_id === selectedAcademyFilter));
+  }, [selectedDateKey, leaveApplications, selectedAcademyFilter]);
 
-  const selectedSchedule = schedules.find(s => s.id === selectedScheduleId);
 
-  // ── Non-suspended active boxers for assignment ──────────────────────
-  const activeBoxers = boxers.filter(b => !b.is_suspended);
+  async function handleSaveBout(e: React.FormEvent) {
+    e.preventDefault();
+    if (!activeDateModalInstance) return;
+    setSavingBout(true);
+    try {
+      const { data: countData, error: countErr } = await supabase.from("bouts").select("id", { count: "exact" }).eq("ring_instance_id", activeDateModalInstance.id);
+      const nextBoutNumber = (countData?.length || 0) + 1;
+
+      const { error } = await supabase.from("bouts").insert({
+        bout_number: nextBoutNumber,
+        status: "active",
+        current_round: 0,
+        round_count: boutForm.round_count,
+        round_duration_sec: boutForm.round_duration_sec,
+        rest_time_sec: boutForm.rest_time_sec,
+        boxer_red_id: boutForm.boxer_red_id,
+        boxer_blue_id: boutForm.boxer_blue_id,
+        ring_instance_id: activeDateModalInstance.id,
+        age_category_id: boutForm.age_category_id || null,
+        weight_category_id: boutForm.weight_category_id || null,
+        bout_type: boutForm.bout_type,
+        // Optional judge count and coach ID could be inserted into relational tables or metadata.
+        // Assuming coach_id / judges are handled separately or in metadata if they exist.
+      });
+      if (error) throw error;
+      
+      setShowBoutModal(false);
+      setBoutForm({ bout_type: "training", age_category_id: "", weight_category_id: "", boxer_red_id: "", boxer_blue_id: "", round_count: 3, round_duration_sec: 180, rest_time_sec: 60, judge_count: 3, coach_id: "" });
+      await loadData(true);
+    } catch (err: any) {
+      alert(`Error saving bout: ${err.message || err}`);
+    } finally {
+      setSavingBout(false);
+    }
+  }
 
   if (loading) {
     return (
@@ -815,6 +953,10 @@ function AdminSchedulingPage() {
                 </div>
               </div>
               <div className="flex flex-wrap items-center gap-2">
+                <select value={selectedAcademyFilter} onChange={e => setSelectedAcademyFilter(e.target.value)} className="bg-subtle/80 border border-border text-foreground text-xs font-semibold rounded-xl px-3 py-1.5 focus:outline-none focus:border-primary">
+                  <option value="all">All Academies</option>
+                  {academies.map(a => <option key={a.id} value={a.id}>{a.name}{a.city ? ` (${a.city})` : ""}</option>)}
+                </select>
                 <div className="flex items-center gap-1 bg-subtle/70 p-1 rounded-xl border border-border/80 shadow-xs">
                   <button onClick={handleCalPrev} className="size-8 rounded-lg hover:bg-elevated flex items-center justify-center transition-colors text-muted-foreground hover:text-foreground cursor-pointer shrink-0">
                     <ChevronLeft className="size-4" />
@@ -918,7 +1060,7 @@ function AdminSchedulingPage() {
             <div className="flex items-center justify-between mb-3">
               <h2 className="font-display font-semibold text-sm text-muted-foreground uppercase tracking-wider">All Schedules</h2>
             </div>
-            {schedules.length === 0 ? (
+            {filteredSchedules.length === 0 ? (
               <div className="bg-surface border border-border border-dashed rounded-xl p-12 text-center">
                 <ClipboardList className="size-8 text-muted-foreground mx-auto mb-3" />
                 <p className="text-sm font-semibold">No ring schedules created</p>
@@ -926,7 +1068,7 @@ function AdminSchedulingPage() {
               </div>
             ) : (
               <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                {schedules.map(s => (
+                {filteredSchedules.map(s => (
                   <div key={s.id} onClick={() => setSelectedScheduleId(s.id)} className="bg-surface border border-border rounded-xl p-5 group hover:border-border-strong hover:shadow-card transition-all duration-200 cursor-pointer">
                     <div className="flex items-start justify-between mb-4">
                       <div className="size-10 rounded-lg bg-subtle grid place-items-center group-hover:bg-primary/10 group-hover:text-primary transition-colors">
@@ -990,8 +1132,6 @@ function AdminSchedulingPage() {
               {selectedSchedule!.rings.map(ring => {
                 const assignedIds = ring.assignedBoxerIds;
                 const agreedIds: string[] = [], notAgreedIds: string[] = [], pendingIds: string[] = [];
-                // RSVP for current selected schedule would just be based on recent or daily poll responses 
-                // Currently simplified. 
                 assignedIds.forEach(id => {
                   const rsvp = ring.rsvps?.[id];
                   if (rsvp?.status === "attending") agreedIds.push(id);
@@ -1016,7 +1156,6 @@ function AdminSchedulingPage() {
                         <button onClick={() => handleDeleteRing(ring.id)} className="text-xs font-medium px-3 py-1.5 rounded-md border border-destructive/20 text-destructive hover:bg-destructive/10 transition">Delete</button>
                       </div>
                     </div>
-                    {/* Boxers assigned */}
                     <div className="p-5 border-b border-border">
                       <div className="flex items-center gap-2 mb-3">
                         <Users className="size-4 text-muted-foreground" />
@@ -1045,7 +1184,6 @@ function AdminSchedulingPage() {
 
       {/* ── Modals ──────────────────────────────────────────────────────── */}
 
-      {/* 3-Step Schedule Wizard */}
       {showScheduleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-xl animate-fade-up overflow-hidden flex flex-col max-h-[90vh]">
@@ -1065,6 +1203,13 @@ function AdminSchedulingPage() {
             <div className="p-6 flex-1 overflow-y-auto space-y-5">
               {scheduleModalStep === 1 && (
                 <div className="space-y-5">
+                  <div>
+                    <label className="block text-xs font-semibold mb-1.5">Academy *</label>
+                    <select required value={sAcademyId} onChange={e => setSAcademyId(e.target.value)} className="input-premium w-full text-xs">
+                      <option value="">Select Academy</option>
+                      {academies.map(a => <option key={a.id} value={a.id}>{a.name}{a.city ? ` (${a.city})` : ""}</option>)}
+                    </select>
+                  </div>
                   <div>
                     <label className="block text-xs font-semibold mb-1.5">Schedule Mode</label>
                     <div className="flex gap-2 mb-2">
@@ -1176,7 +1321,6 @@ function AdminSchedulingPage() {
         </div>
       )}
 
-      {/* Overlap Warning */}
       {overlapWarning && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-sm p-6 animate-fade-up text-center">
@@ -1191,7 +1335,6 @@ function AdminSchedulingPage() {
         </div>
       )}
 
-      {/* Delete Schedule Confirm */}
       {deleteScheduleId && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-sm p-6 animate-fade-up text-center">
@@ -1206,7 +1349,6 @@ function AdminSchedulingPage() {
         </div>
       )}
 
-      {/* Ring Create / Edit Modal */}
       {showRingModal && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm overflow-y-auto">
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-2xl my-8 animate-fade-up flex flex-col max-h-[90vh]">
@@ -1248,13 +1390,28 @@ function AdminSchedulingPage() {
                   </div>
                 </div>
               </div>
-              {/* Boxer assignment — single column */}
+              <div className="grid md:grid-cols-2 gap-5 pt-4 border-t border-border">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Age Category (Optional)</label>
+                  <select value={ringForm.age_category_id || ""} onChange={e => setRingForm({...ringForm, age_category_id: e.target.value || null, weight_category_id: null})} className="input-premium w-full">
+                    <option value="">All Ages</option>
+                    {ageCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Weight Category (Optional)</label>
+                  <select value={ringForm.weight_category_id || ""} onChange={e => setRingForm({...ringForm, weight_category_id: e.target.value || null})} className="input-premium w-full" disabled={!ringForm.age_category_id}>
+                    <option value="">All Weights</option>
+                    {weightCategories.filter(w => w.age_category_id === ringForm.age_category_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
               <div className="pt-4 border-t border-border">
                 <BoxerMultiSelect
-                  label="Assign Boxers (suspended boxers excluded)"
+                  label="Assign Boxers (filtered by category, suspended excluded)"
                   selectedIds={ringForm.assignedBoxerIds}
                   onChange={ids => setRingForm({...ringForm, assignedBoxerIds: ids})}
-                  allBoxers={activeBoxers}
+                  allBoxers={activeBoxers.filter(b => (!ringForm.age_category_id || b.age_category_id === ringForm.age_category_id) && (!ringForm.weight_category_id || b.weight_category_id === ringForm.weight_category_id))}
                 />
               </div>
             </form>
@@ -1268,7 +1425,6 @@ function AdminSchedulingPage() {
         </div>
       )}
 
-      {/* Day / Date Detail Modal */}
       {activeDateModal && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4">
           <div className="bg-surface border border-border rounded-2xl max-w-2xl w-full p-6 shadow-2xl space-y-4 animate-scale-in">
@@ -1284,7 +1440,6 @@ function AdminSchedulingPage() {
               <button onClick={() => setActiveDateModal(null)} className="size-8 rounded-lg hover:bg-subtle flex items-center justify-center text-muted-foreground hover:text-foreground transition"><X className="size-4" /></button>
             </div>
 
-            {/* Tabs */}
             <div className="flex items-center gap-1.5 border-b border-border pb-2 overflow-x-auto">
               {([
                 { key: "attending", label: "Attending", icon: Check, count: modalDetails.attending.length, tone: "success" },
@@ -1292,7 +1447,9 @@ function AdminSchedulingPage() {
                 { key: "present", label: "Present", icon: MapPin, count: modalDetails.present.length, tone: "primary" },
                 { key: "boxers", label: "Manage Boxers", icon: Users, count: null, tone: "neutral" },
                 { key: "location", label: "Change Location", icon: Navigation, count: null, tone: "neutral" },
+                { key: "bouts", label: "Bouts", icon: Swords, count: activeDateModalInstance ? bouts.filter(b => b.ring_instance_id === activeDateModalInstance.id).length : 0, tone: "neutral" },
                 { key: "cancel", label: "Cancel Session", icon: X, count: null, tone: "destructive" },
+                { key: "notify", label: "Notify", icon: Bell, count: null, tone: "primary" },
               ] as const).map(tab => {
                 const Icon = tab.icon;
                 const isActive = modalTab === tab.key;
@@ -1335,7 +1492,7 @@ function AdminSchedulingPage() {
                   )
                 )}
                 {modalTab === "not_attending" && (
-                  modalDetails.notAttending.length === 0 ? <div className="py-12 text-center text-xs text-muted-foreground">No athletes declined.</div> : (
+                  modalDetails.notAttending.length === 0 ? <div className="py-12 text-center text-xs text-muted-foreground">No boxers declined.</div> : (
                     <table className="w-full text-left text-xs">
                       <thead className="bg-subtle border-b border-border text-muted-foreground uppercase text-[10px] font-semibold tracking-wider sticky top-0">
                         <tr><th className="py-2.5 px-4">Boxer Name</th><th className="py-2.5 px-4">Status</th><th className="py-2.5 px-4">Reason</th></tr>
@@ -1398,6 +1555,43 @@ function AdminSchedulingPage() {
                     </div>
                   </div>
                 )}
+                {modalTab === "bouts" && (
+                  <div className="space-y-4 p-2">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">Manage bouts for this session.</p>
+                      <button onClick={() => setShowBoutModal(true)} disabled={!activeDateModalInstance} className="px-3 py-1.5 rounded-lg bg-primary text-primary-foreground text-xs font-semibold hover:bg-primary/90 transition shadow-card disabled:opacity-50">+ Add Bout</button>
+                    </div>
+                    {(!activeDateModalInstance || bouts.filter(b => b.ring_instance_id === activeDateModalInstance.id).length === 0) ? (
+                      <div className="py-8 text-center text-xs text-muted-foreground bg-surface border border-border rounded-xl">No bouts created for this session yet.</div>
+                    ) : (
+                      <div className="grid gap-3">
+                        {bouts.filter(b => b.ring_instance_id === activeDateModalInstance.id).map(bout => {
+                           const red = activeBoxers.find(b => b.id === bout.boxer_red_id)?.full_name || "Unknown";
+                           const blue = activeBoxers.find(b => b.id === bout.boxer_blue_id)?.full_name || "Unknown";
+                           return (
+                             <div key={bout.id} className="bg-surface border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
+                               <div>
+                                 <h4 className="font-semibold text-sm">Bout #{bout.bout_number}</h4>
+                                 <div className="flex items-center gap-2 mt-1 text-xs font-medium">
+                                   <span className="text-red-500">{red}</span>
+                                   <span className="text-muted-foreground">vs</span>
+                                   <span className="text-blue-500">{blue}</span>
+                                 </div>
+                               </div>
+                               <div className="text-right">
+                                 <span className={`inline-flex px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider ${bout.status === "completed" ? "bg-success/15 text-success" : bout.status === "active" ? "bg-primary/15 text-primary-dark" : "bg-subtle text-muted-foreground"}`}>
+                                   {bout.status}
+                                 </span>
+                                 <p className="text-[10px] text-muted-foreground mt-1">{bout.bout_type === "tournament" ? "🏆 Tournament" : "Training"}</p>
+                               </div>
+                             </div>
+                           )
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {modalTab === "location" && (
                   <div className="space-y-4 p-2">
                     <p className="text-xs text-muted-foreground">Override location for <strong>{activeDateModal.dateKey}</strong>. Assigned boxers will be notified.</p>
@@ -1446,6 +1640,27 @@ function AdminSchedulingPage() {
                     </div>
                   </div>
                 )}
+                {modalTab === "notify" && (
+                  <div className="space-y-4 py-8 text-center">
+                    <div className="size-12 rounded-full bg-primary/10 grid place-items-center mx-auto text-primary-dark"><Bell className="size-6" /></div>
+                    <div>
+                      <h3 className="font-bold text-base text-foreground">Send Notifications?</h3>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-md mx-auto">This will send an attendance request poll to all boxers assigned to this session.</p>
+                    </div>
+                    <div className="flex items-center justify-center gap-3">
+                      <button onClick={() => setModalTab("attending")} className="px-4 py-2 rounded-xl border border-border text-xs font-medium hover:bg-subtle transition">Go Back</button>
+                      <button onClick={async () => {
+                        for (const r of activeDateModal.schedule.rings ?? []) {
+                          await handleNotifyRing(r, activeDateModal.schedule);
+                        }
+                        alert("Notifications sent successfully!");
+                      }} className="px-5 py-2 rounded-xl bg-primary text-primary-foreground font-semibold text-xs hover:bg-primary/90 transition shadow-card flex items-center gap-2">
+                        <Bell className="size-3.5" />
+                        <span>Send Notifications</span>
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1454,6 +1669,95 @@ function AdminSchedulingPage() {
               <span className="font-bold text-foreground bg-subtle px-3 py-1 rounded-lg border border-border">
                 Present: {modalDetails.present.length} / {modalDetails.totalAssigned} Boxers
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+      {showBoutModal && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm overflow-y-auto">
+          <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-2xl my-8 animate-fade-up flex flex-col max-h-[90vh]">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0">
+              <h3 className="font-display font-semibold">Add Bout</h3>
+              <button onClick={() => setShowBoutModal(false)} className="size-8 grid place-items-center rounded-md hover:bg-subtle text-muted-foreground hover:text-foreground transition"><X className="size-4" /></button>
+            </div>
+            <form id="bout-form" onSubmit={handleSaveBout} className="p-6 flex-1 overflow-y-auto space-y-6">
+              <div className="grid md:grid-cols-2 gap-5">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Bout Type *</label>
+                  <select value={boutForm.bout_type} onChange={e => setBoutForm({...boutForm, bout_type: e.target.value})} className="input-premium w-full" required>
+                    <option value="training">Training</option>
+                    <option value="tournament">Tournament</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Coach (Optional)</label>
+                  <select value={boutForm.coach_id} onChange={e => setBoutForm({...boutForm, coach_id: e.target.value})} className="input-premium w-full">
+                    <option value="">Select Coach</option>
+                    {coaches.map(c => <option key={c.id} value={c.id}>{c.email}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-5 pt-4 border-t border-border">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Age Category *</label>
+                  <select value={boutForm.age_category_id} onChange={e => setBoutForm({...boutForm, age_category_id: e.target.value, weight_category_id: "", boxer_red_id: "", boxer_blue_id: ""})} className="input-premium w-full" required>
+                    <option value="">Select Age Category</option>
+                    {ageCategories.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Weight Category *</label>
+                  <select value={boutForm.weight_category_id} onChange={e => setBoutForm({...boutForm, weight_category_id: e.target.value, boxer_red_id: "", boxer_blue_id: ""})} className="input-premium w-full" required disabled={!boutForm.age_category_id}>
+                    <option value="">Select Weight Category</option>
+                    {weightCategories.filter(w => w.age_category_id === boutForm.age_category_id).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-5 pt-4 border-t border-border">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Red Corner Boxer *</label>
+                  <select value={boutForm.boxer_red_id} onChange={e => setBoutForm({...boutForm, boxer_red_id: e.target.value})} className="input-premium w-full" required disabled={!boutForm.weight_category_id}>
+                    <option value="">Select Boxer (Red)</option>
+                    {activeBoxers.filter(b => b.age_category_id === boutForm.age_category_id && b.weight_category_id === boutForm.weight_category_id && b.id !== boutForm.boxer_blue_id).map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Blue Corner Boxer *</label>
+                  <select value={boutForm.boxer_blue_id} onChange={e => setBoutForm({...boutForm, boxer_blue_id: e.target.value})} className="input-premium w-full" required disabled={!boutForm.weight_category_id}>
+                    <option value="">Select Boxer (Blue)</option>
+                    {activeBoxers.filter(b => b.age_category_id === boutForm.age_category_id && b.weight_category_id === boutForm.weight_category_id && b.id !== boutForm.boxer_red_id).map(c => <option key={c.id} value={c.id}>{c.full_name}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid md:grid-cols-2 gap-5 pt-4 border-t border-border">
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">No. of Rounds *</label>
+                  <input type="number" min="1" max="15" value={boutForm.round_count} onChange={e => setBoutForm({...boutForm, round_count: Number(e.target.value)})} className="input-premium w-full" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Round Duration (sec) *</label>
+                  <input type="number" min="30" max="600" value={boutForm.round_duration_sec} onChange={e => setBoutForm({...boutForm, round_duration_sec: Number(e.target.value)})} className="input-premium w-full" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">Rest Time (sec) *</label>
+                  <input type="number" min="10" max="300" value={boutForm.rest_time_sec} onChange={e => setBoutForm({...boutForm, rest_time_sec: Number(e.target.value)})} className="input-premium w-full" required />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold mb-1.5">No. of Judges *</label>
+                  <select value={boutForm.judge_count} onChange={e => setBoutForm({...boutForm, judge_count: Number(e.target.value)})} className="input-premium w-full" required>
+                    {[1, 3, 5].map(n => <option key={n} value={n}>{n} Judge{n > 1 ? 's' : ''}</option>)}
+                  </select>
+                </div>
+              </div>
+            </form>
+            <div className="px-6 py-4 border-t border-border bg-subtle/30 flex justify-end gap-3 shrink-0">
+              <button type="button" onClick={() => setShowBoutModal(false)} className="px-6 py-2.5 text-sm font-medium border border-border rounded-xl hover:bg-subtle transition">Cancel</button>
+              <button type="submit" form="bout-form" disabled={savingBout} className="px-8 py-2.5 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 disabled:opacity-50 transition shadow-card">
+                {savingBout ? "Saving..." : "Save Bout"}
+              </button>
             </div>
           </div>
         </div>

@@ -1,7 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, SectionCard, AvatarInitials } from "@/components/dashboard/DashboardLayout";
-import { useState } from "react";
-import { Users, Trophy, TrendingDown, Award, ChevronRight, X, Swords, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Users, Trophy, TrendingDown, Award, ChevronRight, X, Swords, Eye, Loader2 } from "lucide-react";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/coach/boxers")({ component: CoachBoxers });
 
@@ -22,12 +24,7 @@ interface Boxer {
   injuryNote?: string;
 }
 
-const STUB_BOXERS: Boxer[] = [
-  { id: "bx1", name: "Aisha Khan", age: 18, weight: 59.8, stance: "orthodox", category: "Youth · 60 kg", wins: 8, losses: 1, kos: 3, lastBout: "2026-08-10", nextBout: "2026-09-05", fitStatus: "fit" },
-  { id: "bx2", name: "Priya Sharma", age: 17, weight: 57.2, stance: "southpaw", category: "Youth · 57 kg", wins: 5, losses: 3, kos: 1, lastBout: "2026-08-10", nextBout: null, fitStatus: "injured", injuryNote: "Right hand sprain — 2 week rest" },
-  { id: "bx3", name: "Sana Sheikh", age: 16, weight: 45.5, stance: "orthodox", category: "Junior · 46 kg", wins: 12, losses: 0, kos: 7, lastBout: "2026-07-22", nextBout: null, fitStatus: "suspended", injuryNote: "Medical suspension" },
-  { id: "bx4", name: "Divya Rao", age: 22, weight: 70.1, stance: "southpaw", category: "Senior · 70 kg", wins: 15, losses: 4, kos: 4, lastBout: "2026-06-15", nextBout: "2026-09-05", fitStatus: "fit" },
-];
+
 
 function fitBadge(status: Boxer["fitStatus"]) {
   if (status === "fit") return <span className="badge badge-success">Fit</span>;
@@ -103,10 +100,96 @@ function BoxerDetailModal({ boxer, onClose }: { boxer: Boxer; onClose: () => voi
 }
 
 function CoachBoxers() {
+  const { profile } = useAuth();
+  const [boxers, setBoxers] = useState<Boxer[]>([]);
+  const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Boxer | null>(null);
   const [filter, setFilter] = useState<"all" | "fit" | "injured" | "suspended">("all");
 
-  const filtered = STUB_BOXERS.filter(b => filter === "all" || b.fitStatus === filter);
+  useEffect(() => {
+    async function loadData() {
+      if (!profile?.academy_id) return;
+      setLoading(true);
+      try {
+        const [boxersRes, ageCatsRes, weightCatsRes, boutsRes] = await Promise.all([
+          supabase.from("boxer_profiles").select("*").eq("academy_id", profile.academy_id),
+          supabase.from("age_categories").select("*"),
+          supabase.from("weight_categories").select("*"),
+          supabase.from("bouts").select("*")
+        ]);
+
+        const boxersData = boxersRes.data || [];
+        const ageCats = ageCatsRes.data || [];
+        const weightCats = weightCatsRes.data || [];
+        const bouts = boutsRes.data || [];
+
+        const ageMap = new Map(ageCats.map((a: any) => [a.id, a.name]));
+        const weightMap = new Map(weightCats.map((w: any) => [w.id, w.name]));
+
+        const builtBoxers: Boxer[] = boxersData.map((b: any) => {
+          // Compute age from dob
+          let age = 0;
+          if (b.dob) {
+            const diff = Date.now() - new Date(b.dob).getTime();
+            age = Math.floor(diff / (1000 * 60 * 60 * 24 * 365.25));
+          }
+
+          // Category
+          const ageCatName = b.age_category_id ? ageMap.get(b.age_category_id) : "Unknown Age";
+          const weightCatName = b.weight_category_id ? weightMap.get(b.weight_category_id) : "Unknown Weight";
+          
+          // Bouts logic (approximation as per schema limits)
+          const myBouts = bouts.filter((bout: any) => bout.boxer_red_id === b.id || bout.boxer_blue_id === b.id);
+          
+          let wins = 0;
+          let losses = 0;
+          let kos = 0;
+          let lastBout = null;
+          
+          // For nextBout, check if there's any bout pending or in_progress (we don't have exact bout date easily available without joining ring_instances)
+          const nextBoutObj = myBouts.find((bout: any) => bout.status === "pending" || bout.status === "active");
+          const nextBout = nextBoutObj ? "Upcoming" : null;
+          
+          for (const bout of myBouts) {
+             if (bout.status === "completed") {
+                // If decision logic was robust we'd check winner, for now we leave counts at 0 as placeholder
+                // wins++ or losses++
+                lastBout = "Recent"; // Placeholder for last bout date
+             }
+          }
+
+          let fitStatus: Boxer["fitStatus"] = "fit";
+          if (b.is_suspended) fitStatus = "suspended";
+          // injured state might not exist directly on profile, so we default to fit unless suspended
+
+          return {
+            id: b.id,
+            name: b.full_name || "Unknown Boxer",
+            age: age || 18,
+            weight: b.weight || 60,
+            stance: (b.stance || b.boxing_stance || "orthodox").toLowerCase() as "orthodox" | "southpaw",
+            category: `${ageCatName} · ${weightCatName}`,
+            wins,
+            losses,
+            kos,
+            lastBout,
+            nextBout,
+            fitStatus,
+            injuryNote: b.is_suspended ? "Suspended by admin" : undefined
+          };
+        });
+
+        setBoxers(builtBoxers);
+      } catch (error) {
+        console.error("Failed to load boxers", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [profile?.academy_id]);
+
+  const filtered = boxers.filter(b => filter === "all" || b.fitStatus === filter);
 
   const chips: { key: typeof filter; label: string }[] = [
     { key: "all", label: "All" },
@@ -115,26 +198,35 @@ function CoachBoxers() {
     { key: "suspended", label: "Suspended" },
   ];
 
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+        <Loader2 className="size-8 animate-spin mb-4 text-primary" />
+        <p>Loading your boxers...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="animate-fade-up space-y-6">
       <PageHeader
         title="My Boxers"
-        subtitle={`${STUB_BOXERS.length} boxer${STUB_BOXERS.length !== 1 ? "s" : ""} under your supervision`}
+        subtitle={`${boxers.length} boxer${boxers.length !== 1 ? "s" : ""} under your supervision`}
       />
 
       {/* Stats */}
       <div className="grid grid-cols-3 gap-4">
         <div className="bento-card p-4 text-center">
           <div className="flex items-center justify-center gap-1.5 mb-2"><Trophy className="size-4 text-success" strokeWidth={1.75} /><span className="label-micro">Fit</span></div>
-          <div className="text-stat font-display text-success">{STUB_BOXERS.filter(b => b.fitStatus === "fit").length}</div>
+          <div className="text-stat font-display text-success">{boxers.filter(b => b.fitStatus === "fit").length}</div>
         </div>
         <div className="bento-card p-4 text-center">
           <div className="flex items-center justify-center gap-1.5 mb-2"><TrendingDown className="size-4 text-warning" strokeWidth={1.75} /><span className="label-micro">Injured</span></div>
-          <div className="text-stat font-display text-warning">{STUB_BOXERS.filter(b => b.fitStatus === "injured").length}</div>
+          <div className="text-stat font-display text-warning">{boxers.filter(b => b.fitStatus === "injured").length}</div>
         </div>
         <div className="bento-card p-4 text-center">
           <div className="flex items-center justify-center gap-1.5 mb-2"><Award className="size-4 text-destructive" strokeWidth={1.75} /><span className="label-micro">Suspended</span></div>
-          <div className="text-stat font-display text-destructive">{STUB_BOXERS.filter(b => b.fitStatus === "suspended").length}</div>
+          <div className="text-stat font-display text-destructive">{boxers.filter(b => b.fitStatus === "suspended").length}</div>
         </div>
       </div>
 

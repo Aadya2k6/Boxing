@@ -485,42 +485,38 @@ function PaymentWall({
   const [couponCodeInput, setCouponCodeInput] = useState("");
   const [couponError, setCouponError] = useState<string | null>(null);
 
-  // Load the athlete's academy gateway config from system_settings JSONB
+  // Load the athlete's center gateway config
   useEffect(() => {
     if (!user) return;
     (async () => {
       const { data: ap } = await supabase
         .from("boxer_profiles")
-        .select("academy_id")
+        .select("academy_id, center_id")
         .eq("user_id", user.id)
         .maybeSingle();
 
       if (ap?.academy_id) {
         setAthleteAcademyId(ap.academy_id);
-        const { data: ac } = await supabase
-          .from("academies")
+      }
+
+      // Gateway config is per-center; fall back to razorpay if no center
+      if (ap?.center_id) {
+        const { data: center } = await supabase
+          .from("centers")
           .select("active_gateway")
-          .eq("id", ap.academy_id)
+          .eq("id", ap.center_id)
           .maybeSingle();
 
-        if (ac?.active_gateway) {
-          setAthleteAcademy({ payment_gateway: ac.active_gateway });
+        if (center?.active_gateway) {
+          setAthleteAcademy({ payment_gateway: center.active_gateway });
           return;
         }
       }
 
-      // Fallback: Check active_gateway from academies table
-      const { data: firstAc } = await supabase
-        .from("academies")
-        .select("active_gateway")
-        .not("active_gateway", "is", null)
-        .limit(1)
-        .maybeSingle();
-
-      const resolvedGateway = firstAc?.active_gateway || "razorpay";
-      setAthleteAcademy({ payment_gateway: resolvedGateway });
+      setAthleteAcademy({ payment_gateway: "razorpay" });
     })();
   }, [user]);
+
 
   const isCashPending = assignment?.assignment_status === "cash_pending";
   const isOnlinePending = assignment?.assignment_status === "online_pending";

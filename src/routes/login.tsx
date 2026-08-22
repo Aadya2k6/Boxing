@@ -43,8 +43,9 @@ function LoginPage() {
       const perms: any[] = profile?.granted_permissions ?? [];
       const isFederation = perms.some((p: any) => p?.type === "federation");
 
+      const isFedRole = role === "state_federation_admin" || role === "national_federation_admin" || role === "custom_federation_admin";
       let dest = "/athlete";
-      if (role === "boxos_admin" && isFederation) dest = "/federation";
+      if (isFedRole || (role === "boxos_admin" && isFederation)) dest = "/federation";
       else if (role === "boxos_admin") dest = "/boxos-admin";
       else if (role === "superadmin") dest = "/superadmin";
       else if (role === "admin") dest = "/admin";

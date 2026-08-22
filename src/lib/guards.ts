@@ -41,11 +41,17 @@ export function useRequireAuth(requiredRole?: UserRole) {
 
     // Wrong role → navigate to the user's own dashboard
     if (requiredRole && profile.role !== requiredRole) {
-      if (profile.role === "boxos_admin") {
-        // Check if this is a federation account disguised as boxos_admin
-        const perms: any[] = profile.granted_permissions ?? [];
-        const isFed = perms.some((p: any) => p?.type === "federation");
-        navigate({ to: (isFed ? "/federation" : "/boxos-admin") as any });
+      const isFedRole = profile.role === "state_federation_admin" || profile.role === "national_federation_admin" || profile.role === "custom_federation_admin";
+      const isBoxosFed = profile.role === "boxos_admin" && (profile.granted_permissions ?? []).some((p: any) => p?.type === "federation");
+
+      if (requiredRole === ("federation" as any) && (isFedRole || isBoxosFed)) {
+        return; // Allow access
+      }
+
+      if (isFedRole || isBoxosFed) {
+        navigate({ to: "/federation" as any });
+      } else if (profile.role === "boxos_admin") {
+        navigate({ to: "/boxos-admin" as any });
       } else if (profile.role === "admin") {
         navigate({ to: "/admin" });
       } else if (profile.role === "superadmin") {
@@ -92,7 +98,12 @@ export function useRequireAthlete() {
     }
 
     if (profile.role !== "athlete") {
-      if (profile.role === "boxos_admin") {
+      const isFedRole = profile.role === "state_federation_admin" || profile.role === "national_federation_admin" || profile.role === "custom_federation_admin";
+      const isBoxosFed = profile.role === "boxos_admin" && (profile.granted_permissions ?? []).some((p: any) => p?.type === "federation");
+
+      if (isFedRole || isBoxosFed) {
+        navigate({ to: "/federation" as any });
+      } else if (profile.role === "boxos_admin") {
         navigate({ to: "/boxos-admin" as any });
       } else if (profile.role === "admin") {
         navigate({ to: "/admin" });
@@ -121,13 +132,17 @@ export function useRedirectIfLoggedIn() {
     // Suspended accounts stay on the login page (no redirect loop)
     if (profile.is_active === false) return;
 
+    const isFedRole = profile.role === "state_federation_admin" || profile.role === "national_federation_admin" || profile.role === "custom_federation_admin";
+    const isBoxosFed = profile.role === "boxos_admin" && (profile.granted_permissions ?? []).some((p: any) => p?.type === "federation");
+
     const dest: string =
+      (isFedRole || isBoxosFed) ? "/federation" :
       profile.role === "boxos_admin" ? "/boxos-admin" :
-        profile.role === "admin" ? "/admin" :
-          profile.role === "superadmin" ? "/superadmin" :
-            profile.role === "coach" ? "/coach" :
-              profile.role === "external_judge" ? "/judge" :
-                "/athlete";
+      profile.role === "admin" ? "/admin" :
+      profile.role === "superadmin" ? "/superadmin" :
+      profile.role === "coach" ? "/coach" :
+      profile.role === "external_judge" ? "/judge" :
+      "/athlete";
     navigate({ to: dest as any });
   }, [session, profile, loading, navigate]);
 }

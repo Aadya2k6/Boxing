@@ -1,6 +1,16 @@
 import { supabase } from "./supabase";
 
-export async function loadReportData() {
+export async function loadReportData(academyId?: string) {
+  let invQuery = supabase.from("invoices").select("*").order("created_at", { ascending: true });
+  let bpQuery = supabase.from("boxer_profiles").select("id, full_name, academy_id, onboarding_complete").eq("onboarding_complete", true);
+  let acsQuery = supabase.from("academies").select("id, name, city");
+
+  if (academyId) {
+    invQuery = invQuery.eq("academy_id", academyId);
+    bpQuery = bpQuery.eq("academy_id", academyId);
+    acsQuery = acsQuery.eq("id", academyId);
+  }
+
   const [
     { data: invoices },
     { data: payments },
@@ -12,12 +22,12 @@ export async function loadReportData() {
     { data: feePlans },
     { data: bouts },
   ] = await Promise.all([
-    supabase.from("invoices").select("*").order("created_at", { ascending: true }),
+    invQuery,
     supabase.from("payments").select("*").order("created_at", { ascending: true }),
-    supabase.from("boxer_profiles").select("id, full_name, academy_id, onboarding_complete").eq("onboarding_complete", true),
+    bpQuery,
     supabase.from("attendance").select("*"),
     supabase.from("leave_applications").select("*"),
-    supabase.from("academies").select("id, name, city"),
+    acsQuery,
     supabase.from("discount_schemes").select("*"),
     supabase.from("fee_plans").select("*"),
     supabase.from("bouts").select("*"),

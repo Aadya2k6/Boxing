@@ -64,6 +64,7 @@ import { Route as AthleteProfileRouteImport } from './routes/athlete.profile'
 import { Route as AthletePaymentsRouteImport } from './routes/athlete.payments'
 import { Route as AthleteNotificationsRouteImport } from './routes/athlete.notifications'
 import { Route as AthleteDocumentsRouteImport } from './routes/athlete.documents'
+import { Route as AthleteDeclarationRouteImport } from './routes/athlete.declaration'
 import { Route as AthleteBoutsRouteImport } from './routes/athlete.bouts'
 import { Route as AthleteAttendanceRouteImport } from './routes/athlete.attendance'
 import { Route as AdminSettingsRouteImport } from './routes/admin.settings'
@@ -73,9 +74,8 @@ import { Route as AdminNotificationsRouteImport } from './routes/admin.notificat
 import { Route as AdminJudgesRouteImport } from './routes/admin.judges'
 import { Route as AdminInvoicesRouteImport } from './routes/admin.invoices'
 import { Route as AdminFeesRouteImport } from './routes/admin.fees'
-import { Route as AdminCoachesRouteImport } from './routes/admin.coaches'
+import { Route as AdminBoxersRouteImport } from './routes/admin.boxers'
 import { Route as AdminAttendanceRouteImport } from './routes/admin.attendance'
-import { Route as AdminAthletesRouteImport } from './routes/admin.athletes'
 import { Route as BoxosAdminAcademiesAcademyIdRouteImport } from './routes/boxos-admin.academies.$academyId'
 
 const SuperadminRoute = SuperadminRouteImport.update({
@@ -356,6 +356,11 @@ const AthleteDocumentsRoute = AthleteDocumentsRouteImport.update({
   path: '/documents',
   getParentRoute: () => AthleteRoute,
 } as any)
+const AthleteDeclarationRoute = AthleteDeclarationRouteImport.update({
+  id: '/declaration',
+  path: '/declaration',
+  getParentRoute: () => AthleteRoute,
+} as any)
 const AthleteBoutsRoute = AthleteBoutsRouteImport.update({
   id: '/bouts',
   path: '/bouts',
@@ -401,19 +406,14 @@ const AdminFeesRoute = AdminFeesRouteImport.update({
   path: '/fees',
   getParentRoute: () => AdminRoute,
 } as any)
-const AdminCoachesRoute = AdminCoachesRouteImport.update({
-  id: '/coaches',
-  path: '/coaches',
+const AdminBoxersRoute = AdminBoxersRouteImport.update({
+  id: '/boxers',
+  path: '/boxers',
   getParentRoute: () => AdminRoute,
 } as any)
 const AdminAttendanceRoute = AdminAttendanceRouteImport.update({
   id: '/attendance',
   path: '/attendance',
-  getParentRoute: () => AdminRoute,
-} as any)
-const AdminAthletesRoute = AdminAthletesRouteImport.update({
-  id: '/athletes',
-  path: '/athletes',
   getParentRoute: () => AdminRoute,
 } as any)
 const BoxosAdminAcademiesAcademyIdRoute =
@@ -436,9 +436,8 @@ export interface FileRoutesByFullPath {
   '/scratch_admin_scheduling': typeof Scratch_admin_schedulingRoute
   '/scratch_scheduling': typeof Scratch_schedulingRoute
   '/superadmin': typeof SuperadminRouteWithChildren
-  '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
-  '/admin/coaches': typeof AdminCoachesRoute
+  '/admin/boxers': typeof AdminBoxersRoute
   '/admin/fees': typeof AdminFeesRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/judges': typeof AdminJudgesRoute
@@ -448,6 +447,7 @@ export interface FileRoutesByFullPath {
   '/admin/settings': typeof AdminSettingsRoute
   '/athlete/attendance': typeof AthleteAttendanceRoute
   '/athlete/bouts': typeof AthleteBoutsRoute
+  '/athlete/declaration': typeof AthleteDeclarationRoute
   '/athlete/documents': typeof AthleteDocumentsRoute
   '/athlete/notifications': typeof AthleteNotificationsRoute
   '/athlete/payments': typeof AthletePaymentsRoute
@@ -499,9 +499,8 @@ export interface FileRoutesByTo {
   '/onboarding': typeof OnboardingRoute
   '/scratch_admin_scheduling': typeof Scratch_admin_schedulingRoute
   '/scratch_scheduling': typeof Scratch_schedulingRoute
-  '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
-  '/admin/coaches': typeof AdminCoachesRoute
+  '/admin/boxers': typeof AdminBoxersRoute
   '/admin/fees': typeof AdminFeesRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/judges': typeof AdminJudgesRoute
@@ -511,6 +510,7 @@ export interface FileRoutesByTo {
   '/admin/settings': typeof AdminSettingsRoute
   '/athlete/attendance': typeof AthleteAttendanceRoute
   '/athlete/bouts': typeof AthleteBoutsRoute
+  '/athlete/declaration': typeof AthleteDeclarationRoute
   '/athlete/documents': typeof AthleteDocumentsRoute
   '/athlete/notifications': typeof AthleteNotificationsRoute
   '/athlete/payments': typeof AthletePaymentsRoute
@@ -570,9 +570,8 @@ export interface FileRoutesById {
   '/scratch_admin_scheduling': typeof Scratch_admin_schedulingRoute
   '/scratch_scheduling': typeof Scratch_schedulingRoute
   '/superadmin': typeof SuperadminRouteWithChildren
-  '/admin/athletes': typeof AdminAthletesRoute
   '/admin/attendance': typeof AdminAttendanceRoute
-  '/admin/coaches': typeof AdminCoachesRoute
+  '/admin/boxers': typeof AdminBoxersRoute
   '/admin/fees': typeof AdminFeesRoute
   '/admin/invoices': typeof AdminInvoicesRoute
   '/admin/judges': typeof AdminJudgesRoute
@@ -582,6 +581,7 @@ export interface FileRoutesById {
   '/admin/settings': typeof AdminSettingsRoute
   '/athlete/attendance': typeof AthleteAttendanceRoute
   '/athlete/bouts': typeof AthleteBoutsRoute
+  '/athlete/declaration': typeof AthleteDeclarationRoute
   '/athlete/documents': typeof AthleteDocumentsRoute
   '/athlete/notifications': typeof AthleteNotificationsRoute
   '/athlete/payments': typeof AthletePaymentsRoute
@@ -642,9 +642,8 @@ export interface FileRouteTypes {
     | '/scratch_admin_scheduling'
     | '/scratch_scheduling'
     | '/superadmin'
-    | '/admin/athletes'
     | '/admin/attendance'
-    | '/admin/coaches'
+    | '/admin/boxers'
     | '/admin/fees'
     | '/admin/invoices'
     | '/admin/judges'
@@ -654,6 +653,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/athlete/attendance'
     | '/athlete/bouts'
+    | '/athlete/declaration'
     | '/athlete/documents'
     | '/athlete/notifications'
     | '/athlete/payments'
@@ -705,9 +705,8 @@ export interface FileRouteTypes {
     | '/onboarding'
     | '/scratch_admin_scheduling'
     | '/scratch_scheduling'
-    | '/admin/athletes'
     | '/admin/attendance'
-    | '/admin/coaches'
+    | '/admin/boxers'
     | '/admin/fees'
     | '/admin/invoices'
     | '/admin/judges'
@@ -717,6 +716,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/athlete/attendance'
     | '/athlete/bouts'
+    | '/athlete/declaration'
     | '/athlete/documents'
     | '/athlete/notifications'
     | '/athlete/payments'
@@ -775,9 +775,8 @@ export interface FileRouteTypes {
     | '/scratch_admin_scheduling'
     | '/scratch_scheduling'
     | '/superadmin'
-    | '/admin/athletes'
     | '/admin/attendance'
-    | '/admin/coaches'
+    | '/admin/boxers'
     | '/admin/fees'
     | '/admin/invoices'
     | '/admin/judges'
@@ -787,6 +786,7 @@ export interface FileRouteTypes {
     | '/admin/settings'
     | '/athlete/attendance'
     | '/athlete/bouts'
+    | '/athlete/declaration'
     | '/athlete/documents'
     | '/athlete/notifications'
     | '/athlete/payments'
@@ -1235,6 +1235,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AthleteDocumentsRouteImport
       parentRoute: typeof AthleteRoute
     }
+    '/athlete/declaration': {
+      id: '/athlete/declaration'
+      path: '/declaration'
+      fullPath: '/athlete/declaration'
+      preLoaderRoute: typeof AthleteDeclarationRouteImport
+      parentRoute: typeof AthleteRoute
+    }
     '/athlete/bouts': {
       id: '/athlete/bouts'
       path: '/bouts'
@@ -1298,11 +1305,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminFeesRouteImport
       parentRoute: typeof AdminRoute
     }
-    '/admin/coaches': {
-      id: '/admin/coaches'
-      path: '/coaches'
-      fullPath: '/admin/coaches'
-      preLoaderRoute: typeof AdminCoachesRouteImport
+    '/admin/boxers': {
+      id: '/admin/boxers'
+      path: '/boxers'
+      fullPath: '/admin/boxers'
+      preLoaderRoute: typeof AdminBoxersRouteImport
       parentRoute: typeof AdminRoute
     }
     '/admin/attendance': {
@@ -1310,13 +1317,6 @@ declare module '@tanstack/react-router' {
       path: '/attendance'
       fullPath: '/admin/attendance'
       preLoaderRoute: typeof AdminAttendanceRouteImport
-      parentRoute: typeof AdminRoute
-    }
-    '/admin/athletes': {
-      id: '/admin/athletes'
-      path: '/athletes'
-      fullPath: '/admin/athletes'
-      preLoaderRoute: typeof AdminAthletesRouteImport
       parentRoute: typeof AdminRoute
     }
     '/boxos-admin/academies/$academyId': {
@@ -1330,9 +1330,8 @@ declare module '@tanstack/react-router' {
 }
 
 interface AdminRouteChildren {
-  AdminAthletesRoute: typeof AdminAthletesRoute
   AdminAttendanceRoute: typeof AdminAttendanceRoute
-  AdminCoachesRoute: typeof AdminCoachesRoute
+  AdminBoxersRoute: typeof AdminBoxersRoute
   AdminFeesRoute: typeof AdminFeesRoute
   AdminInvoicesRoute: typeof AdminInvoicesRoute
   AdminJudgesRoute: typeof AdminJudgesRoute
@@ -1344,9 +1343,8 @@ interface AdminRouteChildren {
 }
 
 const AdminRouteChildren: AdminRouteChildren = {
-  AdminAthletesRoute: AdminAthletesRoute,
   AdminAttendanceRoute: AdminAttendanceRoute,
-  AdminCoachesRoute: AdminCoachesRoute,
+  AdminBoxersRoute: AdminBoxersRoute,
   AdminFeesRoute: AdminFeesRoute,
   AdminInvoicesRoute: AdminInvoicesRoute,
   AdminJudgesRoute: AdminJudgesRoute,
@@ -1362,6 +1360,7 @@ const AdminRouteWithChildren = AdminRoute._addFileChildren(AdminRouteChildren)
 interface AthleteRouteChildren {
   AthleteAttendanceRoute: typeof AthleteAttendanceRoute
   AthleteBoutsRoute: typeof AthleteBoutsRoute
+  AthleteDeclarationRoute: typeof AthleteDeclarationRoute
   AthleteDocumentsRoute: typeof AthleteDocumentsRoute
   AthleteNotificationsRoute: typeof AthleteNotificationsRoute
   AthletePaymentsRoute: typeof AthletePaymentsRoute
@@ -1374,6 +1373,7 @@ interface AthleteRouteChildren {
 const AthleteRouteChildren: AthleteRouteChildren = {
   AthleteAttendanceRoute: AthleteAttendanceRoute,
   AthleteBoutsRoute: AthleteBoutsRoute,
+  AthleteDeclarationRoute: AthleteDeclarationRoute,
   AthleteDocumentsRoute: AthleteDocumentsRoute,
   AthleteNotificationsRoute: AthleteNotificationsRoute,
   AthletePaymentsRoute: AthletePaymentsRoute,

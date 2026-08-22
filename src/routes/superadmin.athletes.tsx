@@ -1330,6 +1330,7 @@ function SuperAdminAthletesPage() {
           boxer_profile_id: boxerProfileId,
           fee_plan_id: sendPlanId,
           academy_id: targetAcademyId,
+          center_id: selectedAthleteForModal?.center_id,
           assigned_by: user?.id,
           status: "active",
         }).select("id").single();

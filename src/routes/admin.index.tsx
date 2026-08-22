@@ -14,14 +14,14 @@ function Overview() {
   const { profile } = useAuth();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
-    totalAthletes: 0,
+    totalBoxers: 0,
     pendingOnboarding: 0,
     presentToday: 0,
     pendingLeaves: 0,
     collectionRate: 0,
     outstanding: 0,
   });
-  const [recentAthletes, setRecentAthletes] = useState<any[]>([]);
+  const [recentBoxers, setRecentBoxers] = useState<any[]>([]);
   const [pendingLeaves, setPendingLeaves] = useState<any[]>([]);
 
   const loadData = useCallback(async () => {
@@ -57,20 +57,20 @@ function Overview() {
       ]);
 
       const allBoxers = boxers ?? [];
-      const athleteProfiles = (userProfiles ?? []).filter(p => p.role === "athlete");
+      const boxerProfiles = (userProfiles ?? []).filter(p => p.role === "boxer");
 
-      // Unique athlete count
-      const athleteUserIds = new Set<string>();
-      athleteProfiles.forEach(p => athleteUserIds.add(p.id));
+      // Unique boxer count
+      const boxerUserIds = new Set<string>();
+      boxerProfiles.forEach(p => boxerUserIds.add(p.id));
       allBoxers.forEach(b => {
-        if (b.user_id) athleteUserIds.add(b.user_id);
-        else athleteUserIds.add(b.id);
+        if (b.user_id) boxerUserIds.add(b.user_id);
+        else boxerUserIds.add(b.id);
       });
-      const totalAthletes = athleteUserIds.size;
+      const totalBoxers = boxerUserIds.size;
 
       // Pending onboarding
-      const verifiedAthletes = allBoxers.filter(b => b.verification_status === "verified" || b.onboarding_complete === true).length;
-      const pendingOnboarding = Math.max(0, totalAthletes - verifiedAthletes);
+      const verifiedBoxers = allBoxers.filter(b => b.verification_status === "verified" || b.onboarding_complete === true).length;
+      const pendingOnboarding = Math.max(0, totalBoxers - verifiedBoxers);
 
       // Financials
       const totalInvoiced = (invs ?? []).reduce((a: number, i: any) => a + Number(i.amount_due ?? 0), 0);
@@ -79,7 +79,7 @@ function Overview() {
       const rate = totalInvoiced > 0 ? Math.round((totalCollected / totalInvoiced) * 100) : 100;
 
       setStats({
-        totalAthletes,
+        totalBoxers,
         pendingOnboarding,
         presentToday: attendanceToday?.length || 0,
         pendingLeaves: leaves?.length || 0,
@@ -87,9 +87,9 @@ function Overview() {
         outstanding: totalOutstanding,
       });
 
-      // Recent athletes
+      // Recent boxers
       const sortedBoxers = [...allBoxers].sort((a, b) => new Date(b.created_at || 0).getTime() - new Date(a.created_at || 0).getTime()).slice(0, 6);
-      setRecentAthletes(sortedBoxers);
+      setRecentBoxers(sortedBoxers);
       setPendingLeaves(leaves ?? []);
     } catch (err) {
       console.error("Error loading admin dashboard data:", err);
@@ -127,11 +127,11 @@ function Overview() {
         <>
         <PageHeader
           title="Academy Overview"
-          subtitle={`${new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${stats.totalAthletes} active athletes`}
+          subtitle={`${new Date().toLocaleDateString("en-IN", { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · ${stats.totalBoxers} active boxers`}
           actions={
-            <Link to="/admin/athletes">
+            <Link to="/admin/boxers">
               <button className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition-all shadow-card cursor-pointer">
-                <Users className="size-3.5" /> Manage Athletes
+                <Users className="size-3.5" /> Manage Boxers
               </button>
             </Link>
           }
@@ -139,7 +139,7 @@ function Overview() {
 
       {/* KPIs */}
       <div className="grid sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <StatCard label="Total athletes" value={loading ? "—" : stats.totalAthletes.toString()} />
+        <StatCard label="Total boxers" value={loading ? "—" : stats.totalBoxers.toString()} />
         <StatCard label="Present today" value={loading ? "—" : stats.presentToday.toString()} deltaTone={undefined} hint="Marked via geo-fence" />
         <StatCard label="Pending leaves" value={loading ? "—" : stats.pendingLeaves.toString()} deltaTone={stats.pendingLeaves > 0 ? "warning" : undefined} hint={stats.pendingLeaves > 0 ? "Requires action" : undefined} />
         <StatCard label="Pending onboarding" value={loading ? "—" : stats.pendingOnboarding.toString()} deltaTone={undefined} hint="Awaiting package assignment" />
@@ -147,24 +147,24 @@ function Overview() {
       </div>
 
       <div className="grid lg:grid-cols-3 gap-4">
-        {/* Recent athletes */}
+        {/* Recent boxers */}
         <div className="lg:col-span-2">
           <SectionCard
-            title="Recently onboarded athletes"
+            title="Recently onboarded boxers"
             action={
-              <Link to="/admin/athletes" className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
+              <Link to="/admin/boxers" className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-1">
                 View all <ChevronRight className="size-3.5" />
               </Link>
             }
           >
             {loading ? (
               <div className="flex justify-center py-8"><Loader2 className="size-5 animate-spin text-muted-foreground" /></div>
-            ) : recentAthletes.length === 0 ? (
-              <div className="py-8 text-center text-xs text-muted-foreground">No recent athletes found</div>
+            ) : recentBoxers.length === 0 ? (
+              <div className="py-8 text-center text-xs text-muted-foreground">No recent boxers found</div>
             ) : (
               <DataTable
-                headers={["Athlete", "City", "Stance", "Joined"]}
-                rows={recentAthletes.map((a) => [
+                headers={["Boxer", "City", "Stance", "Joined"]}
+                rows={recentBoxers.map((a) => [
                   <div key="name" className="flex items-center gap-2.5">
                     <AvatarInitials name={a.full_name || "?"} />
                     <span className="font-medium text-sm">{a.full_name || "—"}</span>
@@ -222,7 +222,7 @@ function Overview() {
               {loading ? "—" : stats.presentToday}
             </div>
             <div className="text-xs text-muted-foreground mt-1">
-              athletes marked present via geo-fence
+              boxers marked present via geo-fence
             </div>
           </div>
         </div>

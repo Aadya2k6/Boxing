@@ -1123,11 +1123,26 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
   
   // ── Signup screen (Phase 1) ──────────────────────────────────────────
   function SignupScreen() {
-    const [fullName, setFullName] = useState("");
+    const [dob, setDob] = useState("2015-08-21");
+    const [athleteName, setAthleteName] = useState("");
+    const [guardianName, setGuardianName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
+    const [showPassword, setShowPassword] = useState(false);
+    const [agreedTerms, setAgreedTerms] = useState(false);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Calculate age from DOB
+    const calculatedAge = useMemo(() => {
+      if (!dob) return null;
+      const d = new Date(dob);
+      if (isNaN(d.getTime())) return null;
+      const ageDiff = Date.now() - d.getTime();
+      return Math.floor(ageDiff / (365.25 * 86400000));
+    }, [dob]);
+
+    const isMinor = calculatedAge !== null ? calculatedAge < 18 : true;
 
     async function handleSignup(e: React.FormEvent) {
       e.preventDefault();
@@ -1135,17 +1150,37 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
       setError(null);
 
       try {
+        if (!agreedTerms) {
+          throw new Error("Please agree to the Terms of Service and Privacy Policy to continue.");
+        }
+
         const userEmail = email.trim().toLowerCase();
         const userPassword = password.trim();
+        const userAthleteName = athleteName.trim();
+        const userGuardianName = guardianName.trim();
 
-        if (!userEmail || !userPassword || !fullName.trim()) {
-          throw new Error("All fields are required.");
-        }
+        if (!dob) throw new Error("Athlete's date of birth is required.");
+        if (!userAthleteName) throw new Error("Athlete's full name is required.");
+        if (isMinor && !userGuardianName) throw new Error("Guardian's full name is required.");
+        if (!userEmail || !userPassword) throw new Error("Email and password are required.");
+
+        const accountFullName = isMinor ? userGuardianName : userAthleteName;
+        const accountRole = isMinor ? "guardian" : "athlete";
 
         const { data: signUpData, error: signUpErr } = await supabase.auth.signUp({
           email: userEmail,
           password: userPassword,
-          options: { data: { full_name: fullName.trim() } },
+          options: {
+            data: {
+              full_name: accountFullName,
+              role: accountRole,
+              athlete_name: userAthleteName,
+              athlete_dob: dob,
+              is_minor: isMinor,
+              guardian_name: isMinor ? userGuardianName : undefined,
+              guardian_email: isMinor ? userEmail : undefined,
+            },
+          },
         });
 
         if (signUpErr) {
@@ -1162,8 +1197,23 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
             throw new Error(signUpErr.message);
           }
         }
-        
-        // Wait for session to propagate and useAuth to re-render OnboardingPage
+
+        // Save prefilled data to draft in localStorage
+        try {
+          const draftKey = `boxos_onboard_draft_${signUpData.user?.id ?? "guest"}`;
+          const currentDraft = {
+            dob,
+            full_name: userAthleteName,
+            gName: isMinor ? userGuardianName : undefined,
+            gEmail: isMinor ? userEmail : undefined,
+            nationality: "Indian",
+            country: "India",
+            medicalFitnessDeclared: true,
+          };
+          localStorage.setItem(draftKey, JSON.stringify(currentDraft));
+          localStorage.setItem(`boxos_onboard_draft_guest`, JSON.stringify(currentDraft));
+        } catch {}
+
       } catch (err: any) {
         setError(err.message || "Failed to create account.");
         setLoading(false);
@@ -1179,24 +1229,146 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
           <CinematicCard>
             <div className="text-center mb-8">
               <h1 className="text-3xl font-display font-bold text-cinematic-primary tracking-tight">Create Athlete Account</h1>
-              <p className="text-sm text-cinematic-secondary mt-3">Step 1 of 3: Set up your login credentials.</p>
+              <p className="text-sm text-cinematic-secondary mt-3">Step 1 of 3: Set up your account credentials.</p>
             </div>
 
             <form onSubmit={handleSignup} className="space-y-5">
+              {/* Athlete Date of Birth */}
               <div>
-                <label className="block text-xs font-semibold text-cinematic-primary mb-2">Full Name</label>
-                <CinematicInput value={fullName} onChange={(e) => setFullName(e.target.value)} required placeholder="Aarav Mehta" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-cinematic-primary mb-2">Email Address</label>
-                <CinematicInput type="email" value={email} onChange={(e) => setEmail(e.target.value)} required placeholder="aarav@example.com" />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-cinematic-primary mb-2">Password</label>
-                <CinematicInput type="password" value={password} onChange={(e) => setPassword(e.target.value)} required placeholder="••••••••" minLength={8} />
-                <p className="text-[10px] text-cinematic-secondary/70 mt-1">Minimum 8 characters.</p>
+                <label className="block text-xs font-semibold text-cinematic-primary mb-2">Athlete's Date of Birth</label>
+                <CinematicInput
+                  type="date"
+                  required
+                  value={dob}
+                  onChange={(e) => setDob(e.target.value)}
+                />
               </div>
 
+              {/* Dynamic Age and Minor Banner */}
+              {calculatedAge !== null && (
+                <div className="space-y-2">
+                  <div className="text-xs font-semibold text-cinematic-blue">
+                    Age: {calculatedAge}
+                  </div>
+
+                  {isMinor && (
+                    <div className="p-3.5 rounded-xl bg-cinematic-blue/10 border border-cinematic-blue/20 text-cinematic-primary text-xs leading-relaxed">
+                      Since the athlete is under 18, a guardian creates and manages this account.
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Athlete's full name */}
+              <div>
+                <label className="block text-xs font-semibold text-cinematic-primary mb-2">Athlete's Full Name</label>
+                <CinematicInput
+                  value={athleteName}
+                  onChange={(e) => setAthleteName(e.target.value)}
+                  required
+                  placeholder="e.g. Aarav Mehta"
+                />
+              </div>
+
+              {/* Guardian fields when minor, or Athlete fields when adult */}
+              {isMinor ? (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-cinematic-primary mb-2">Guardian's Full Name</label>
+                    <CinematicInput
+                      value={guardianName}
+                      onChange={(e) => setGuardianName(e.target.value)}
+                      required
+                      placeholder="e.g. Rajesh Mehta"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-cinematic-primary mb-2">Guardian's Email Address</label>
+                    <CinematicInput
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="guardian@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-cinematic-primary mb-2">Guardian's Password</label>
+                    <div className="relative">
+                      <CinematicInput
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        placeholder="••••••••"
+                        minLength={8}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-cinematic-blue hover:text-blue-400 transition-colors"
+                      >
+                        {showPassword ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-cinematic-secondary/70 mt-1">Minimum 8 characters.</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <label className="block text-xs font-semibold text-cinematic-primary mb-2">Athlete's Email Address</label>
+                    <CinematicInput
+                      type="email"
+                      value={email}
+                      onChange={(e) => setEmail(e.target.value)}
+                      required
+                      placeholder="athlete@example.com"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-cinematic-primary mb-2">Athlete's Password</label>
+                    <div className="relative">
+                      <CinematicInput
+                        type={showPassword ? "text" : "password"}
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        required
+                        placeholder="••••••••"
+                        minLength={8}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-4 top-1/2 -translate-y-1/2 text-xs font-semibold text-cinematic-blue hover:text-blue-400 transition-colors"
+                      >
+                        {showPassword ? "Hide" : "Show"}
+                      </button>
+                    </div>
+                    <p className="text-[10px] text-cinematic-secondary/70 mt-1">Minimum 8 characters.</p>
+                  </div>
+                </>
+              )}
+
+              {/* Terms and Privacy Checkbox */}
+              <div className="pt-2">
+                <label className="flex items-start gap-3 cursor-pointer text-xs text-cinematic-secondary select-none">
+                  <input
+                    type="checkbox"
+                    checked={agreedTerms}
+                    onChange={(e) => setAgreedTerms(e.target.checked)}
+                    className="mt-0.5 size-4 rounded border-white/20 bg-white/5 text-cinematic-blue focus:ring-cinematic-blue"
+                  />
+                  <span>
+                    I agree to the <span className="text-cinematic-primary underline">Terms of Service</span> and <span className="text-cinematic-primary underline">Privacy Policy</span>
+                  </span>
+                </label>
+              </div>
+
+              {/* Error Alert */}
               {error && (
                 <div className="flex items-start gap-3 p-4 rounded-xl bg-cinematic-red/10 border border-cinematic-red/20 text-sm text-cinematic-red font-medium">
                   <AlertCircle className="size-5 shrink-0 mt-0.5" />
@@ -1204,17 +1376,23 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
                 </div>
               )}
 
+              {/* Create Account Button */}
               <button
                 type="submit"
-                disabled={loading || !fullName || !email || !password}
-                className="w-full flex items-center justify-center gap-2 bg-cinematic-blue text-white py-4 rounded-xl text-sm font-bold hover:bg-blue-600 disabled:opacity-50 transition shadow-xl mt-4"
+                disabled={loading}
+                className="w-full flex items-center justify-center gap-2 bg-cinematic-blue text-white py-4 rounded-xl text-sm font-bold hover:bg-blue-600 disabled:opacity-50 transition shadow-xl mt-4 cursor-pointer"
               >
-                {loading ? <><Loader2 className="size-4.5 animate-spin" /> Creating Account…</> : "Continue to Next Step"}
+                {loading ? <><Loader2 className="size-4.5 animate-spin" /> Creating Account…</> : "Create Account"}
               </button>
             </form>
             
-            <div className="mt-8 pt-6 border-t border-white/5 text-center text-sm text-cinematic-secondary">
-              Already have an account? <Link to="/login" className="text-cinematic-primary hover:text-cinematic-blue font-medium transition-colors">Sign in</Link>
+            <div className="mt-8 pt-6 border-t border-white/5 flex flex-col items-center gap-2 text-center text-sm text-cinematic-secondary">
+              <div>
+                Already have an account? <Link to="/login" className="text-cinematic-primary hover:text-cinematic-blue font-medium transition-colors">Sign in</Link>
+              </div>
+              <div>
+                Already a guardian? <Link to="/login" className="text-cinematic-primary hover:text-cinematic-blue font-medium transition-colors">Add another child</Link>
+              </div>
             </div>
           </CinematicCard>
         </div>

@@ -1,8 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader, Badge } from "@/components/dashboard/DashboardLayout";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { CalendarCheck as CalIcon, Users as UsersIcon, MapPin as MapPinIcon, Check as CheckIcon, X as XIcon, Loader2 as SpinnerIcon } from "lucide-react";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/lib/auth";
 
 export const Route = createFileRoute("/coach/attendance")({ component: CoachAttendance });
 
@@ -25,39 +27,145 @@ interface TodaySession {
   boxers: SessionBoxer[];
 }
 
-const STUB_SESSIONS: TodaySession[] = [
-  {
-    ringName: "Ring A",
-    location: "Main Hall",
-    from: "06:00",
-    to: "08:00",
-    boxers: [
-      { id: "bx1", name: "Aisha Khan", attendanceStatus: "present", fitStatus: "fit" },
-      { id: "bx2", name: "Priya Sharma", attendanceStatus: "not_marked", fitStatus: "injured" },
-      { id: "bx3", name: "Sana Sheikh", attendanceStatus: "absent", fitStatus: "suspended" },
-    ],
-  },
-];
+
 
 function CoachAttendance() {
-  const [sessions, setSessions] = useState(STUB_SESSIONS);
+  const { profile, user } = useAuth();
+  const [sessions, setSessions] = useState<TodaySession[]>([]);
   const [saving, setSaving] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function loadData() {
+      if (!profile?.academy_id) return;
+      setLoading(true);
+      try {
+        const todayDate = TODAY;
+        
+        const [templatesRes, sessionsRes, instancesRes, overridesRes, boxersRes, attendanceRes] = await Promise.all([
+          supabase.from("ring_schedule_templates").select("id, name").eq("academy_id", profile.academy_id),
+          supabase.from("ring_sessions").select("*"),
+          supabase.from("ring_instances").select("*").eq("date", todayDate).eq("is_cancelled", false),
+          supabase.from("ring_instance_overrides").select("*"),
+          supabase.from("boxer_profiles").select("id, full_name, is_suspended, academy_id").eq("academy_id", profile.academy_id),
+          supabase.from("attendance").select("*") // Filtered by date inside
+        ]);
+
+        const templates = templatesRes.data || [];
+        const templateIds = templates.map((t: any) => t.id);
+        const dbSessions = (sessionsRes.data || []).filter((s: any) => templateIds.includes(s.template_id));
+        const instances = instancesRes.data || [];
+        const overrides = overridesRes.data || [];
+        const boxers = boxersRes.data || [];
+        
+        // Filter attendance for today (session_date might be timestamp)
+        const todaysAtt = (attendanceRes.data || []).filter((a: any) => a.session_date && String(a.session_date).substring(0, 10) === todayDate);
+        
+        const boxerMap = new Map(boxers.map((b: any) => [b.id, b]));
+
+        const builtSessions: TodaySession[] = [];
+        for (const session of dbSessions) {
+          const inst = instances.find((i: any) => i.template_id === session.template_id);
+          if (!inst) continue; // Not scheduled for today
+          
+          const over = overrides.find((o: any) => o.ring_instance_id === inst.id && o.ring_session_id === session.id);
+          
+          // assigned_boxer_ids might be stored as json/string arrays
+          let assignedIds: string[] = [];
+          try {
+             if (over?.assigned_boxer_ids) {
+                assignedIds = typeof over.assigned_boxer_ids === 'string' ? JSON.parse(over.assigned_boxer_ids) : over.assigned_boxer_ids;
+             } else if (session.assignedBoxerIds || session.assigned_boxer_ids) {
+                const ids = session.assignedBoxerIds || session.assigned_boxer_ids;
+                assignedIds = typeof ids === 'string' ? JSON.parse(ids) : ids;
+             } else {
+                // If no specific assignments, just show all academy boxers for fallback
+                assignedIds = boxers.map((b: any) => b.id);
+             }
+          } catch(e) {
+             assignedIds = boxers.map((b: any) => b.id);
+          }
+
+          const sessionBoxers: SessionBoxer[] = assignedIds.map(id => {
+            const b = boxerMap.get(id);
+            if (!b) return null;
+            
+            const att = todaysAtt.find((a: any) => a.boxer_profile_id === b.id);
+            const attStatus = att?.status ? (String(att.status).toLowerCase() === "present" || String(att.status).toLowerCase() === "attending" ? "present" : "absent") : "not_marked";
+
+            return {
+              id: b.id,
+              name: b.full_name || "Unknown Boxer",
+              attendanceStatus: attStatus as "present" | "absent" | "not_marked",
+              fitStatus: b.is_suspended ? "suspended" : "fit"
+            };
+          }).filter(Boolean) as SessionBoxer[];
+
+          builtSessions.push({
+            ringName: session.name || "Ring",
+            location: over?.location || session.custom_location || templates.find((t: any) => t.id === session.template_id)?.name || "Main Venue",
+            from: session.from_time || "00:00",
+            to: session.to_time || "00:00",
+            boxers: sessionBoxers,
+          });
+        }
+        
+        setSessions(builtSessions);
+      } catch (err: any) {
+        toast.error("Failed to load attendance data");
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadData();
+  }, [profile?.academy_id]);
 
   async function markAttendance(sessionIdx: number, boxerIdx: number, status: "present" | "absent") {
     const boxer = sessions[sessionIdx].boxers[boxerIdx];
     setSaving(boxer.id);
-    // TODO: supabase.from("attendance").upsert(...)
-    await new Promise(r => setTimeout(r, 500));
-    setSessions(prev => {
-      const next = [...prev];
-      next[sessionIdx] = {
-        ...next[sessionIdx],
-        boxers: next[sessionIdx].boxers.map((b, i) => i === boxerIdx ? { ...b, attendanceStatus: status } : b),
-      };
-      return next;
-    });
-    setSaving(null);
-    toast.success(`${boxer.name} marked ${status}`);
+    
+    try {
+      // Check if existing record
+      const { data: existing } = await supabase.from("attendance")
+        .select("id")
+        .eq("boxer_profile_id", boxer.id)
+        .like("session_date", `${TODAY}%`)
+        .single();
+        
+      if (existing) {
+        await supabase.from("attendance").update({ status }).eq("id", existing.id);
+      } else {
+        await supabase.from("attendance").insert({
+           boxer_profile_id: boxer.id,
+           session_date: TODAY,
+           status: status,
+           marked_by: user?.id
+        });
+      }
+      
+      setSessions(prev => {
+        const next = [...prev];
+        next[sessionIdx] = {
+          ...next[sessionIdx],
+          boxers: next[sessionIdx].boxers.map((b, i) => i === boxerIdx ? { ...b, attendanceStatus: status } : b),
+        };
+        return next;
+      });
+      toast.success(`${boxer.name} marked ${status}`);
+    } catch(err: any) {
+      toast.error(`Failed to mark attendance: ${err.message}`);
+    } finally {
+      setSaving(null);
+    }
+  }
+
+  if (loading) {
+    return (
+      <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
+        <SpinnerIcon className="size-8 animate-spin mb-4 text-primary" />
+        <p>Loading sessions...</p>
+      </div>
+    );
   }
 
   return (

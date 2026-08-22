@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { PageHeader } from "@/components/dashboard/DashboardLayout";
 import { useAuth } from "@/lib/auth";
 import { Globe2, MapPin, Building2, Shield } from "lucide-react";
+import { useFederationFilters } from "@/lib/federation";
 
 export const Route = createFileRoute("/federation/settings")({
   component: FederationSettings,
@@ -9,17 +10,8 @@ export const Route = createFileRoute("/federation/settings")({
 
 function FederationSettings() {
   const { profile } = useAuth();
-  const perms: any[] = profile?.granted_permissions ?? [];
-  const fedPerm = perms.find((p: any) => p?.type === "federation");
-  const scope = fedPerm?.scope ?? "national";
-  const value = fedPerm?.value ?? null;
-
+  const { scope, states, cities, label: jurisdiction } = useFederationFilters();
   const ScopeIcon = scope === "national" ? Globe2 : scope === "state" ? MapPin : Building2;
-  const jurisdiction = scope === "national"
-    ? "All India (National Scope)"
-    : scope === "state"
-    ? `State: ${value}`
-    : `Custom Regions: ${Array.isArray(value) ? value.join(", ") : value}`;
 
   return (
     <div className="animate-fade-up space-y-6 max-w-2xl">

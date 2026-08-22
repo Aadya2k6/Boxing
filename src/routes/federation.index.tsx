@@ -5,24 +5,16 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { Link } from "@tanstack/react-router";
+import { useFederationFilters } from "@/lib/federation";
 
 export const Route = createFileRoute("/federation/")({
   component: FederationIndex,
 });
 
-// ── Derive scope filters ──────────────────────────────────────────────────────
-function useFederationFilters() {
-  const { profile } = useAuth();
-  const perms: any[] = profile?.granted_permissions ?? [];
-  const fedPerm = perms.find((p: any) => p?.type === "federation");
-  return {
-    scope: (fedPerm?.scope ?? "national") as "national" | "state" | "custom",
-    value: fedPerm?.value ?? null,
-  };
-}
+// ── Federation Index ──────────────────────────────────────────────────────────
 
 function FederationIndex() {
-  const { scope, value } = useFederationFilters();
+  const { scope, states, cities } = useFederationFilters();
   const [stats, setStats] = useState({ athletes: 0, academies: 0, suspended: 0 });
   const [recentBouts, setRecentBouts] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -32,24 +24,70 @@ function FederationIndex() {
       setLoading(true);
       try {
         // Build athlete query filtered by jurisdiction — read-only sports data only
-        let athleteQuery = supabase
-          .from("boxer_profiles")
-          .select("id, state, city, academy_id, is_suspended", { count: "exact", head: false });
+        const [profRes, bpRes, acRes, centerRes] = await Promise.all([
+          supabase.from("profiles").select("*").in("role", ["boxer", "athlete"]),
+          supabase.from("boxer_profiles").select("*"),
+          supabase.from("academies").select("*"),
+          supabase.from("centers").select("*"),
+        ]);
+        
+        const bps = bpRes.data || [];
+        const profs = profRes.data || [];
+        const acs = acRes.data || [];
+        const centers = centerRes.data || [];
 
-        if (scope === "state" && value) {
-          athleteQuery = athleteQuery.eq("state", value as string);
-        } else if (scope === "custom" && Array.isArray(value)) {
-          athleteQuery = athleteQuery.in("city", value as string[]);
+        let allAthletes: any[] = [];
+        const seenIds = new Set<string>();
+
+        for (const bp of bps) {
+          const userProf = profs.find(p => p.id === bp.user_id);
+          const centerId = bp.center_id || bp.preferred_center_id;
+          const center = centers.find(c => c.id === centerId);
+          const academyId = bp.academy_id || userProf?.academy_id || center?.academy_id;
+          const academy = acs.find(a => a.id === academyId);
+
+          const st = bp.state || center?.state || academy?.state || "";
+          const ct = bp.city || center?.city || academy?.city || "";
+
+          seenIds.add(bp.id);
+          if (bp.user_id) seenIds.add(bp.user_id);
+          allAthletes.push({
+            ...bp,
+            computed_state: st,
+            computed_city: ct,
+          });
         }
-        // national: no filter
 
-        const { data: athletes, count: athleteCount } = await athleteQuery;
+        for (const p of profs) {
+          if (!seenIds.has(p.id)) {
+            const academy = acs.find(a => a.id === p.academy_id);
+            allAthletes.push({
+              ...p,
+              computed_state: academy?.state || "",
+              computed_city: academy?.city || "",
+              is_suspended: false,
+            });
+          }
+        }
+        
+        let filteredAthletes = allAthletes;
+        if (scope === "state" && states.length > 0) {
+          filteredAthletes = filteredAthletes.filter(a => 
+            states.some(s => a.computed_state && a.computed_state.toLowerCase().trim().includes(s.toLowerCase().trim()))
+          );
+        } else if (scope === "custom" && cities.length > 0) {
+          filteredAthletes = filteredAthletes.filter(a => 
+            cities.some(c => a.computed_city && a.computed_city.toLowerCase().trim().includes(c.toLowerCase().trim()))
+          );
+        }
+
+        const athleteCount = filteredAthletes.length;
 
         // Academy count (distinct academy_ids visible to this federation)
-        const visibleAcademyIds = [...new Set((athletes ?? []).map((a: any) => a.academy_id).filter(Boolean))];
+        const visibleAcademyIds = [...new Set((filteredAthletes ?? []).map((a: any) => a.academy_id).filter(Boolean))];
 
         // Count suspended
-        const suspendedCount = (athletes ?? []).filter((a: any) => a.is_suspended).length;
+        const suspendedCount = (filteredAthletes ?? []).filter((a: any) => a.is_suspended).length;
 
         setStats({
           athletes: athleteCount ?? 0,
@@ -80,7 +118,7 @@ function FederationIndex() {
     }
 
     load();
-  }, [scope, value]);
+  }, [scope, states, cities]);
 
   const METRICS = [
     { icon: Users, label: "Athletes in Jurisdiction", value: loading ? "—" : stats.athletes.toLocaleString(), color: "text-indigo-500", bg: "bg-indigo-500/10" },

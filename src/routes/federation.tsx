@@ -5,31 +5,17 @@ import {
 import { useAuth } from "@/lib/auth";
 import { useRequireAuth } from "@/lib/guards";
 import { cn } from "@/lib/utils";
+import { useFederationFilters } from "@/lib/federation";
 
 export const Route = createFileRoute("/federation")({
   component: FederationLayout,
 });
 
-// ── Derive federation scope label from granted_permissions ─────────────────────
-function useFederationScope() {
-  const { profile } = useAuth();
-  const perms: any[] = profile?.granted_permissions ?? [];
-  const fedPerm = perms.find((p: any) => p?.type === "federation");
-  const scope: "national" | "state" | "custom" = fedPerm?.scope ?? "national";
-  const value: string | string[] | null = fedPerm?.value ?? null;
-
-  let label = "National — All India";
-  if (scope === "state" && value) label = `State — ${value}`;
-  if (scope === "custom" && Array.isArray(value)) label = `Custom — ${value.join(", ")}`;
-
-  return { scope, value, label };
-}
-
 function FederationLayout() {
   const { signOut, profile } = useAuth();
-  const { loading } = useRequireAuth("boxos_admin");
+  const { loading } = useRequireAuth("federation" as any);
   const location = useLocation();
-  const { label } = useFederationScope();
+  const { label } = useFederationFilters();
 
   if (loading) {
     return (
