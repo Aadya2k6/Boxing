@@ -608,7 +608,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
               }}
             >
               <option value="">Select State…</option>
-              {State.getStatesOfCountry("IN").map(s => (
+              {State.getStatesOfCountry("IN").map((s: any) => (
                 <option key={s.isoCode} value={s.name}>{s.name}</option>
               ))}
             </Select>
@@ -621,9 +621,9 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
             >
               <option value="">Select City…</option>
               {(() => {
-                const st = State.getStatesOfCountry("IN").find(s => s.name === data.state);
+                const st = State.getStatesOfCountry("IN").find((s: any) => s.name === data.state);
                 if (!st) return null;
-                return City.getCitiesOfState("IN", st.isoCode).map(c => (
+                return City.getCitiesOfState("IN", st.isoCode).map((c: any) => (
                   <option key={c.name} value={c.name}>{c.name}</option>
                 ));
               })()}
