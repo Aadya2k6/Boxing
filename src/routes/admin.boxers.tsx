@@ -954,7 +954,7 @@ function AdminBoxersPage() {
     try {
       const targetAcademyId = profile?.academy_id;
 
-      let profQuery = supabase.from("profiles").select("*").eq("role", "boxer").order("created_at", { ascending: false });
+      let profQuery = supabase.from("profiles").select("*").eq("role", "athlete").order("created_at", { ascending: false });
       let bpQuery = supabase.from("boxer_profiles").select("*").order("created_at", { ascending: false });
       let plansQuery = supabase.from("fee_plans").select("id,name,amount,cycle").eq("is_active", true);
       let assignsQuery = supabase.from("fee_assignments").select("id,boxer_profile_id,fee_plan_id,status,assignment_status,payment_mode,rollover_requested,fee_plans(name,amount,cycle)");

@@ -66,12 +66,13 @@ function InviteModal({ onClose, academies, tournaments, onInvite }: { onClose: (
 
       // 2. Insert into external_judge_invites
       const { error: inviteErr } = await supabase.from("external_judge_invites").insert({
+        profile_id: authData?.user?.id,
         email: form.email,
         full_name: form.name || null,
         tournament_template_id: form.tournament,
         academy_id: form.academy,
         invited_by: user?.id,
-        status: "accepted",
+        status: "active",
       });
 
       if (inviteErr) throw inviteErr;

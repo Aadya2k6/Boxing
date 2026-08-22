@@ -227,22 +227,24 @@ function JudgeDashboard() {
     if (!user?.id) return;
     try {
       // Fetch all bout_judge_assignments for this judge
-      const { data: assignments, error: assignErr } = await supabase
-        .from("bout_judge_assignments")
-        .select("bout_id")
-        .eq("judge_profile_id", user.id);
+      // Fetch today's instances to get bouts
+      const today = new Date().toISOString().split("T")[0];
+      const { data: instances, error: instErr } = await supabase
+        .from("ring_instances")
+        .select("id")
+        .eq("date", today);
+        
+      if (instErr) throw instErr;
+      const instanceIds = instances?.map(i => i.id) || [];
 
-      if (assignErr) throw assignErr;
-      if (!assignments || assignments.length === 0) {
+      if (instanceIds.length === 0) {
         setBouts([]);
         setActiveBout(null);
         setLoading(false);
         return;
       }
 
-      const boutIds = assignments.map(a => a.bout_id);
-
-      // Fetch bouts with related data
+      // Fetch bouts with related data directly, bypassing bout_judge_assignments
       const { data: boutRows, error: boutErr } = await supabase
         .from("bouts")
         .select(`
@@ -257,10 +259,19 @@ function JudgeDashboard() {
           age_categories(name),
           weight_categories(name)
         `)
-        .in("id", boutIds)
+        .in("ring_instance_id", instanceIds)
         .order("bout_number", { ascending: true });
 
       if (boutErr) throw boutErr;
+      
+      const boutIds = boutRows?.map(b => b.id) || [];
+      
+      if (boutIds.length === 0) {
+        setBouts([]);
+        setActiveBout(null);
+        setLoading(false);
+        return;
+      }
 
       // Fetch this judge's scores for all these bouts
       const { data: scores } = await supabase
@@ -323,7 +334,7 @@ function JudgeDashboard() {
       setActiveBout(active);
     } catch (err: any) {
       console.error("[JudgeDashboard] fetch error:", err);
-      toast.error("Failed to load bout assignments.");
+      toast.error("Failed to load bout assignments: " + (err?.message || "Unknown error"));
     } finally {
       setLoading(false);
     }

@@ -167,6 +167,8 @@ function AdminSchedulingPage() {
   const [weightCategories, setWeightCategories] = useState<WeightCategory[]>([]);
   const [bouts, setBouts] = useState<Bout[]>([]);
   const [coaches, setCoaches] = useState<{id: string; email: string}[]>([]);
+  const [judges, setJudges] = useState<{id: string; full_name: string}[]>([]);
+  const [boutJudgeAssignments, setBoutJudgeAssignments] = useState<any[]>([]);
 
   // Bout Modal
   const [showBoutModal, setShowBoutModal] = useState(false);
@@ -183,6 +185,10 @@ function AdminSchedulingPage() {
     judge_count: 3,
     coach_id: "",
   });
+
+  // Judge Assignment State
+  const [judgeAssignBoutId, setJudgeAssignBoutId] = useState<string | null>(null);
+  const [selectedJudgeIds, setSelectedJudgeIds] = useState<string[]>([]);
 
   const [selectedScheduleId, setSelectedScheduleId] = useState<string | null>(null);
   const [cancellingAllDay, setCancellingAllDay] = useState(false);
@@ -289,7 +295,7 @@ function AdminSchedulingPage() {
         acsQuery = acsQuery.eq("id", targetAcademyId);
       }
 
-      const [boxersRes, templatesRes, ringsRes, instancesRes, overridesRes, pollsRes, attendanceRes, leavesRes, academiesRes, ageRes, weightRes, boutsRes, coachesRes] = await Promise.all([
+      const [boxersRes, templatesRes, ringsRes, instancesRes, overridesRes, pollsRes, attendanceRes, leavesRes, academiesRes, ageRes, weightRes, boutsRes, coachesRes, judgesRes, assignmentsRes] = await Promise.all([
         bpQuery,
         tQuery,
         supabase.from("ring_sessions").select("*"),
@@ -302,7 +308,9 @@ function AdminSchedulingPage() {
         supabase.from("age_categories").select("*").order("min_age"),
         supabase.from("weight_categories").select("*").order("min_kg"),
         supabase.from("bouts").select("*"),
-        supabase.from("profiles").select("id, email").eq("role", "coach")
+        supabase.from("profiles").select("id, email").eq("role", "coach"),
+        supabase.from("profiles").select("id, full_name").eq("role", "external_judge").eq("is_active", true),
+        supabase.from("bout_judge_assignments").select("*")
       ]);
 
       if (academiesRes.data) setAcademies(academiesRes.data);
@@ -310,6 +318,8 @@ function AdminSchedulingPage() {
       if (weightRes.data) setWeightCategories(weightRes.data);
       if (boutsRes.data) setBouts(boutsRes.data);
       if (coachesRes.data) setCoaches(coachesRes.data);
+      if (judgesRes.data) setJudges(judgesRes.data);
+      if (assignmentsRes.data) setBoutJudgeAssignments(assignmentsRes.data);
 
       const pollIds = (pollsRes.data ?? []).map((p: any) => p.id);
       const responsesByInstance = new Map<string, Record<string, { status: "attending" | "not_attending"; reason?: string }>>();
@@ -902,6 +912,35 @@ function AdminSchedulingPage() {
     }
   }
 
+  async function handleSaveJudges() {
+    if (!judgeAssignBoutId) return;
+    setSavingBout(true);
+    try {
+      await supabase.from("bout_judge_assignments").delete().eq("bout_id", judgeAssignBoutId);
+      
+      if (selectedJudgeIds.length > 0) {
+        const { error } = await supabase.from("bout_judge_assignments").insert(
+          selectedJudgeIds.map(id => ({
+            bout_id: judgeAssignBoutId,
+            judge_profile_id: id,
+            assigned_by: user?.id,
+            judge_role: "judge"
+          }))
+        );
+        if (error) throw error;
+      }
+      
+      setJudgeAssignBoutId(null);
+      await loadData(true);
+    } catch (err: any) {
+      alert(`Error saving judges: ${err.message || err}`);
+    } finally {
+      setSavingBout(false);
+    }
+  }
+
+
+
   if (loading) {
     return (
       <div className="flex flex-col items-center justify-center py-20 text-muted-foreground">
@@ -1321,6 +1360,53 @@ function AdminSchedulingPage() {
         </div>
       )}
 
+      {/* Judge Assignment Modal */}
+      {judgeAssignBoutId && (
+        <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
+          <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-md animate-scale-in">
+            <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+              <h3 className="font-display font-semibold">Assign Judges to Bout</h3>
+              <button onClick={() => setJudgeAssignBoutId(null)} className="size-8 grid place-items-center rounded-md hover:bg-subtle text-muted-foreground hover:text-foreground transition"><X className="size-4" /></button>
+            </div>
+            <div className="p-6">
+              <p className="text-xs text-muted-foreground mb-4">Select judges to score this bout. They will see it on their Judge Portal immediately.</p>
+              
+              {judges.length === 0 ? (
+                <div className="p-4 bg-subtle border border-border rounded-xl text-center text-sm text-muted-foreground">
+                  No active external judges found. <br />Go to Judges tab to invite some.
+                </div>
+              ) : (
+                <div className="space-y-2 max-h-[40vh] overflow-y-auto pr-2">
+                  {judges.map(j => {
+                    const checked = selectedJudgeIds.includes(j.id);
+                    return (
+                      <label key={j.id} className={`flex items-center gap-3 p-3 border rounded-xl cursor-pointer transition ${checked ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={(e) => {
+                            if (e.target.checked) setSelectedJudgeIds(prev => [...prev, j.id]);
+                            else setSelectedJudgeIds(prev => prev.filter(id => id !== j.id));
+                          }}
+                          className="size-4 accent-primary"
+                        />
+                        <span className="text-sm font-semibold">{j.full_name || "Judge"}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+            <div className="px-6 py-4 border-t border-border bg-subtle/30 flex justify-end gap-3 rounded-b-2xl">
+              <button onClick={() => setJudgeAssignBoutId(null)} className="px-5 py-2 text-sm border border-border rounded-xl hover:bg-subtle transition font-medium">Cancel</button>
+              <button onClick={handleSaveJudges} disabled={savingBout} className="px-6 py-2 text-sm bg-primary text-primary-foreground rounded-xl hover:bg-primary/90 transition shadow-card font-semibold disabled:opacity-50 flex items-center gap-2">
+                {savingBout && <Loader2 className="size-3.5 animate-spin" />} Save Assignments
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {overlapWarning && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm">
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-sm p-6 animate-fade-up text-center">
@@ -1569,7 +1655,8 @@ function AdminSchedulingPage() {
                            const red = activeBoxers.find(b => b.id === bout.boxer_red_id)?.full_name || "Unknown";
                            const blue = activeBoxers.find(b => b.id === bout.boxer_blue_id)?.full_name || "Unknown";
                            return (
-                             <div key={bout.id} className="bg-surface border border-border rounded-xl p-4 flex items-center justify-between shadow-sm">
+                             <div key={bout.id} className="space-y-0">
+                             <div className="bg-surface border border-border rounded-t-xl p-4 flex items-center justify-between shadow-sm">
                                <div>
                                  <h4 className="font-semibold text-sm">Bout #{bout.bout_number}</h4>
                                  <div className="flex items-center gap-2 mt-1 text-xs font-medium">
@@ -1584,6 +1671,37 @@ function AdminSchedulingPage() {
                                  </span>
                                  <p className="text-[10px] text-muted-foreground mt-1">{bout.bout_type === "tournament" ? "🏆 Tournament" : "Training"}</p>
                                </div>
+                             </div>
+                             
+                             <div className="bg-subtle/50 px-4 py-3 border-x border-b border-border rounded-b-xl mb-2 text-xs">
+                               <div className="flex items-center justify-between mb-2">
+                                 <span className="font-semibold text-muted-foreground">Assigned Judges</span>
+                                 <button 
+                                   onClick={() => {
+                                     setJudgeAssignBoutId(bout.id);
+                                     setSelectedJudgeIds(boutJudgeAssignments.filter(a => a.bout_id === bout.id).map(a => a.judge_profile_id));
+                                   }}
+                                   className="text-primary hover:underline font-medium"
+                                 >
+                                   Manage Judges
+                                 </button>
+                               </div>
+                               
+                               {boutJudgeAssignments.filter(a => a.bout_id === bout.id).length === 0 ? (
+                                 <div className="text-muted-foreground italic">No judges assigned yet.</div>
+                               ) : (
+                                 <div className="flex flex-wrap gap-1.5">
+                                   {boutJudgeAssignments.filter(a => a.bout_id === bout.id).map(a => {
+                                     const j = judges.find(jdg => jdg.id === a.judge_profile_id);
+                                     return (
+                                       <span key={a.id} className="px-2 py-1 bg-surface border border-border rounded-md shadow-sm">
+                                         {j?.full_name || "Unknown Judge"}
+                                       </span>
+                                     );
+                                   })}
+                                 </div>
+                               )}
+                             </div>
                              </div>
                            )
                         })}
@@ -1673,7 +1791,7 @@ function AdminSchedulingPage() {
           </div>
         </div>
       )}
-      {showBoutModal && (
+      {showBoutModal && activeDateModalInstance && (
         <div className="fixed inset-0 z-[70] flex items-center justify-center p-4 bg-background/80 backdrop-blur-sm overflow-y-auto">
           <div className="bg-surface border border-border rounded-2xl shadow-card w-full max-w-2xl my-8 animate-fade-up flex flex-col max-h-[90vh]">
             <div className="px-6 py-4 border-b border-border flex items-center justify-between shrink-0">

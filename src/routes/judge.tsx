@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Outlet, useNavigate } from "@tanstack/react-router";
+import { Outlet, useNavigate, useLocation } from "@tanstack/react-router";
 import { LogOut, Clock, ShieldAlert } from "lucide-react";
 import { useAuth } from "@/lib/auth";
 import { useRequireAuth } from "@/lib/guards";
@@ -36,7 +36,7 @@ function useJudgeAccess(userId: string | null | undefined): {
         // 1. Check profile is_active + access_expires_at first (fastest revocation path)
         const { data: profile } = await supabase
           .from("profiles")
-          .select("is_active, access_expires_at, judge_scope_tournament_id")
+          .select("is_active, access_expires_at, judge_scope_tournament_id, email")
           .eq("id", userId!)
           .maybeSingle();
 
@@ -54,15 +54,23 @@ function useJudgeAccess(userId: string | null | undefined): {
         }
 
         // 2. Check external_judge_invites for the active invite
-        const { data: invite } = await supabase
+        let orQuery = `profile_id.eq.${userId}`;
+        if (profile.email) {
+          orQuery += `,email.eq.${profile.email}`;
+        }
+        
+        const { data: invite, error: inviteErr } = await supabase
           .from("external_judge_invites")
           .select("status, expires_at, tournament_template_id")
-          .eq("profile_id", userId!)
+          .or(orQuery)
           .order("invited_at", { ascending: false })
           .limit(1)
           .maybeSingle();
 
-        if (!invite || invite.status === "revoked" || invite.status === "expired") {
+        console.log("Judge Access Check -> invite:", invite, "inviteErr:", inviteErr);
+
+        if (invite && (invite.status === "revoked" || invite.status === "expired")) {
+          console.warn("Judge Access Denied -> Invite is revoked or expired");
           setAccess({ tournamentName: "", state: "expired", expiresAt: null });
           setLoading(false);
           return;
@@ -71,7 +79,7 @@ function useJudgeAccess(userId: string | null | undefined): {
         // 3. Fetch tournament name
         let tournamentName = "Tournament";
         const tournamentId =
-          invite.tournament_template_id ?? profile.judge_scope_tournament_id;
+          invite?.tournament_template_id ?? profile.judge_scope_tournament_id;
 
         if (tournamentId) {
           const { data: template } = await supabase
@@ -87,7 +95,7 @@ function useJudgeAccess(userId: string | null | undefined): {
               setAccess({
                 tournamentName,
                 state: "expired",
-                expiresAt: invite.expires_at ?? null,
+                expiresAt: invite?.expires_at ?? null,
               });
               setLoading(false);
               return;
@@ -96,7 +104,7 @@ function useJudgeAccess(userId: string | null | undefined): {
         }
 
         // 4. Determine state from expires_at
-        const expiresAt = invite.expires_at ?? profile.access_expires_at ?? null;
+        const expiresAt = invite?.expires_at ?? profile.access_expires_at ?? null;
         let state: AccessState = "active";
 
         if (expiresAt) {
@@ -168,16 +176,17 @@ function JudgeLayout() {
   const { profile, loading: authLoading } = useRequireAuth("external_judge");
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
 
   const { access, loading: accessLoading } = useJudgeAccess(user?.id);
 
   // ── Security gate: redirect to /judge/expired if access is revoked/expired ─
   useEffect(() => {
     if (accessLoading || authLoading) return;
-    if (access && access.state === "expired") {
+    if (access && access.state === "expired" && location.pathname !== "/judge/expired") {
       navigate({ to: "/judge/expired" as any });
     }
-  }, [access, accessLoading, authLoading, navigate]);
+  }, [access, accessLoading, authLoading, navigate, location.pathname]);
 
   if (authLoading || accessLoading) {
     return (
@@ -188,7 +197,7 @@ function JudgeLayout() {
   }
 
   // Don't render children while redirecting for expired access
-  if (!access || access.state === "expired") {
+  if ((!access || access.state === "expired") && location.pathname !== "/judge/expired") {
     return (
       <div className="min-h-screen bg-background grid place-items-center">
         <span className="size-6 border-2 border-destructive border-t-transparent rounded-full animate-spin" />
@@ -225,9 +234,9 @@ function JudgeLayout() {
 
       {/* Persistent real access-status banner */}
       <AccessStatusBanner
-        tournamentName={access.tournamentName}
-        state={access.state}
-        expiresAt={access.expiresAt}
+        tournamentName={access?.tournamentName ?? ""}
+        state={access?.state ?? "expired"}
+        expiresAt={access?.expiresAt ?? null}
       />
 
       {/* Page content — narrow, judge-focused */}
