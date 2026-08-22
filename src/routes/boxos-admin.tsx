@@ -11,7 +11,7 @@ function BoxosAdminLayout() {
   if (loading) {
     return (
       <div className="min-h-screen bg-background grid place-items-center">
-        <span className="size-6 border-2 border-t-transparent rounded-full animate-spin border-fuchsia-600" />
+        <span className="size-6 border-2 border-t-transparent rounded-full animate-spin border-blue-500" />
       </div>
     );
   }
@@ -23,9 +23,9 @@ function BoxosAdminLayout() {
       role="BOXOS Admin"
       userName={profile?.full_name ?? "BOXOS Platform Admin"}
       userMeta="Platform Administrator"
-      accentClass="text-fuchsia-600"
-      accentBg="bg-fuchsia-500/10"
-      dotColor="bg-fuchsia-500"
+      accentClass="text-blue-400"
+      accentBg="bg-blue-500/10"
+      dotColor="bg-blue-500"
       navSections={[
         {
           label: "Platform Management",

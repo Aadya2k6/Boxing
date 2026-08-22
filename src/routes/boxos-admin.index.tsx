@@ -235,7 +235,7 @@ function BoxosAdminAcademies() {
         actions={
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 bg-fuchsia-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-fuchsia-700 transition shadow-card cursor-pointer"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark transition shadow-card cursor-pointer"
           >
             <Plus className="size-4" /> Create Academy
           </button>
@@ -275,7 +275,7 @@ function BoxosAdminAcademies() {
       {/* Academy Cards List */}
       {loading ? (
         <div className="py-16 text-center">
-          <Loader2 className="size-8 animate-spin mx-auto text-fuchsia-600 mb-3" />
+          <Loader2 className="size-8 animate-spin mx-auto text-blue-400 mb-3" />
           <div className="text-sm text-muted-foreground">Loading academies from database…</div>
         </div>
       ) : filtered.length === 0 ? (
@@ -289,7 +289,7 @@ function BoxosAdminAcademies() {
           </p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="mt-4 inline-flex items-center gap-2 bg-fuchsia-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-fuchsia-700 transition cursor-pointer"
+            className="mt-4 inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primary-dark transition cursor-pointer shadow-card"
           >
             <Plus className="size-4" /> Create First Academy
           </button>
@@ -307,7 +307,7 @@ function BoxosAdminAcademies() {
                   {/* Card Header */}
                   <div className="flex items-start justify-between gap-3 mb-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <div className="size-11 rounded-xl bg-gradient-to-br from-fuchsia-500/20 to-purple-600/20 border border-fuchsia-500/30 grid place-items-center text-fuchsia-600 font-bold font-display text-sm shrink-0">
+                      <div className="size-11 rounded-xl bg-gradient-to-br from-blue-500/20 to-indigo-600/20 border border-blue-500/30 grid place-items-center text-blue-400 font-bold font-display text-sm shrink-0">
                         {academy.name.split(" ").map(w => w[0]).slice(0, 2).join("")}
                       </div>
                       <div className="min-w-0">
@@ -403,7 +403,7 @@ function BoxosAdminAcademies() {
                     <Link
                       to="/boxos-admin/academies/$academyId"
                       params={{ academyId: academy.id }}
-                      className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-fuchsia-600/10 text-fuchsia-600 rounded-lg hover:bg-fuchsia-600 hover:text-white transition cursor-pointer"
+                      className="inline-flex items-center gap-1 px-3 py-1 text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-lg hover:bg-blue-500/20 transition cursor-pointer"
                     >
                       <span>View</span>
                       <ChevronRight className="size-3" />
@@ -748,7 +748,7 @@ function CreateAcademyModal({ onClose, onSuccess }: { onClose: () => void; onSuc
               type="button"
               onClick={handleLocateMe}
               disabled={locating}
-              className="inline-flex items-center gap-1.5 text-xs text-fuchsia-600 font-semibold hover:underline cursor-pointer"
+              className="inline-flex items-center gap-1.5 text-xs text-blue-400 font-semibold hover:underline cursor-pointer"
             >
               {locating ? <Loader2 className="size-3.5 animate-spin" /> : <Locate className="size-3.5" />}
               Auto-detect current GPS coordinates
@@ -771,7 +771,7 @@ function CreateAcademyModal({ onClose, onSuccess }: { onClose: () => void; onSuc
               <button
                 type="button"
                 onClick={addSuperadminRow}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-fuchsia-600 hover:text-fuchsia-700 cursor-pointer"
+                className="inline-flex items-center gap-1 text-xs font-semibold text-blue-400 hover:text-blue-300 cursor-pointer"
               >
                 <Plus className="size-3.5" /> Add another
               </button>
@@ -824,14 +824,14 @@ function CreateAcademyModal({ onClose, onSuccess }: { onClose: () => void; onSuc
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated cursor-pointer"
+              className="px-4 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated cursor-pointer text-muted-foreground hover:text-foreground"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-2 bg-fuchsia-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-fuchsia-700 disabled:opacity-50 transition cursor-pointer shadow-card"
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-50 transition cursor-pointer shadow-card"
             >
               {loading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
               Create Academy &amp; Send Invites

@@ -79,7 +79,7 @@ function PlatformSettingsPage() {
 
       {loading ? (
         <div className="py-16 text-center">
-          <Loader2 className="size-6 animate-spin mx-auto text-fuchsia-600 mb-2" />
+          <Loader2 className="size-6 animate-spin mx-auto text-blue-400 mb-2" />
           <div className="text-xs text-muted-foreground">Loading configuration…</div>
         </div>
       ) : (
@@ -92,7 +92,7 @@ function PlatformSettingsPage() {
             <div className="space-y-4">
               <label className="block">
                 <span className="block text-xs font-semibold mb-1.5 flex items-center gap-1.5">
-                  <Clock className="size-3.5 text-fuchsia-600" />
+                  <Clock className="size-3.5 text-blue-400" />
                   Academy Code Verification Window (Days)
                 </span>
                 <input
@@ -121,7 +121,7 @@ function PlatformSettingsPage() {
             <div className="space-y-4">
               <label className="block">
                 <span className="block text-xs font-semibold mb-1.5 flex items-center gap-1.5">
-                  <FileText className="size-3.5 text-fuchsia-600" />
+                  <FileText className="size-3.5 text-blue-400" />
                   Active Terms Version Tag
                 </span>
                 <input
@@ -143,7 +143,7 @@ function PlatformSettingsPage() {
             <button
               type="submit"
               disabled={saving}
-              className="inline-flex items-center gap-2 bg-fuchsia-600 text-white px-6 py-2.5 rounded-xl font-semibold hover:bg-fuchsia-700 disabled:opacity-50 transition cursor-pointer shadow-card"
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-6 py-2.5 rounded-xl font-semibold hover:bg-primary-dark disabled:opacity-50 transition cursor-pointer shadow-card"
             >
               {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
               Save Platform Settings
@@ -204,7 +204,7 @@ function ChangePasswordSection() {
           <div className="grid sm:grid-cols-2 gap-4">
             <label className="block relative">
               <span className="block text-xs font-semibold mb-1.5 flex items-center gap-1.5">
-                <KeyRound className="size-3.5 text-fuchsia-600" />
+                <KeyRound className="size-3.5 text-blue-400" />
                 New Password
               </span>
               <input

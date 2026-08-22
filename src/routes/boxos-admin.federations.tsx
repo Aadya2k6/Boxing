@@ -118,7 +118,7 @@ function BoxosAdminFederations() {
         actions={
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 bg-fuchsia-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-fuchsia-700 transition shadow-card cursor-pointer"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark transition shadow-card cursor-pointer"
           >
             <Plus className="size-4" /> Create Federation
           </button>
@@ -127,7 +127,7 @@ function BoxosAdminFederations() {
 
       {/* Scope Legend */}
       <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-        <div className="flex items-center gap-1.5"><Globe2 className="size-3.5 text-indigo-500" /><span className="font-semibold text-indigo-500">National</span> — full athlete roster access</div>
+        <div className="flex items-center gap-1.5"><Globe2 className="size-3.5 text-blue-400" /><span className="font-semibold text-blue-400">National</span> — full athlete roster access</div>
         <div className="text-border">·</div>
         <div className="flex items-center gap-1.5"><MapPin className="size-3.5 text-emerald-500" /><span className="font-semibold text-emerald-500">State</span> — filtered by state</div>
         <div className="text-border">·</div>
@@ -149,7 +149,7 @@ function BoxosAdminFederations() {
       {/* Accounts List */}
       {loading ? (
         <div className="py-16 text-center">
-          <Loader2 className="size-8 animate-spin mx-auto text-fuchsia-600 mb-3" />
+          <Loader2 className="size-8 animate-spin mx-auto text-blue-400 mb-3" />
           <div className="text-sm text-muted-foreground">Loading federation accounts…</div>
         </div>
       ) : filtered.length === 0 ? (
@@ -162,7 +162,7 @@ function BoxosAdminFederations() {
           {!search && (
             <button
               onClick={() => setShowCreateModal(true)}
-              className="mt-4 inline-flex items-center gap-2 bg-fuchsia-600 text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-fuchsia-700 transition cursor-pointer"
+              className="mt-4 inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primary-dark transition cursor-pointer shadow-card"
             >
               <Plus className="size-4" /> Create First Federation
             </button>
@@ -342,8 +342,8 @@ function MultiSelectDropdown({
       
       {isOpen && (
         <>
-          <div className="fixed inset-0 z-10" onClick={() => setIsOpen(false)} />
-          <div className="absolute top-full left-0 right-0 mt-1 bg-surface border border-border rounded-xl shadow-modal z-20 max-h-60 overflow-y-auto p-1.5 animate-in fade-in slide-in-from-top-2">
+          <div className="fixed inset-0 z-20" onClick={() => setIsOpen(false)} />
+          <div className="absolute top-full left-0 right-0 mt-1 bg-[#0B0F17] border border-border-strong rounded-xl shadow-elevated z-30 max-h-60 overflow-y-auto p-1.5 animate-in fade-in slide-in-from-top-2">
             {options.map(opt => (
               <label key={opt.value} className="flex items-center gap-2 px-2 py-2 rounded-lg hover:bg-elevated cursor-pointer text-sm">
                 <input
@@ -356,7 +356,7 @@ function MultiSelectDropdown({
                       onChange(selectedValues.filter(v => v !== opt.value));
                     }
                   }}
-                  className="accent-fuchsia-600"
+                  className="accent-blue-500"
                 />
                 <span className="flex-1 truncate">{opt.label}</span>
                 {opt.hint && <span className="text-[10px] text-muted-foreground shrink-0">{opt.hint}</span>}
@@ -416,8 +416,6 @@ function CreateFederationModal({ actorId, onClose, onSuccess }: {
 
     setLoading(true);
     try {
-      // Call the create-federation-account edge function (service-role)
-      // which handles auth user creation + profile row via handle_new_user trigger
       const { data: { session } } = await supabase.auth.getSession();
       const edgeFnUrl = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/create-federation-account`;
 
@@ -459,15 +457,15 @@ function CreateFederationModal({ actorId, onClose, onSuccess }: {
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-surface rounded-2xl shadow-modal w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-up">
+      <div className="bg-surface border border-border rounded-2xl shadow-elevated w-full max-w-lg max-h-[90vh] overflow-y-auto animate-fade-up">
         <div className="p-5 border-b border-border sticky top-0 bg-surface/95 backdrop-blur-md z-10 flex items-center justify-between">
           <div>
             <div className="font-display font-bold text-lg flex items-center gap-2">
-              <Globe className="size-5 text-fuchsia-600" /> Create Federation Portal
+              <Globe className="size-5 text-blue-400" /> Create Federation Portal
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">Provision a new federation account with jurisdictional access</div>
           </div>
-          <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer"><X className="size-4" /></button>
+          <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer text-muted-foreground hover:text-foreground"><X className="size-4" /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-5">
@@ -496,7 +494,7 @@ function CreateFederationModal({ actorId, onClose, onSuccess }: {
 
             <div className="grid grid-cols-3 gap-2">
               {([
-                { val: "national", label: "National", desc: "All India", icon: Globe2, color: "indigo" },
+                { val: "national", label: "National", desc: "All India", icon: Globe2, color: "blue" },
                 { val: "state", label: "State", desc: "One state only", icon: MapPin, color: "emerald" },
                 { val: "custom", label: "Custom", desc: "Specific regions", icon: Building2, color: "amber" },
               ] as const).map(opt => (
@@ -508,8 +506,8 @@ function CreateFederationModal({ actorId, onClose, onSuccess }: {
                     form.scope === opt.val ? `border-${opt.color}-500 bg-${opt.color}-500/8` : "border-border hover:border-border-strong"
                   }`}
                 >
-                  <opt.icon className={`size-5 ${form.scope === opt.val ? `text-${opt.color}-500` : "text-muted-foreground"}`} />
-                  <div className={`text-xs font-bold ${form.scope === opt.val ? `text-${opt.color}-600` : ""}`}>{opt.label}</div>
+                  <opt.icon className={`size-5 ${form.scope === opt.val ? `text-${opt.color}-400` : "text-muted-foreground"}`} />
+                  <div className={`text-xs font-bold ${form.scope === opt.val ? `text-${opt.color}-400` : ""}`}>{opt.label}</div>
                   <div className="text-[10px] text-muted-foreground">{opt.desc}</div>
                 </button>
               ))}
@@ -542,7 +540,6 @@ function CreateFederationModal({ actorId, onClose, onSuccess }: {
                     selectedValues={selectedStates}
                     onChange={(newStates) => {
                       setSelectedStates(newStates);
-                      // Auto-remove cities belonging to unselected states
                       setSelectedCities(prev => prev.filter(c => newStates.some(s => (INDIA_DATA[s] || []).includes(c))));
                     }}
                   />
@@ -571,8 +568,8 @@ function CreateFederationModal({ actorId, onClose, onSuccess }: {
             )}
 
             {form.scope === "national" && (
-              <div className="bg-indigo-500/8 border border-indigo-500/20 rounded-xl p-3 text-xs text-muted-foreground">
-                <span className="font-semibold text-indigo-600">National scope:</span> This account will have read-only access to athlete demographics, age categories, and match history for <strong>all athletes</strong> across every academy on the platform.
+              <div className="bg-blue-500/8 border border-blue-500/20 rounded-xl p-3 text-xs text-muted-foreground">
+                <span className="font-semibold text-blue-400">National scope:</span> This account will have read-only access to athlete demographics, age categories, and match history for <strong>all athletes</strong> across every academy on the platform.
               </div>
             )}
           </div>
@@ -580,11 +577,11 @@ function CreateFederationModal({ actorId, onClose, onSuccess }: {
           <div className="border-t border-border" />
 
           <div className="flex items-center justify-end gap-2">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated cursor-pointer">Cancel</button>
+            <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated cursor-pointer text-muted-foreground hover:text-foreground">Cancel</button>
             <button
               type="submit"
               disabled={loading}
-              className="inline-flex items-center gap-2 bg-fuchsia-600 text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-fuchsia-700 disabled:opacity-50 transition cursor-pointer shadow-card"
+              className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-50 transition cursor-pointer shadow-card"
             >
               {loading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
               Provision Federation Account

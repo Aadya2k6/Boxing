@@ -1,15 +1,18 @@
 import { createClient } from "@supabase/supabase-js";
+import fs from "fs";
 
-// We need the anon key and url from .env
-const url = process.env.VITE_SUPABASE_URL || "YOUR_URL";
-const key = process.env.VITE_SUPABASE_ANON_KEY || "YOUR_KEY";
+const envFile = fs.readFileSync(".env", "utf8");
+const urlMatch = envFile.match(/VITE_SUPABASE_URL=(.+)/);
+const keyMatch = envFile.match(/VITE_SUPABASE_ANON_KEY=(.+)/);
+
+const url = urlMatch ? urlMatch[1].trim() : "";
+const key = keyMatch ? keyMatch[1].trim() : "";
 
 const supabase = createClient(url, key);
 
 async function check() {
-  const { data, error } = await supabase.from('user_profiles').select('*').limit(5);
-  console.log("Profiles:");
-  console.dir(data, { depth: null });
+  const { data, error } = await supabase.from('profiles').select('id, email, role, full_name').limit(20);
+  console.log("Profiles:", data, "Error:", error);
 }
 
 check();

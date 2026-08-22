@@ -83,14 +83,17 @@ function FederationTournaments() {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="animate-fade-up space-y-6">
+    <div className="animate-fade-up space-y-6 relative">
+      {/* Subtle Arena Fog */}
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-0 right-0 -translate-y-1/3 translate-x-1/3 opacity-25 pointer-events-none" />
+
       <PageHeader
         title="Tournament Engine"
         subtitle="Create and manage World Boxing rules tournaments across your jurisdiction"
         actions={
           <button
             onClick={() => setShowCreateModal(true)}
-            className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2.5 rounded-lg text-sm font-semibold hover:bg-[#dc2626] transition shadow-card cursor-pointer"
+            className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark transition shadow-card cursor-pointer"
           >
             <Plus className="size-4" /> New Tournament
           </button>
@@ -99,45 +102,45 @@ function FederationTournaments() {
 
       {/* Tournament List */}
       {loading ? (
-        <div className="py-12 text-center">
+        <div className="py-12 text-center relative z-10">
           <Loader2 className="size-8 animate-spin mx-auto text-primary mb-3" />
           <div className="text-sm text-muted-foreground">Loading tournaments…</div>
         </div>
       ) : tournaments.length === 0 ? (
-        <div className="bg-surface border border-border rounded-2xl p-12 text-center">
+        <div className="bg-surface border border-border rounded-2xl p-12 text-center shadow-card relative z-10">
           <Trophy className="size-12 text-muted-foreground/40 mx-auto mb-3" strokeWidth={1.25} />
-          <div className="font-display font-bold text-lg">No tournaments yet</div>
+          <div className="font-display font-bold text-lg text-foreground">No tournaments yet</div>
           <p className="text-sm text-muted-foreground mt-1 max-w-sm mx-auto">
             Create your first federation tournament to begin drafting athletes and generating staff.
           </p>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="mt-4 inline-flex items-center gap-2 bg-[#ef4444] text-white px-4 py-2 rounded-xl text-sm font-semibold hover:bg-[#dc2626] transition cursor-pointer"
+            className="mt-4 inline-flex items-center gap-2 bg-primary text-primary-foreground px-4 py-2 rounded-xl text-sm font-semibold hover:bg-primary-dark transition cursor-pointer shadow-card"
           >
             <Plus className="size-4" /> Create Tournament
           </button>
         </div>
       ) : (
-        <div className="space-y-4">
+        <div className="space-y-4 relative z-10">
           {tournaments.map(t => (
-            <div key={t.id} className="bg-surface border border-border rounded-2xl p-5 shadow-sm hover:border-border-strong transition-all">
+            <div key={t.id} className="bg-surface border border-border rounded-2xl p-6 shadow-card hover:border-border-strong transition-all">
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap mb-1">
-                    <span className="font-display font-bold text-base">{t.name}</span>
+                  <div className="flex items-center gap-2 flex-wrap mb-1.5">
+                    <span className="font-display font-bold text-base text-foreground">{t.name}</span>
                     {statusBadge(t.status)}
-                    {t.is_multi_academy && <span className="badge badge-neutral">Multi-Academy</span>}
+                    {t.is_multi_academy && <span className="px-2.5 py-0.5 rounded-full text-[10px] uppercase font-bold tracking-wider bg-blue-500/10 text-blue-400 border border-blue-500/20">Multi-Academy</span>}
                   </div>
-                  <div className="flex items-center gap-4 text-xs text-muted-foreground mt-1.5 flex-wrap">
+                  <div className="flex items-center gap-4 text-xs text-muted-foreground mt-2 flex-wrap">
                     {t.valid_from && (
                       <span className="flex items-center gap-1">
-                        <Calendar className="size-3" />
+                        <Calendar className="size-3.5 text-muted-foreground" />
                         {new Date(t.valid_from).toLocaleDateString("en-IN", { month: "short", day: "numeric" })}
                         {t.valid_to ? ` – ${new Date(t.valid_to).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}` : ""}
                       </span>
                     )}
                     {(t.academy as any)?.name && (
-                      <span>Host: {(t.academy as any).name}</span>
+                      <span className="text-muted-foreground">Host: <strong className="text-foreground">{(t.academy as any).name}</strong></span>
                     )}
                   </div>
                 </div>
@@ -147,12 +150,12 @@ function FederationTournaments() {
                     <>
                       <button
                         onClick={() => setShowDraftModal(t)}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-indigo-500/10 text-indigo-600 rounded-lg hover:bg-indigo-500/20 transition cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded-xl hover:bg-blue-500/20 transition cursor-pointer"
                       >
                         <Users className="size-3.5" /> Draft Athletes
                       </button>
                       <button
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-500/10 text-emerald-600 rounded-lg hover:bg-emerald-500/20 transition cursor-pointer"
+                        className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-semibold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 rounded-xl hover:bg-emerald-500/20 transition cursor-pointer"
                         onClick={() => toast.info("Staff generation UI coming soon. Link tournament judges via Admin portal first.")}
                       >
                         <Shield className="size-3.5" /> Generate Staff
@@ -236,32 +239,32 @@ function CreateTournamentModal({ actorId, onClose, onSuccess }: {
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-surface rounded-2xl shadow-modal w-full max-w-md animate-fade-up">
+      <div className="bg-surface border border-border rounded-2xl shadow-elevated w-full max-w-md animate-fade-up text-foreground overflow-hidden">
         <div className="p-5 border-b border-border flex items-center justify-between">
-          <div className="font-display font-bold text-lg flex items-center gap-2">
-            <Trophy className="size-5 text-amber-500" /> Create Tournament
+          <div className="font-display font-bold text-lg flex items-center gap-2 text-foreground">
+            <Trophy className="size-5 text-amber-400" /> Create Tournament
           </div>
-          <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer"><X className="size-4" /></button>
+          <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer text-muted-foreground hover:text-foreground"><X className="size-4" /></button>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <label className="block">
-            <span className="block text-xs font-semibold mb-1.5">Tournament Name *</span>
-            <input type="text" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. State Boxing Championship 2026" className="input-premium" />
+            <span className="block text-xs font-semibold mb-1.5 text-foreground">Tournament Name *</span>
+            <input type="text" required value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="e.g. State Boxing Championship 2026" className="input-premium text-sm" />
           </label>
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="block text-xs font-semibold mb-1.5">Start Date</span>
-              <input type="date" value={form.valid_from} onChange={e => setForm(f => ({ ...f, valid_from: e.target.value }))} className="input-premium" />
+              <span className="block text-xs font-semibold mb-1.5 text-foreground">Start Date</span>
+              <input type="date" value={form.valid_from} onChange={e => setForm(f => ({ ...f, valid_from: e.target.value }))} className="input-premium text-sm" />
             </label>
             <label className="block">
-              <span className="block text-xs font-semibold mb-1.5">End Date</span>
-              <input type="date" value={form.valid_to} onChange={e => setForm(f => ({ ...f, valid_to: e.target.value }))} className="input-premium" />
+              <span className="block text-xs font-semibold mb-1.5 text-foreground">End Date</span>
+              <input type="date" value={form.valid_to} onChange={e => setForm(f => ({ ...f, valid_to: e.target.value }))} className="input-premium text-sm" />
             </label>
           </div>
           <div className="flex items-center justify-end gap-2 pt-2">
-            <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated cursor-pointer">Cancel</button>
-            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 bg-[#ef4444] text-white px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-[#dc2626] disabled:opacity-50 transition cursor-pointer shadow-card">
+            <button type="button" onClick={onClose} className="px-4 py-2.5 text-sm border border-border rounded-xl hover:bg-elevated cursor-pointer text-muted-foreground hover:text-foreground">Cancel</button>
+            <button type="submit" disabled={loading} className="inline-flex items-center gap-2 bg-primary text-primary-foreground px-5 py-2.5 rounded-xl text-sm font-semibold hover:bg-primary-dark disabled:opacity-50 transition cursor-pointer shadow-card">
               {loading ? <Loader2 className="size-4 animate-spin" /> : <Plus className="size-4" />}
               Create Tournament
             </button>
@@ -420,15 +423,15 @@ function DraftAthletesModal({ tournament, scope, scopeStates, scopeCities, actor
 
   return (
     <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex items-center justify-center p-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-surface rounded-2xl shadow-modal w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-up">
+      <div className="bg-surface border border-border rounded-2xl shadow-elevated w-full max-w-xl max-h-[90vh] overflow-hidden flex flex-col animate-fade-up text-foreground">
         <div className="p-5 border-b border-border flex items-center justify-between shrink-0">
           <div>
-            <div className="font-display font-bold text-base flex items-center gap-2">
-              <Users className="size-4 text-indigo-500" /> Draft Athletes
+            <div className="font-display font-bold text-base flex items-center gap-2 text-foreground">
+              <Users className="size-4 text-blue-400" /> Draft Athletes
             </div>
             <div className="text-xs text-muted-foreground mt-0.5">{tournament.name}</div>
           </div>
-          <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer"><X className="size-4" /></button>
+          <button onClick={onClose} className="size-8 rounded-lg hover:bg-elevated grid place-items-center cursor-pointer text-muted-foreground hover:text-foreground"><X className="size-4" /></button>
         </div>
 
         <div className="p-4 border-b border-border shrink-0">
@@ -437,7 +440,7 @@ function DraftAthletesModal({ tournament, scope, scopeStates, scopeCities, actor
             <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Search athletes…" className="input-premium pl-9 text-sm" />
           </div>
           {selected.length > 0 && (
-            <div className="mt-2 text-xs font-semibold text-indigo-600">{selected.length} selected</div>
+            <div className="mt-2 text-xs font-semibold text-blue-400">{selected.length} selected</div>
           )}
         </div>
 
@@ -455,17 +458,17 @@ function DraftAthletesModal({ tournament, scope, scopeStates, scopeCities, actor
                     key={a.id}
                     type="button"
                     onClick={() => toggle(a.id)}
-                    className={`w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-left text-sm transition cursor-pointer border ${
-                      isSelected ? "bg-indigo-500/8 border-indigo-500/30 text-indigo-700" : "border-transparent hover:bg-elevated"
+                    className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl text-left text-sm transition cursor-pointer border ${
+                      isSelected ? "bg-blue-500/10 border-blue-500/30 text-foreground" : "border-transparent hover:bg-subtle/50 text-foreground"
                     }`}
                   >
                     <div>
-                      <div className="font-semibold">{a.full_name}</div>
+                      <div className="font-semibold text-foreground">{a.full_name}</div>
                       <div className="text-xs text-muted-foreground mt-0.5">
                         {(a.age_category as any)?.name} · {(a.weight_category as any)?.weight_class} · {[a.city, a.state].filter(Boolean).join(", ")}
                       </div>
                     </div>
-                    {isSelected && <CheckCircle2 className="size-4 text-indigo-500 shrink-0" />}
+                    {isSelected && <CheckCircle2 className="size-4 text-blue-400 shrink-0" />}
                   </button>
                 );
               })}
@@ -473,16 +476,16 @@ function DraftAthletesModal({ tournament, scope, scopeStates, scopeCities, actor
           )}
         </div>
 
-        <div className="p-4 border-t border-border shrink-0 flex items-center justify-between gap-3">
+        <div className="p-4 border-t border-border shrink-0 flex items-center justify-between gap-3 flex-wrap">
           <div className="text-xs text-muted-foreground">
             Notifications will be sent to all selected athletes.
           </div>
-          <div className="flex items-center gap-2">
-            <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-xl hover:bg-elevated cursor-pointer">Cancel</button>
+          <div className="flex items-center gap-2 ml-auto">
+            <button onClick={onClose} className="px-4 py-2 text-sm border border-border rounded-xl hover:bg-elevated cursor-pointer text-muted-foreground hover:text-foreground">Cancel</button>
             <button
               onClick={handleConfirmDraft}
               disabled={selected.length === 0 || sending}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-indigo-600 text-white rounded-xl hover:bg-indigo-700 disabled:opacity-50 transition cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold bg-primary text-primary-foreground rounded-xl hover:bg-primary-dark disabled:opacity-50 transition cursor-pointer shadow-card"
             >
               {sending ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
               Notify {selected.length > 0 ? selected.length : ""} Athletes

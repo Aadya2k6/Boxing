@@ -161,25 +161,25 @@ function FederationAthletes() {
   });
 
   return (
-    <div className="animate-fade-up space-y-6">
+    <div className="animate-fade-up space-y-6 relative">
+      {/* Subtle Arena Fog */}
+      <div className="atmosphere-base atmosphere-blue animate-ambient-drift w-[800px] h-[800px] top-0 right-0 -translate-y-1/3 translate-x-1/3 opacity-25 pointer-events-none" />
+
       <PageHeader
         title="Athlete Roster"
         subtitle={`${athletes.length} athletes in your jurisdiction — read-only sports data`}
       />
 
-      {/* DEBUG TEMPORARY */}
-      <div className="bg-red-500/10 border border-red-500 text-red-700 p-4 rounded-lg text-xs space-y-1">
-        <strong>DEBUG DIAGNOSTICS:</strong><br/>
-        Scope: {scope} | States: {JSON.stringify(states)} | Cities: {JSON.stringify(cities)}<br/>
-        DB Rows Fetched &rarr; boxer_profiles: {debugStats.boxerProfilesCount ?? "..."} | profiles: {debugStats.profilesCount ?? "..."} | academies: {debugStats.academiesCount ?? "..."} | centers: {debugStats.centersCount ?? "..."}<br/>
-        Combined Total: {debugStats.totalCombined ?? "..."} | After State/City Filter: {debugStats.afterFilterCount ?? "..."}<br/>
-        Query Error: {queryError || "None"}
+      {/* Privacy note */}
+      <div className="bg-blue-500/5 border border-blue-500/20 rounded-xl px-4 py-3 text-xs text-muted-foreground flex items-start gap-2.5 relative z-10">
+        <Shield className="size-4 text-blue-400 shrink-0 mt-0.5" />
+        <span>
+          <span className="font-semibold text-blue-400">Privacy Boundary:</span> You can see athlete sports data (name, demographics, category, match record, federation ID). Academy-internal schedules, fee records, and attendance are not accessible to federations.
+        </span>
       </div>
 
-      {/* NOTE: No fee, schedule, or attendance data is shown here — Federation privacy boundary */}
-
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 relative z-10">
         <div className="relative flex-1 max-w-sm">
           <Search className="size-4 text-muted-foreground absolute left-3 top-1/2 -translate-y-1/2" />
           <input
@@ -187,7 +187,7 @@ function FederationAthletes() {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search by name, state, city or federation ID…"
-            className="input-premium pl-9"
+            className="input-premium pl-9 text-sm"
           />
         </div>
 
@@ -197,94 +197,88 @@ function FederationAthletes() {
             onChange={e => setGenderFilter(e.target.value as any)}
             className="input-premium text-sm"
           >
-            <option value="all">All Genders</option>
-            <option value="Male">Male</option>
-            <option value="Female">Female</option>
+            <option value="all" className="bg-[#050811] text-foreground">All Genders</option>
+            <option value="Male" className="bg-[#050811] text-foreground">Male</option>
+            <option value="Female" className="bg-[#050811] text-foreground">Female</option>
           </select>
           <select
             value={statusFilter}
             onChange={e => setStatusFilter(e.target.value as any)}
             className="input-premium text-sm"
           >
-            <option value="all">All Statuses</option>
-            <option value="active">Active</option>
-            <option value="suspended">Suspended</option>
+            <option value="all" className="bg-[#050811] text-foreground">All Statuses</option>
+            <option value="active" className="bg-[#050811] text-foreground">Active</option>
+            <option value="suspended" className="bg-[#050811] text-foreground">Suspended</option>
           </select>
         </div>
-        <div className="text-xs font-semibold text-muted-foreground shrink-0">{filtered.length} shown</div>
-      </div>
-
-      {/* Privacy note */}
-      <div className="bg-indigo-500/5 border border-indigo-500/20 rounded-xl px-4 py-3 text-xs text-muted-foreground flex items-start gap-2">
-        <Shield className="size-3.5 text-indigo-500 shrink-0 mt-0.5" />
-        <span>
-          <span className="font-semibold text-indigo-600">Privacy Boundary:</span> You can see athlete sports data (name, demographics, category, match record, federation ID). Academy-internal schedules, fee records, and attendance are not accessible to federations.
-        </span>
+        <div className="text-xs font-semibold text-muted-foreground shrink-0 sm:ml-auto">{filtered.length} shown</div>
       </div>
 
       {/* Table */}
       {loading ? (
         <div className="py-16 text-center text-muted-foreground">Loading athletes…</div>
       ) : filtered.length === 0 ? (
-        <div className="bg-surface border border-border rounded-2xl p-12 text-center">
+        <div className="bg-surface border border-border rounded-2xl p-12 text-center shadow-card relative z-10">
           <Users className="size-10 text-muted-foreground/40 mx-auto mb-3" strokeWidth={1.25} />
           <div className="font-semibold text-muted-foreground">No athletes found</div>
           <p className="text-xs text-muted-foreground mt-1">Try adjusting your search or filters.</p>
         </div>
       ) : (
-        <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-sm">
+        <div className="bg-surface border border-border rounded-2xl overflow-hidden shadow-card relative z-10">
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border bg-elevated/50">
-                  <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">Athlete</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">Age / Gender</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">Category</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">Record</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">Location</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">Academy</th>
-                  <th className="text-left px-4 py-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">Status</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Athlete</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Age / Gender</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Category</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Record</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Location</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Academy</th>
+                  <th className="text-left px-4 py-3 text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border/50">
                 {filtered.map(a => (
-                  <tr key={a.id} className="hover:bg-elevated/30 transition-colors">
+                  <tr key={a.id} className="hover:bg-subtle/50 transition-colors">
                     <td className="px-4 py-3">
-                      <div className="font-semibold text-sm">{a.full_name}</div>
+                      <div className="font-semibold text-sm text-foreground">{a.full_name}</div>
                       {a.national_federation_boxer_id && (
-                        <div className="text-[10px] text-muted-foreground font-mono mt-0.5">ID: {a.national_federation_boxer_id}</div>
+                        <div className="text-[10px] text-blue-400 font-mono mt-1 inline-block bg-blue-500/10 px-1.5 py-0.5 rounded border border-blue-500/20">
+                          ID: {a.national_federation_boxer_id}
+                        </div>
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-sm">{calcAge(a.date_of_birth)} yrs</div>
+                      <div className="text-sm text-foreground">{calcAge(a.date_of_birth)} yrs</div>
                       <div className="text-xs text-muted-foreground">{a.gender}</div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-xs">{(a.age_category as any)?.name ?? "—"}</div>
+                      <div className="text-xs text-foreground">{(a.age_category as any)?.name ?? "—"}</div>
                       <div className="text-xs text-muted-foreground">{(a.weight_category as any)?.weight_class ?? "—"}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="font-mono text-xs tracking-wider">
-                        <span className="text-success">{a.record_wins}W</span>
+                        <span className="text-emerald-400 font-semibold">{a.record_wins}W</span>
                         <span className="text-muted-foreground mx-0.5">·</span>
-                        <span className="text-destructive">{a.record_losses}L</span>
+                        <span className="text-rose-400 font-semibold">{a.record_losses}L</span>
                         <span className="text-muted-foreground mx-0.5">·</span>
-                        <span>{a.record_draws}D</span>
+                        <span className="text-muted-foreground">{a.record_draws}D</span>
                         <span className="text-muted-foreground mx-0.5">·</span>
-                        <span className="text-amber-500">{a.record_kos}KO</span>
+                        <span className="text-amber-400 font-semibold">{a.record_kos}KO</span>
                       </div>
                     </td>
                     <td className="px-4 py-3">
-                      <div className="text-xs">{[a.city, a.state].filter(Boolean).join(", ") || "—"}</div>
+                      <div className="text-xs text-foreground">{[a.city, a.state].filter(Boolean).join(", ") || "—"}</div>
                     </td>
                     <td className="px-4 py-3">
                       <div className="text-xs text-muted-foreground">{(a.academy as any)?.name ?? "—"}</div>
                     </td>
                     <td className="px-4 py-3">
                       {a.is_suspended ? (
-                        <span className="badge badge-danger text-[10px]">Suspended</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-rose-500/10 text-rose-400 border border-rose-500/20">Suspended</span>
                       ) : (
-                        <span className="badge badge-success text-[10px]">Active</span>
+                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">Active</span>
                       )}
                     </td>
                   </tr>

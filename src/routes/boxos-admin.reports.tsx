@@ -177,7 +177,7 @@ function PlatformReportsPage() {
         <div className="bento-card p-5">
           <div className="flex items-center justify-between text-muted-foreground mb-2">
             <span className="text-xs font-semibold">Total Academies</span>
-            <Building2 className="size-4 text-fuchsia-600" />
+            <Building2 className="size-4 text-blue-400" />
           </div>
           <div className="text-3xl font-display font-bold text-foreground">{metrics.totalAcademies}</div>
           <div className="text-xs text-muted-foreground mt-1">
@@ -286,7 +286,7 @@ function PlatformReportsPage() {
           <SectionCard title="Academy Ranking" subtitle="Ranked by fee revenue and registered boxers">
             {loading ? (
               <div className="py-12 text-center">
-                <Loader2 className="size-6 animate-spin mx-auto text-fuchsia-600 mb-2" />
+                <Loader2 className="size-6 animate-spin mx-auto text-blue-400 mb-2" />
                 <div className="text-xs text-muted-foreground">Compiling platform rankings…</div>
               </div>
             ) : topAcademies.length === 0 ? (
@@ -309,7 +309,7 @@ function PlatformReportsPage() {
                   <Link
                     to="/boxos-admin/academies/$academyId"
                     params={{ academyId: a.id }}
-                    className="p-1 hover:text-fuchsia-600 transition"
+                    className="p-1 hover:text-blue-400 transition"
                   >
                     <ChevronRight className="size-4" />
                   </Link>,

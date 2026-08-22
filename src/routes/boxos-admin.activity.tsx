@@ -169,7 +169,7 @@ function PlatformActivityLogPage() {
       <SectionCard title="Event History" subtitle={`${filtered.length} event record${filtered.length !== 1 ? "s" : ""}`}>
         {loading ? (
           <div className="py-16 text-center">
-            <Loader2 className="size-6 animate-spin mx-auto text-fuchsia-600 mb-2" />
+            <Loader2 className="size-6 animate-spin mx-auto text-blue-400 mb-2" />
             <div className="text-xs text-muted-foreground">Streaming live lifecycle events…</div>
           </div>
         ) : filtered.length === 0 ? (
@@ -182,14 +182,14 @@ function PlatformActivityLogPage() {
             headers={["Academy", "Event Type", "Reason / Description", "Timestamp", ""]}
             rows={filtered.map(ev => [
               <div className="font-semibold text-sm text-foreground flex items-center gap-1.5">
-                <Building2 className="size-3.5 text-muted-foreground shrink-0" />
+                <Building2 className="size-3.5 text-blue-400 shrink-0" />
                 <span>{ev.academy_name}</span>
               </div>,
               eventTypeBadge(ev.event_type),
-              <span className="text-xs text-muted-foreground max-w-md block truncate" title={ev.reason ?? ""}>
+              <span className="text-xs text-foreground/90 max-w-md block truncate" title={ev.reason ?? ""}>
                 {ev.reason || "—"}
               </span>,
-              <span className="text-xs text-muted-foreground tabular whitespace-nowrap">
+              <span className="text-xs text-muted-foreground font-mono tabular whitespace-nowrap">
                 {new Date(ev.created_at).toLocaleString("en-IN", {
                   month: "short",
                   day: "numeric",
@@ -201,10 +201,10 @@ function PlatformActivityLogPage() {
               <Link
                 to="/boxos-admin/academies/$academyId"
                 params={{ academyId: ev.academy_id }}
-                className="p-1 hover:text-fuchsia-600 transition inline-block"
+                className="p-1 hover:text-blue-400 transition inline-block text-muted-foreground"
                 title="View Academy"
               >
-                <ExternalLink className="size-3.5 text-muted-foreground hover:text-fuchsia-600" />
+                <ExternalLink className="size-3.5 hover:text-blue-400" />
               </Link>,
             ])}
           />
